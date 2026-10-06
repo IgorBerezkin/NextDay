@@ -28,6 +28,21 @@ fn short(s: &str, n: usize) -> String {
     }
 }
 
+fn pretty_links(text: &str) -> String {
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(pos) = rest.find("http://").into_iter().chain(rest.find("https://")).min() {
+        out.push_str(&rest[..pos]);
+        let tail = &rest[pos..];
+        let end = tail.find(|c: char| c.is_whitespace() || "<>\"'".contains(c)).unwrap_or(tail.len());
+        let url = tail[..end].trim_end_matches(|c: char| ".,;:!?)]}".contains(c));
+        out.push_str("ссылка");
+        rest = &tail[url.len()..];
+    }
+    out.push_str(rest);
+    out
+}
+
 pub fn hours_text(h: f64) -> String {
     let s = format!("{:.2}", h);
     let s = s.trim_end_matches('0').trim_end_matches('.');
@@ -183,7 +198,7 @@ fn morning_toast(app: &AppHandle, s: &Status) {
                         format!("В чеклисте {n}.")
                     }
                 }
-                _ if !p.description.is_empty() => short(&p.description, 120),
+                _ if !p.description.is_empty() => short(&pretty_links(&p.description), 120),
                 _ => "Хорошего дня!".to_string(),
             };
             (title, body)
@@ -242,5 +257,12 @@ mod tests {
         assert_eq!(hours_text(5.0), "5");
         assert_eq!(hours_text(1.5), "1,5");
         assert_eq!(hours_text(0.25), "0,25");
+    }
+
+    #[test]
+    fn links_become_words() {
+        assert_eq!(pretty_links("по референсу (https://sketchfab.com/3d-models/x-4fda).").as_str(), "по референсу (ссылка).");
+        assert_eq!(pretty_links("http://a.ru и https://b.ru/c?d=1").as_str(), "ссылка и ссылка");
+        assert_eq!(pretty_links("без ссылок").as_str(), "без ссылок");
     }
 }

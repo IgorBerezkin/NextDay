@@ -7,7 +7,7 @@ import { api, assetUrl, type Day } from "../api";
 import { SealDialog } from "../screens/parts";
 import { sfx } from "../sound";
 import { STICKERS, type IconName } from "../ui/icons";
-import { Button, fileName, StampOverlay, toast, toastError } from "../ui/kit";
+import { Button, fileName, openTarget, StampOverlay, toast, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
 import { flood, inkEmpty, line, loadInk, stampCell } from "./ink";
 import {
@@ -111,6 +111,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     orig?: Item;
     last?: { cx: number; cy: number };
     changed: boolean;
+    link?: string;
   }>(null);
   const editStart = useRef<{ id: string; text: string; isNew: boolean } | null>(null);
   const editRef = useRef<HTMLTextAreaElement>(null);
@@ -436,7 +437,8 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
       const it = itemsRef.current.find((i) => i.id === el.dataset.id);
       if (it) {
         setSelected(it.id);
-        drag.current = { mode: "move", id: it.id, start: p, orig: it, changed: false };
+        const link = target.closest<HTMLElement>(".link")?.dataset.target;
+        drag.current = { mode: "move", id: it.id, start: p, orig: it, changed: false, link };
         e.currentTarget.setPointerCapture(e.pointerId);
       }
       return;
@@ -485,13 +487,16 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     }
     if (d.changed && d.id) {
       commit(itemsRef.current.map((i) => (i.id === d.id ? clampItem(noteFits(i)) : i)));
+    } else if (d.link) {
+      void openTarget(d.link);
     }
   };
 
   const onDoubleClick = (e: React.MouseEvent) => {
     if (tool !== "select") return;
-    const el = (e.target as HTMLElement).closest<HTMLElement>("[data-id]");
-    if (el?.dataset.id) startEdit(el.dataset.id);
+    const t = e.target as HTMLElement;
+    const el = t.closest<HTMLElement>("[data-id]");
+    if (el?.dataset.id && !t.closest(".link")) startEdit(el.dataset.id);
   };
 
   const keyState = useRef({ selected, editing, tool });

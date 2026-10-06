@@ -1,5 +1,12 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 
+export type SubItem = {
+  id: string;
+  text: string;
+  done: boolean;
+  doneAt: string | null;
+};
+
 export type CheckItem = {
   id: string;
   text: string;
@@ -7,6 +14,7 @@ export type CheckItem = {
   attach: string | null;
   done: boolean;
   doneAt: string | null;
+  subs?: SubItem[];
 };
 
 export type Plan = {
@@ -82,7 +90,8 @@ export type DaySummary = {
   hasResult: boolean;
 };
 
-export type ItemInput = { id?: string; text: string; hours: number | null; attach: string | null };
+export type SubInput = { id?: string; text: string };
+export type ItemInput = { id?: string; text: string; hours: number | null; attach: string | null; subs: SubInput[] };
 export type PlanInput = { name: string; description: string; checklist: ItemInput[] | null };
 export type AssetInfo = { file: string; path: string };
 

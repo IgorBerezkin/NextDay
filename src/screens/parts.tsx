@@ -53,9 +53,9 @@ export function ChecklistView({
   const hDone = items.reduce((s, i) => s + (i.done ? (i.hours ?? 0) : 0), 0);
   const [flash, setFlash] = useState(false);
 
-  const toggle = async (it: CheckItem, v: boolean) => {
+  const toggle = async (id: string, v: boolean) => {
     try {
-      const d = await api.setCheck(date, it.id, v);
+      const d = await api.setCheck(date, id, v);
       onDay?.(d);
       if (v && d.plan?.checklist?.every((i) => i.done)) {
         sfx.allDone();
@@ -92,24 +92,52 @@ export function ChecklistView({
       </div>
       {!preview && <Progress value={done / items.length} />}
       <ul className="cl-list">
-        {items.map((it) => (
-          <li key={it.id} className={it.done ? "done" : ""}>
-            {tickable ? (
-              <Check checked={it.done} onChange={(v) => void toggle(it, v)} />
-            ) : (
-              <span className={`cl-mark${it.done ? " on" : ""}`}>{it.done && <Px name="check" scale={1.5} />}</span>
-            )}
-            <div className="cl-body">
-              <span className="cl-text">
-                <Linkify text={it.text} />
-              </span>
-              {it.attach && <AttachChip target={it.attach} />}
-            </div>
-            {it.hours != null && <span className="cl-hours">{hoursText(it.hours)} ч</span>}
-          </li>
-        ))}
+        {items.map((it) => {
+          const subs = it.subs ?? [];
+          return (
+            <li key={it.id} className={it.done ? "done" : ""}>
+              {tickable ? <Check checked={it.done} onChange={(v) => void toggle(it.id, v)} /> : <Mark done={it.done} />}
+              <div className="cl-body">
+                <span className="cl-text">
+                  <Linkify text={it.text} />
+                </span>
+                {it.attach && <AttachChip target={it.attach} />}
+                {subs.length > 0 && (
+                  <ul className="cl-subs">
+                    {subs.map((s) => (
+                      <li key={s.id} className={s.done ? "done" : ""}>
+                        {tickable ? (
+                          <Check small checked={s.done} onChange={(v) => void toggle(s.id, v)} />
+                        ) : (
+                          <Mark done={s.done} small />
+                        )}
+                        <span className="cl-text">
+                          <Linkify text={s.text} />
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {subs.length > 0 && !preview && (
+                <span className="cl-subcount">
+                  {subs.filter((s) => s.done).length}/{subs.length}
+                </span>
+              )}
+              {it.hours != null && <span className="cl-hours">{hoursText(it.hours)} ч</span>}
+            </li>
+          );
+        })}
       </ul>
     </div>
+  );
+}
+
+function Mark({ done, small }: { done: boolean; small?: boolean }) {
+  return (
+    <span className={`cl-mark${done ? " on" : ""}${small ? " small" : ""}`}>
+      {done && <Px name="check" scale={small ? 1 : 1.5} />}
+    </span>
   );
 }
 
@@ -203,7 +231,11 @@ export function SealInfo({ day }: { day: Day }) {
       {r.rating ? <Face rating={r.rating} scale={3} /> : <Px name="lock" scale={3} />}
       <div>
         <b>{r.rating ? RATING_LABELS[r.rating] : r.autoSealed ? "Запечатан сам" : "Запечатан"}</b>
-        {r.summary && <p className="seal-summary">«{r.summary}»</p>}
+        {r.summary && (
+          <p className="seal-summary">
+            «<Linkify text={r.summary} />»
+          </p>
+        )}
         <p className="muted small">
           {r.autoSealed ? "Срок итогов истёк " : "Печать "}
           {stamp(r.sealedAt)}

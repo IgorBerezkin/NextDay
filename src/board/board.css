@@ -233,6 +233,11 @@
   font-size: 50px;
   line-height: 1.2;
 }
+.bi.note .link {
+  color: inherit;
+  text-decoration-thickness: 4px;
+  text-underline-offset: 6px;
+}
 .bi.image {
   background: #1a1c2c;
   box-shadow: 0 -4px 0 0 #1a1c2c, 0 4px 0 0 #1a1c2c, -4px 0 0 0 #1a1c2c, 4px 0 0 0 #1a1c2c, 8px 12px 0 0 rgba(26, 28, 44, 0.2);

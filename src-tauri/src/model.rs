@@ -13,6 +13,19 @@ pub struct CheckItem {
     pub done: bool,
     #[serde(default)]
     pub done_at: Option<String>,
+    #[serde(default)]
+    pub subs: Vec<SubItem>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SubItem {
+    pub id: String,
+    pub text: String,
+    #[serde(default)]
+    pub done: bool,
+    #[serde(default)]
+    pub done_at: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -177,6 +190,16 @@ pub struct CheckItemInput {
     pub hours: Option<f64>,
     #[serde(default)]
     pub attach: Option<String>,
+    #[serde(default)]
+    pub subs: Vec<SubItemInput>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SubItemInput {
+    #[serde(default)]
+    pub id: Option<String>,
+    pub text: String,
 }
 
 #[derive(Serialize, Debug)]

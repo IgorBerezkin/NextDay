@@ -328,13 +328,19 @@ button {
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
   cursor: pointer;
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 .link.path {
   color: var(--teal);
 }
 .link:hover {
   background: var(--yellow);
+}
+.link.inert {
+  cursor: inherit;
+}
+.link.inert:hover {
+  background: none;
 }
 
 .checklist {
@@ -377,12 +383,37 @@ button {
   margin: 0;
   padding: 0;
 }
-.cl-list li {
+.cl-list > li {
   display: flex;
   align-items: flex-start;
   gap: 12px;
   padding: 8px 2px 10px;
   background: linear-gradient(to right, var(--paper3) 50%, transparent 50%) bottom / 6px 3px repeat-x;
+}
+.cl-subs {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cl-subs li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cl-subs li.done .cl-text {
+  color: var(--ink3);
+  text-decoration: line-through;
+  text-decoration-thickness: 3px;
+  text-decoration-color: var(--ink4);
+}
+.cl-subcount {
+  flex: none;
+  padding: 7px 0 0;
+  color: var(--ink3);
+  white-space: nowrap;
 }
 .cl-body {
   flex: 1;
@@ -397,7 +428,7 @@ button {
   word-break: break-word;
   user-select: text;
 }
-.cl-list li.done .cl-text {
+.cl-list > li.done > .cl-body > .cl-text {
   color: var(--ink3);
   text-decoration: line-through;
   text-decoration-thickness: 3px;
@@ -423,6 +454,11 @@ button {
 .cl-mark.on {
   background: var(--lime);
   --bc: var(--ink);
+}
+.cl-mark.small {
+  width: 16px;
+  height: 16px;
+  margin: 3px;
 }
 
 .check {
@@ -471,6 +507,10 @@ button {
 .check.big .check-box {
   width: 36px;
   height: 36px;
+}
+.check.small .check-box {
+  width: 22px;
+  height: 22px;
 }
 .check.big .check-label {
   font: 16px/1 var(--head);
@@ -837,10 +877,21 @@ button {
   gap: 4px;
   margin-top: 16px;
 }
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 .item-row {
   display: flex;
   align-items: flex-start;
   gap: 6px;
+}
+.item-row.sub {
+  padding-left: 28px;
+}
+.item-row.sub .item-num {
+  width: 30px;
 }
 .item-num {
   font: 8px/1 var(--head);

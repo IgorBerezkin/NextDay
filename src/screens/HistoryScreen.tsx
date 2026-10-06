@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Nav } from "../App";
 import { api, type DaySummary } from "../api";
-import { Button, toastError } from "../ui/kit";
+import { Button, Linkify, toastError } from "../ui/kit";
 import { Face, Px } from "../ui/Px";
 import type { IconName } from "../ui/icons";
 import { fromDate, hoursText, longDate, plural, RATING_LABELS, shortMonth, shortWeekday, toDate } from "../util";
@@ -238,7 +238,17 @@ function DayCard({ d, today, onOpen }: { d: DaySummary; today: string; onOpen: (
       </div>
       <div className="dc-body">
         <div className="dc-name">«{d.name}»</div>
-        {d.summary ? <div className="dc-sum">«{d.summary}»</div> : d.description && <div className="dc-desc">{d.description}</div>}
+        {d.summary ? (
+          <div className="dc-sum">
+            «<Linkify inert text={d.summary} />»
+          </div>
+        ) : (
+          d.description && (
+            <div className="dc-desc">
+              <Linkify inert text={d.description} />
+            </div>
+          )
+        )}
         <div className="dc-meta">
           {d.date === today && <span className="tag">сегодня</span>}
           {d.hasChecklist && (

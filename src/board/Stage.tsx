@@ -1,7 +1,7 @@
 import { openPath } from "@tauri-apps/plugin-opener";
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { assetPath, assetUrl } from "../api";
-import { Button, toastError } from "../ui/kit";
+import { Button, Linkify, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
 import { loadInk } from "./ink";
 import { BH, BW, INK_H, INK_W, PALETTE, textOn, type Board, type ImageItem, type Item } from "./model";
@@ -73,7 +73,9 @@ export function ItemView({
         data-id={it.id}
         style={{ ...style, background: PALETTE[it.color], color: textOn(it.color), visibility: hidden ? "hidden" : undefined }}
       >
-        <div className="note-text">{it.text}</div>
+        <div className="note-text">
+          <Linkify text={it.text} />
+        </div>
       </div>
     );
   if (it.kind === "image")

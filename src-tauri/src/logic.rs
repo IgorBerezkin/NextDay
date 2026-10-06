@@ -6,6 +6,8 @@ use serde_json::Value;
 use std::collections::HashSet;
 use std::path::Path;
 
+const MAX_SUBS: usize = 3;
+
 pub struct Ctx {
     pub at: NaiveDateTime,
     pub today: NaiveDate,
@@ -105,12 +107,23 @@ pub fn save_plan(store: &Store, at: NaiveDateTime, date_s: &str, input: PlanInpu
                     _ => None,
                 };
                 let attach = it.attach.map(|a| a.trim().to_string()).filter(|a| !a.is_empty());
-                let mut id = it.id.filter(|s| !s.is_empty() && s.len() <= 40).unwrap_or_default();
-                if id.is_empty() || seen.contains(&id) {
-                    id = format!("i{}", uid());
+                let id = unique_id(it.id, "i", &mut seen);
+                let mut subs = Vec::new();
+                for s in it.subs {
+                    let text = s.text.trim().to_string();
+                    if text.is_empty() {
+                        continue;
+                    }
+                    if chars(&text) > 300 {
+                        return Err("Подпункт должен быть не длиннее 300 символов.".into());
+                    }
+                    let id = unique_id(s.id, "s", &mut seen);
+                    subs.push(SubItem { id, text, done: false, done_at: None });
                 }
-                seen.insert(id.clone());
-                out.push(CheckItem { id, text, hours, attach, done: false, done_at: None });
+                if subs.len() > MAX_SUBS {
+                    return Err("У пункта может быть не больше трёх подпунктов.".into());
+                }
+                out.push(CheckItem { id, text, hours, attach, done: false, done_at: None, subs });
             }
             if out.len() > 40 {
                 return Err("В чеклисте может быть не больше 40 пунктов.".into());
@@ -154,11 +167,40 @@ pub fn set_check(store: &Store, at: NaiveDateTime, date_s: &str, item_id: &str, 
         .as_mut()
         .and_then(|p| p.checklist.as_mut())
         .ok_or("В плане нет чеклиста.")?;
-    let it = items.iter_mut().find(|i| i.id == item_id).ok_or("Пункт не найден.")?;
-    it.done = done;
-    it.done_at = done.then(|| fmt_dt(c.at));
+    let stamp = done.then(|| fmt_dt(c.at));
+    if let Some(it) = items.iter_mut().find(|i| i.id == item_id) {
+        it.done = done;
+        it.done_at = stamp.clone();
+        for s in &mut it.subs {
+            s.done = done;
+            s.done_at = stamp.clone();
+        }
+    } else {
+        let it = items
+            .iter_mut()
+            .find(|i| i.subs.iter().any(|s| s.id == item_id))
+            .ok_or("Пункт не найден.")?;
+        if let Some(s) = it.subs.iter_mut().find(|s| s.id == item_id) {
+            s.done = done;
+            s.done_at = stamp.clone();
+        }
+        let all = it.subs.iter().all(|s| s.done);
+        if it.done != all {
+            it.done = all;
+            it.done_at = all.then(|| fmt_dt(c.at));
+        }
+    }
     store.save_day(&day)?;
     Ok(day)
+}
+
+fn unique_id(given: Option<String>, prefix: &str, seen: &mut HashSet<String>) -> String {
+    let mut id = given.filter(|s| !s.is_empty() && s.len() <= 40).unwrap_or_default();
+    if id.is_empty() || seen.contains(&id) {
+        id = format!("{prefix}{}", uid());
+    }
+    seen.insert(id.clone());
+    id
 }
 
 pub fn save_board(store: &Store, at: NaiveDateTime, date_s: &str, board: &Value) -> Result<String, String> {
@@ -425,7 +467,7 @@ mod tests {
             checklist: Some(
                 items
                     .iter()
-                    .map(|(t, h)| CheckItemInput { id: None, text: t.to_string(), hours: *h, attach: None })
+                    .map(|(t, h)| CheckItemInput { id: None, text: t.to_string(), hours: *h, attach: None, subs: vec![] })
                     .collect(),
             ),
         }
@@ -491,6 +533,44 @@ mod tests {
         assert_eq!(auto_seal_due(&s, t2), 1);
         let d = s.load_day("2026-10-07").unwrap();
         assert!(d.result.sealed && d.result.auto_sealed);
+    }
+
+    fn plan_with_subs(subs: &[&str]) -> PlanInput {
+        PlanInput {
+            name: "День".into(),
+            description: String::new(),
+            checklist: Some(vec![CheckItemInput {
+                id: None,
+                text: "Модель персонажа".into(),
+                hours: Some(3.0),
+                attach: None,
+                subs: subs.iter().map(|t| SubItemInput { id: None, text: t.to_string() }).collect(),
+            }]),
+        }
+    }
+
+    #[test]
+    fn at_most_three_subs() {
+        let s = tmp_store("subs-limit");
+        let t = at("2026-10-06T21:00:00");
+        assert!(save_plan(&s, t, "2026-10-07", plan_with_subs(&["a", "b", "c", "d"])).is_err());
+        let d = save_plan(&s, t, "2026-10-07", plan_with_subs(&["a", " ", "b", "c"])).unwrap();
+        assert_eq!(d.plan.unwrap().checklist.unwrap()[0].subs.len(), 3);
+    }
+
+    #[test]
+    fn subs_drive_parent() {
+        let s = tmp_store("subs-check");
+        let d = save_plan(&s, at("2026-10-06T21:00:00"), "2026-10-07", plan_with_subs(&["a", "b"])).unwrap();
+        let item = d.plan.unwrap().checklist.unwrap().remove(0);
+        let t = at("2026-10-07T12:00:00");
+        let d = set_check(&s, t, "2026-10-07", &item.subs[0].id, true).unwrap();
+        assert!(!d.plan.unwrap().checklist.unwrap()[0].done);
+        let d = set_check(&s, t, "2026-10-07", &item.subs[1].id, true).unwrap();
+        assert!(d.plan.unwrap().checklist.unwrap()[0].done);
+        let d = set_check(&s, t, "2026-10-07", &item.id, false).unwrap();
+        let it = d.plan.unwrap().checklist.unwrap().remove(0);
+        assert!(!it.done && it.subs.iter().all(|x| !x.done));
     }
 
     #[test]

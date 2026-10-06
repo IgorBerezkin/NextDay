@@ -38,15 +38,19 @@ export function Check({
   disabled,
   label,
   className,
+  small,
 }: {
   checked: boolean;
   onChange?: (v: boolean) => void;
   disabled?: boolean;
   label?: ReactNode;
   className?: string;
+  small?: boolean;
 }) {
   return (
-    <label className={`check${checked ? " on" : ""}${disabled ? " disabled" : ""}${className ? " " + className : ""}`}>
+    <label
+      className={`check${checked ? " on" : ""}${disabled ? " disabled" : ""}${small ? " small" : ""}${className ? " " + className : ""}`}
+    >
       <input
         type="checkbox"
         checked={checked}
@@ -57,7 +61,7 @@ export function Check({
           onChange?.(e.target.checked);
         }}
       />
-      <span className="check-box">{checked && <Px name="check" scale={2} />}</span>
+      <span className="check-box">{checked && <Px name="check" scale={small ? 1.5 : 2} />}</span>
       {label && <span className="check-label">{label}</span>}
     </label>
   );
@@ -164,7 +168,12 @@ export function StampOverlay({ text, onDone }: { text: string; onDone: () => voi
 const LINK_RE =
   /(https?:\/\/[^\s<>"']*[^\s<>"'.,;:!?)\]}])|"([A-Za-z]:\\[^"]+)"|([A-Za-z]:\\[^\s<>"'|?*]*[^\s<>"'|?*.,;:!)\]])/g;
 
+let lastOpen = { target: "", at: 0 };
+
 export async function openTarget(target: string) {
+  const now = Date.now();
+  if (lastOpen.target === target && now - lastOpen.at < 800) return;
+  lastOpen = { target, at: now };
   try {
     if (/^https?:\/\//i.test(target)) await openUrl(target);
     else await openPath(target);
@@ -173,7 +182,7 @@ export async function openTarget(target: string) {
   }
 }
 
-export function Linkify({ text }: { text: string }) {
+export function Linkify({ text, inert }: { text: string; inert?: boolean }) {
   const parts: ReactNode[] = [];
   let last = 0;
   let m: RegExpExecArray | null;
@@ -181,23 +190,32 @@ export function Linkify({ text }: { text: string }) {
   while ((m = LINK_RE.exec(text))) {
     if (m.index > last) parts.push(text.slice(last, m.index));
     const target = m[1] ?? m[2] ?? m[3];
-    const shown = m[0];
+    const cls = m[1] ? "link" : "link path";
+    const label = m[1] ? "ссылка" : fileName(target);
     parts.push(
-      <a
-        key={m.index}
-        className={m[1] ? "link" : "link path"}
-        href="#"
-        title={m[1] ? "Открыть в браузере" : "Открыть файл"}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          void openTarget(target);
-        }}
-      >
-        {shown}
-      </a>,
+      inert ? (
+        <span key={m.index} className={`${cls} inert`} title={target}>
+          {label}
+        </span>
+      ) : (
+        <a
+          key={m.index}
+          className={cls}
+          href="#"
+          title={target}
+          data-target={target}
+          draggable={false}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void openTarget(target);
+          }}
+        >
+          {label}
+        </a>
+      ),
     );
-    last = m.index + shown.length;
+    last = m.index + m[0].length;
   }
   if (last < text.length) parts.push(text.slice(last));
   return <>{parts}</>;
@@ -215,7 +233,7 @@ export function AttachChip({ target, onRemove }: { target: string; onRemove?: ()
     <span className="chip" title={target}>
       <button className="chip-main" onClick={() => void openTarget(target)}>
         <Px name={isUrl ? "arrowR" : "folder"} scale={1.5} />
-        <span>{isUrl ? target.replace(/^https?:\/\/(www\.)?/i, "").slice(0, 32) : fileName(target)}</span>
+        <span>{isUrl ? "ссылка" : fileName(target)}</span>
       </button>
       {onRemove && (
         <button className="chip-x" onClick={onRemove} title="Убрать">

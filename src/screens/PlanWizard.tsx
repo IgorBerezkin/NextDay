@@ -2,11 +2,14 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type CheckItem, type Day, type Plan, type PlanInput } from "../api";
 import { sfx } from "../sound";
-import { AttachChip, Button, Check, toast, toastError } from "../ui/kit";
+import { AttachChip, Button, Check, Linkify, toast, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
 import { hoursText, longDate, NAME_EXAMPLES, parseHours, uid } from "../util";
 
-type Row = { key: string; id?: string; text: string; hours: string; attach: string | null };
+const MAX_SUBS = 3;
+
+type SubRow = { key: string; id?: string; text: string };
+type Row = { key: string; id?: string; text: string; hours: string; attach: string | null; subs: SubRow[] };
 
 const toRow = (i: CheckItem): Row => ({
   key: uid(),
@@ -14,6 +17,7 @@ const toRow = (i: CheckItem): Row => ({
   text: i.text,
   hours: i.hours != null ? hoursText(i.hours) : "",
   attach: i.attach,
+  subs: (i.subs ?? []).map((s) => ({ key: uid(), id: s.id, text: s.text })),
 });
 
 const okHours = (s: string) => {
@@ -29,7 +33,9 @@ const draftKey = (date: string) => `nd.draft.${date}`;
 function loadDraft(date: string): Draft | null {
   try {
     const raw = localStorage.getItem(draftKey(date));
-    return raw ? (JSON.parse(raw) as Draft) : null;
+    if (!raw) return null;
+    const d = JSON.parse(raw) as Draft;
+    return { ...d, rows: d.rows.map((r) => ({ ...r, subs: r.subs ?? [] })) };
   } catch {
     return null;
   }
@@ -83,6 +89,11 @@ export function PlanWizard({
     }
   }, [focusKey, rows]);
 
+  const bindInput = (key: string) => (el: HTMLInputElement | null) => {
+    if (el) inputs.current.set(key, el);
+    else inputs.current.delete(key);
+  };
+
   const canNext = name.trim().length > 0;
   const next = () => {
     if (!canNext) return;
@@ -92,7 +103,7 @@ export function PlanWizard({
   const back = () => setStep((s) => Math.max(0, s - 1));
 
   const addRow = (after?: number, from?: Partial<Row>) => {
-    const r: Row = { key: uid(), text: "", hours: "", attach: null, ...from };
+    const r: Row = { key: uid(), text: "", hours: "", attach: null, subs: [], ...from };
     setRows((rs) => {
       const c = [...rs];
       c.splice(after === undefined ? c.length : after + 1, 0, r);
@@ -111,6 +122,19 @@ export function PlanWizard({
       return c;
     });
 
+  const addSub = (row: Row, after?: number) => {
+    if (row.subs.length >= MAX_SUBS) return false;
+    const s: SubRow = { key: uid(), text: "" };
+    const subs = [...row.subs];
+    subs.splice(after === undefined ? subs.length : after + 1, 0, s);
+    update(row.key, { subs });
+    setFocusKey(s.key);
+    return true;
+  };
+  const updateSub = (row: Row, key: string, text: string) =>
+    update(row.key, { subs: row.subs.map((s) => (s.key === key ? { ...s, text } : s)) });
+  const removeSub = (row: Row, key: string) => update(row.key, { subs: row.subs.filter((s) => s.key !== key) });
+
   const parsed = rows.map((r) => parseHours(r.hours));
   const badHours = rows.some((r, i) => r.text.trim() && parsed[i] !== null && okHours(r.hours) === null);
   const total = rows.reduce((s, r) => s + (r.text.trim() ? (okHours(r.hours) ?? 0) : 0), 0);
@@ -125,13 +149,23 @@ export function PlanWizard({
       toast("Проверьте часы: число от 0,25 до 24, например 1,5 или 90м.", "error");
       return;
     }
+    if (need && rows.some((r) => !r.text.trim() && r.subs.some((s) => s.text.trim()))) {
+      toast("У подпунктов должен быть пункт: заполните его.", "error");
+      return;
+    }
     const input: PlanInput = {
       name: name.trim(),
       description: desc.trim(),
       checklist: need
         ? rows
             .filter((r) => r.text.trim())
-            .map((r) => ({ id: r.id, text: r.text.trim(), hours: okHours(r.hours), attach: r.attach }))
+            .map((r) => ({
+              id: r.id,
+              text: r.text.trim(),
+              hours: okHours(r.hours),
+              attach: r.attach,
+              subs: r.subs.filter((s) => s.text.trim()).map((s) => ({ id: s.id, text: s.text.trim() })),
+            }))
         : null,
     };
     setBusy(true);
@@ -159,16 +193,30 @@ export function PlanWizard({
     if (e.key === "Enter") {
       e.preventDefault();
       if (e.ctrlKey) void save();
+      else if (e.shiftKey) addSub(r);
       else addRow(i);
-    } else if (e.key === "Backspace" && r.text === "" && rows.length > 1) {
+    } else if (e.key === "Backspace" && r.text === "" && r.subs.length === 0 && rows.length > 1) {
       e.preventDefault();
-      const prev = rows[i - 1] ?? rows[i + 1];
+      const prev = rows[i - 1];
       remove(r.key);
-      if (prev) setFocusKey(prev.key);
+      setFocusKey(prev ? (prev.subs.length ? prev.subs[prev.subs.length - 1].key : prev.key) : rows[i + 1].key);
     } else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
       e.preventDefault();
       move(i, e.key === "ArrowUp" ? -1 : 1);
       setFocusKey(r.key);
+    }
+  };
+
+  const subKey = (e: React.KeyboardEvent<HTMLInputElement>, r: Row, i: number, j: number) => {
+    const s = r.subs[j];
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (e.ctrlKey) void save();
+      else if (!addSub(r, j)) addRow(i);
+    } else if (e.key === "Backspace" && s.text === "") {
+      e.preventDefault();
+      removeSub(r, s.key);
+      setFocusKey(j > 0 ? r.subs[j - 1].key : r.key);
     }
   };
 
@@ -261,38 +309,66 @@ export function PlanWizard({
               {rows.map((r, i) => {
                 const bad = r.text.trim() && parsed[i] !== null && okHours(r.hours) === null;
                 return (
-                  <div className="item-row" key={r.key}>
-                    <span className="item-num">{i + 1}</span>
-                    <div className="item-main">
+                  <div className="item" key={r.key}>
+                    <div className="item-row">
+                      <span className="item-num">{i + 1}</span>
+                      <div className="item-main">
+                        <input
+                          className="field"
+                          ref={bindInput(r.key)}
+                          value={r.text}
+                          maxLength={300}
+                          placeholder={i === 0 ? "Например: посмотреть урок по Blockbench https://…" : "Ещё пункт"}
+                          onChange={(e) => update(r.key, { text: e.target.value })}
+                          onKeyDown={(e) => itemKey(e, r, i)}
+                        />
+                        {r.attach && <AttachChip target={r.attach} onRemove={() => update(r.key, { attach: null })} />}
+                      </div>
                       <input
-                        className="field"
-                        ref={(el) => {
-                          if (el) inputs.current.set(r.key, el);
-                          else inputs.current.delete(r.key);
-                        }}
-                        value={r.text}
-                        maxLength={300}
-                        placeholder={i === 0 ? "Например: посмотреть урок по Blockbench https://…" : "Ещё пункт"}
-                        onChange={(e) => update(r.key, { text: e.target.value })}
-                        onKeyDown={(e) => itemKey(e, r, i)}
+                        className={`field hours${bad ? " bad" : ""}`}
+                        value={r.hours}
+                        maxLength={6}
+                        placeholder="ч"
+                        title="Часы на пункт, необязательно: 1,5 или 90м"
+                        onChange={(e) => update(r.key, { hours: e.target.value })}
+                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addRow(i))}
                       />
-                      {r.attach && <AttachChip target={r.attach} onRemove={() => update(r.key, { attach: null })} />}
+                      <button
+                        className="icon-btn"
+                        title="Подпункт, до трёх"
+                        disabled={r.subs.length >= MAX_SUBS}
+                        onClick={() => addSub(r)}
+                      >
+                        <Px name="sub" scale={2} />
+                      </button>
+                      <button className="icon-btn" title="Прикрепить файл" onClick={() => void pickFile(r.key)}>
+                        <Px name="folder" scale={2} />
+                      </button>
+                      <button className="icon-btn" title="Удалить пункт" onClick={() => remove(r.key)}>
+                        <Px name="cross" scale={2} />
+                      </button>
                     </div>
-                    <input
-                      className={`field hours${bad ? " bad" : ""}`}
-                      value={r.hours}
-                      maxLength={6}
-                      placeholder="ч"
-                      title="Часы на пункт, необязательно: 1,5 или 90м"
-                      onChange={(e) => update(r.key, { hours: e.target.value })}
-                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addRow(i))}
-                    />
-                    <button className="icon-btn" title="Прикрепить файл" onClick={() => void pickFile(r.key)}>
-                      <Px name="folder" scale={2} />
-                    </button>
-                    <button className="icon-btn" title="Удалить пункт" onClick={() => remove(r.key)}>
-                      <Px name="cross" scale={2} />
-                    </button>
+                    {r.subs.map((s, j) => (
+                      <div className="item-row sub" key={s.key}>
+                        <span className="item-num">
+                          {i + 1}.{j + 1}
+                        </span>
+                        <div className="item-main">
+                          <input
+                            className="field"
+                            ref={bindInput(s.key)}
+                            value={s.text}
+                            maxLength={300}
+                            placeholder="Подпункт"
+                            onChange={(e) => updateSub(r, s.key, e.target.value)}
+                            onKeyDown={(e) => subKey(e, r, i, j)}
+                          />
+                        </div>
+                        <button className="icon-btn" title="Удалить подпункт" onClick={() => removeSub(r, s.key)}>
+                          <Px name="cross" scale={2} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 );
               })}
@@ -305,7 +381,9 @@ export function PlanWizard({
                   {total > 12 && ", многовато для одного дня"}
                 </span>
               </div>
-              <p className="hint">Enter: новый пункт. Alt+стрелки: переставить. Часы указывать не обязательно.</p>
+              <p className="hint">
+                Enter: новый пункт. Shift+Enter: подпункт, до трёх. Alt+стрелки: переставить. Часы указывать не обязательно.
+              </p>
               {carryLeft.length > 0 && (
                 <div className="carry">
                   <span className="carry-title">Не успели сегодня. Перенести?</span>
@@ -315,13 +393,18 @@ export function PlanWizard({
                       className="chip-add"
                       onClick={() => {
                         sfx.pop();
-                        const from = { text: c.text, hours: c.hours != null ? hoursText(c.hours) : "", attach: c.attach };
-                        const blank = rows.find((r) => !r.text.trim());
+                        const from = {
+                          text: c.text,
+                          hours: c.hours != null ? hoursText(c.hours) : "",
+                          attach: c.attach,
+                          subs: (c.subs ?? []).filter((s) => !s.done).map((s) => ({ key: uid(), text: s.text })),
+                        };
+                        const blank = rows.find((r) => !r.text.trim() && !r.subs.some((s) => s.text.trim()));
                         if (blank) update(blank.key, from);
                         else addRow(undefined, from);
                       }}
                     >
-                      + {c.text}
+                      + <Linkify inert text={c.text} />
                     </button>
                   ))}
                 </div>
