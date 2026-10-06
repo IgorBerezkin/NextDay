@@ -1,0 +1,238 @@
+.setup {
+  position: fixed;
+  inset: 0;
+}
+.setup-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 48px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 0 16px;
+}
+.setup-brand {
+  font: 16px/1 var(--head);
+  color: var(--paper);
+  text-shadow: 3px 3px 0 var(--ink);
+}
+.setup-tag {
+  font: 8px/1 var(--head);
+  text-transform: uppercase;
+  background: var(--yellow);
+  color: var(--ink);
+  padding: 5px 6px 4px;
+}
+.setup-close {
+  width: 38px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--paper);
+  cursor: pointer;
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.setup-close:hover:not(:disabled) {
+  background: var(--red);
+}
+.setup-close:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.setup-card {
+  position: absolute;
+  left: 34px;
+  right: 34px;
+  top: 52px;
+  bottom: 34px;
+  z-index: 2;
+  padding: 24px 30px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  animation: rise 0.25s steps(4);
+}
+.setup-hero {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.setup-logo {
+  flex: none;
+  width: 112px;
+  height: 112px;
+  image-rendering: pixelated;
+  filter: drop-shadow(6px 6px 0 rgba(26, 28, 44, 0.25));
+}
+.setup-hero h1 {
+  font: 24px/1.3 var(--head);
+  margin: 0 0 10px;
+  text-shadow: 3px 3px 0 var(--paper2);
+}
+.setup-hero p {
+  margin: 0 0 6px;
+  line-height: 1.3;
+  color: var(--ink2);
+}
+.setup-hero p.muted {
+  color: var(--ink3);
+}
+.setup-hero .setup-note {
+  margin: var(--p);
+  padding: 5px 10px;
+  background: var(--yellow);
+  box-shadow: var(--border);
+  color: var(--ink);
+}
+.setup-dir {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.setup-label {
+  font: 8px/1 var(--head);
+  text-transform: uppercase;
+  color: var(--ink3);
+  padding-left: var(--p);
+}
+.setup-dir-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.setup-dir-row .field {
+  flex: 1;
+  min-width: 0;
+}
+.setup-dir-row .btn {
+  margin-bottom: var(--p);
+}
+.setup-dir-msg {
+  margin: 0;
+  padding-left: var(--p);
+  color: var(--ink3);
+  line-height: 1.25;
+}
+.setup-dir-msg.bad {
+  color: var(--red);
+}
+.setup-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--teal);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.setup-link:hover {
+  background: var(--yellow);
+}
+.setup-opts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 4px;
+}
+.small-path {
+  padding-left: 46px;
+  word-break: break-all;
+}
+.setup-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.setup-path {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink3);
+}
+.setup-path span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.setup-work h2,
+.setup-error-title {
+  font: 16px/1.3 var(--head);
+  margin: 6px 0 16px;
+}
+.setup-steps {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.setup-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink4);
+}
+.setup-steps li i {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  background: var(--paper2);
+  color: var(--ink);
+}
+.setup-steps li.run {
+  color: var(--ink);
+}
+.setup-steps li.run i {
+  background: var(--yellow);
+  animation: blink 0.6s steps(2) infinite;
+}
+.setup-steps li.done {
+  color: var(--ink2);
+}
+.setup-steps li.done i {
+  background: var(--lime);
+}
+.setup-steps li.fail {
+  color: var(--red);
+}
+.setup-done {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 18px;
+  padding-top: 18px;
+}
+.setup-done p {
+  margin: 0;
+  max-width: 560px;
+  line-height: 1.3;
+  color: var(--ink2);
+}
+.setup-done .setup-foot {
+  width: 100%;
+}
+.setup-done .stamp {
+  margin: 14px 0 6px;
+}
+.setup-error {
+  color: var(--red);
+  word-break: break-word;
+}

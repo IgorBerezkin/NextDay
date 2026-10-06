@@ -1,0 +1,372 @@
+.screen.board-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 20px 10px;
+  overflow: hidden;
+}
+.bd-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -4px -6px 0;
+}
+.bd-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.bd-name {
+  font: 16px/1.3 var(--head);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.save-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink3);
+  white-space: nowrap;
+}
+.save-state.error {
+  color: var(--red);
+}
+.bd-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  margin: var(--p);
+  background: var(--paper2);
+  box-shadow: var(--border);
+}
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.tool {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--ink);
+  background: var(--paper-hi);
+  box-shadow: inset var(--np) var(--np) 0 0 var(--paper3);
+}
+.tool:hover:not(:disabled) {
+  background: #fff;
+}
+.tool.on {
+  background: var(--yellow);
+  box-shadow: inset var(--p) var(--p) 0 0 rgba(26, 28, 44, 0.28);
+}
+.tool:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.tool.size i {
+  display: block;
+  background: var(--ink);
+}
+.tool.text {
+  font: 20px/1 var(--font);
+  width: 46px;
+}
+.palette {
+  display: grid;
+  grid-template-columns: repeat(8, 17px);
+  gap: 3px;
+}
+.sw {
+  width: 17px;
+  height: 17px;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 2px rgba(26, 28, 44, 0.3);
+}
+.sw.on {
+  outline: 3px solid var(--ink);
+  outline-offset: 1px;
+  position: relative;
+  z-index: 1;
+}
+.pop-wrap {
+  position: relative;
+}
+.popover {
+  position: absolute;
+  top: 46px;
+  left: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(5, 46px);
+  gap: 4px;
+  padding: 8px;
+  background: var(--paper-hi);
+  box-shadow: var(--border), 0 calc(var(--p) * 3) 0 0 rgba(13, 14, 26, 0.35);
+  animation: rise 0.15s steps(3);
+}
+.sticker-btn {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.sticker-btn:hover {
+  background: var(--paper2);
+}
+.bd-stage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.bd-stage.drop::after {
+  content: "Отпустите, и картинка ляжет на доску";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 16px/1 var(--head);
+  color: var(--navy);
+  background: rgba(65, 166, 246, 0.16);
+  outline: 4px dashed var(--blue);
+  outline-offset: -10px;
+  pointer-events: none;
+  z-index: 10;
+}
+.bd-hint {
+  color: var(--ink3);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stage-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.stage-wrap.fit-width {
+  height: auto;
+  display: block;
+}
+.stage-box {
+  position: relative;
+  flex: none;
+  margin: 6px 6px 12px;
+  box-shadow: var(--border), 0 calc(var(--p) * 3) 0 0 var(--paper3);
+}
+.stage-wrap.clickable .stage-box {
+  cursor: pointer;
+}
+.stage-wrap.clickable .stage-box:hover {
+  --bc: var(--blue);
+}
+.board {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1280px;
+  height: 800px;
+  transform-origin: 0 0;
+  overflow: hidden;
+  background-color: #fbf6e6;
+  background-image: linear-gradient(#efe4c6 3px, transparent 3px), linear-gradient(90deg, #efe4c6 3px, transparent 3px);
+  background-size: 40px 40px;
+  background-position: -2px -2px;
+  touch-action: none;
+}
+.bd-items {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.ink {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1280px;
+  height: 800px;
+  z-index: 2;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.ink.live {
+  pointer-events: auto;
+}
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.bi {
+  position: absolute;
+}
+.bi.note {
+  padding: 18px 20px;
+  font: 30px/1.25 var(--font);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  box-shadow: 0 -4px 0 0 #1a1c2c, 0 4px 0 0 #1a1c2c, -4px 0 0 0 #1a1c2c, 4px 0 0 0 #1a1c2c, 8px 12px 0 0 rgba(26, 28, 44, 0.2);
+}
+.bi.note.big {
+  font-size: 50px;
+  line-height: 1.2;
+}
+.bi.image {
+  background: #1a1c2c;
+  box-shadow: 0 -4px 0 0 #1a1c2c, 0 4px 0 0 #1a1c2c, -4px 0 0 0 #1a1c2c, 4px 0 0 0 #1a1c2c, 8px 12px 0 0 rgba(26, 28, 44, 0.2);
+}
+.bi.image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+.bi.image.clickable {
+  cursor: zoom-in;
+}
+.bi.sticker svg {
+  width: 100%;
+  height: 100%;
+}
+
+.stage-wrap.tool-select .bi {
+  cursor: move;
+}
+.stage-wrap.tool-note .board {
+  cursor: copy;
+}
+.stage-wrap.tool-pen .ink,
+.stage-wrap.tool-eraser .ink,
+.stage-wrap.tool-fill .ink {
+  cursor: crosshair;
+}
+
+.sel {
+  position: absolute;
+  outline: calc(3px / var(--s)) dashed var(--blue);
+  outline-offset: calc(5px / var(--s));
+}
+.hd {
+  position: absolute;
+  width: calc(14px / var(--s));
+  height: calc(14px / var(--s));
+  background: var(--yellow);
+  box-shadow: 0 0 0 calc(3px / var(--s)) var(--ink);
+  pointer-events: auto;
+}
+.hd-nw {
+  left: calc(-12px / var(--s));
+  top: calc(-12px / var(--s));
+  cursor: nwse-resize;
+}
+.hd-ne {
+  right: calc(-12px / var(--s));
+  top: calc(-12px / var(--s));
+  cursor: nesw-resize;
+}
+.hd-sw {
+  left: calc(-12px / var(--s));
+  bottom: calc(-12px / var(--s));
+  cursor: nesw-resize;
+}
+.hd-se {
+  right: calc(-12px / var(--s));
+  bottom: calc(-12px / var(--s));
+  cursor: nwse-resize;
+}
+.note-edit {
+  position: absolute;
+  z-index: 5;
+  padding: 18px 20px;
+  font: 30px/1.25 var(--font);
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  box-shadow: 0 0 0 calc(4px / var(--s)) var(--blue), 8px 12px 0 0 rgba(26, 28, 44, 0.2);
+}
+.note-edit.big {
+  font-size: 50px;
+  line-height: 1.2;
+}
+.note-edit::placeholder {
+  color: inherit;
+  opacity: 0.45;
+}
+.brush-cursor {
+  position: absolute;
+  outline-style: solid;
+  outline-color: rgba(26, 28, 44, 0.75);
+  box-shadow: inset 0 0 0 calc(1px / var(--s)) rgba(255, 255, 255, 0.7);
+}
+.board-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #b5a37a;
+  text-align: center;
+}
+.board-empty svg {
+  margin-bottom: 14px;
+  color: #cdbd93;
+}
+.board-empty p {
+  margin: 0;
+  font: 30px/1.3 var(--font);
+}
+
+.thumb {
+  width: 100%;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 28px;
+  background: rgba(13, 14, 26, 0.9);
+  animation: fadein 0.15s steps(3);
+}
+.lightbox img {
+  max-width: 100%;
+  max-height: calc(100% - 64px);
+  box-shadow: 0 -4px 0 0 var(--paper), 0 4px 0 0 var(--paper), -4px 0 0 0 var(--paper), 4px 0 0 0 var(--paper);
+}
+.lightbox-bar {
+  display: flex;
+  gap: 8px;
+}
