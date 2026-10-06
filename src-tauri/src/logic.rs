@@ -374,6 +374,7 @@ pub fn overview(store: &Store, at: NaiveDateTime, autostart: bool, debug: bool) 
         autostart,
         data_dir: store.dir.to_string_lossy().to_string(),
         debug,
+        version: crate::updater::VERSION.to_string(),
     }
 }
 

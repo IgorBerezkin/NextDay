@@ -101,6 +101,7 @@ pub struct Settings {
     pub sounds: bool,
     pub autostart_wanted: bool,
     pub tray_hint_shown: bool,
+    pub auto_update: bool,
 }
 
 impl Default for Settings {
@@ -115,6 +116,7 @@ impl Default for Settings {
             sounds: true,
             autostart_wanted: true,
             tray_hint_shown: false,
+            auto_update: true,
         }
     }
 }
@@ -126,6 +128,8 @@ pub struct NotifyState {
     pub evening_for: Option<String>,
     pub evening_repeat_for: Option<String>,
     pub snooze_until: Option<String>,
+    pub last_version: Option<String>,
+    pub update_tried: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -168,6 +172,7 @@ pub struct Overview {
     pub autostart: bool,
     pub data_dir: String,
     pub debug: bool,
+    pub version: String,
 }
 
 #[derive(Deserialize, Debug)]

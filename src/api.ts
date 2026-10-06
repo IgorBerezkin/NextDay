@@ -50,6 +50,7 @@ export type Settings = {
   sounds: boolean;
   autostartWanted: boolean;
   trayHintShown: boolean;
+  autoUpdate: boolean;
 };
 
 export type Overview = {
@@ -71,7 +72,11 @@ export type Overview = {
   autostart: boolean;
   dataDir: string;
   debug: boolean;
+  version: string;
 };
+
+export type UpdatePhase = "idle" | "checking" | "downloading" | "ready" | "installing" | "latest" | "failed";
+export type UpdateStatus = { allowed: boolean; phase: UpdatePhase; version: string | null; error: string | null };
 
 export type DaySummary = {
   date: string;
@@ -113,6 +118,9 @@ export const api = {
   hideToTray: () => invoke<void>("hide_to_tray"),
   quit: () => invoke<void>("quit_app"),
   takePendingRoute: () => invoke<string | null>("take_pending_route"),
+  updateStatus: () => invoke<UpdateStatus>("update_status"),
+  checkUpdate: () => invoke<void>("check_update"),
+  installUpdate: () => invoke<void>("install_update"),
   debugShift: (minutes: number) => invoke<string>("debug_shift_time", { minutes }),
   debugTick: () => invoke<void>("debug_tick"),
 };

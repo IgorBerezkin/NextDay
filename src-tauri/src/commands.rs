@@ -1,6 +1,6 @@
 use crate::model::*;
 use crate::store::Store;
-use crate::{autostart, clock, logic, notify, scheduler, PendingRoute};
+use crate::{autostart, clock, logic, notify, scheduler, updater, PendingRoute};
 use serde_json::Value;
 use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Emitter, State};
@@ -119,6 +119,21 @@ pub fn quit_app(app: AppHandle) {
 #[tauri::command]
 pub fn take_pending_route(pending: State<'_, PendingRoute>) -> Option<String> {
     pending.0.lock().unwrap_or_else(|e| e.into_inner()).take()
+}
+
+#[tauri::command]
+pub fn update_status(app: AppHandle) -> updater::UpdateStatus {
+    updater::status(&app)
+}
+
+#[tauri::command]
+pub fn check_update(app: AppHandle) {
+    updater::check_in_background(&app);
+}
+
+#[tauri::command]
+pub fn install_update(app: AppHandle) -> Result<(), String> {
+    updater::install(&app, false)
 }
 
 #[tauri::command]

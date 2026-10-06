@@ -39,7 +39,7 @@ fn check_dir(path: String) -> Result<setup::DirCheck, String> {
 #[tauri::command]
 async fn install(app: AppHandle, opts: InstallArgs) -> Result<(), String> {
     WORKING.store(true, Ordering::SeqCst);
-    let o = setup::InstallOptions { desktop: opts.desktop, autostart: opts.autostart, dir: opts.dir };
+    let o = setup::InstallOptions { desktop: opts.desktop, autostart: Some(opts.autostart), dir: opts.dir };
     let res = tauri::async_runtime::spawn_blocking(move || {
         setup::install(&o, |s| {
             let _ = app.emit("setup-steps", s.to_vec());
@@ -69,7 +69,7 @@ async fn uninstall(app: AppHandle, remove_data: bool) -> Result<(), String> {
 
 #[tauri::command]
 fn launch_app() -> Result<(), String> {
-    setup::launch()
+    setup::launch(false)
 }
 
 #[tauri::command]
@@ -92,12 +92,23 @@ fn main() {
         let res = if uninstall_mode {
             setup::uninstall(has("--remove-data"), |_| {}, false)
         } else {
-            let opts = setup::InstallOptions {
-                desktop: !has("--no-desktop"),
-                autostart: !has("--no-autostart"),
-                dir: setup::arg_value("--dir"),
+            let update = has("--update");
+            let opts = if update {
+                setup::InstallOptions::keep_current()
+            } else {
+                setup::InstallOptions {
+                    desktop: !has("--no-desktop"),
+                    autostart: Some(!has("--no-autostart")),
+                    dir: setup::arg_value("--dir"),
+                }
             };
-            setup::install(&opts, |_| {}, false).and_then(|_| if has("--launch") { setup::launch() } else { Ok(()) })
+            let installed = setup::install(&opts, |_| {}, false);
+            let launched = if has("--launch") && (installed.is_ok() || update) {
+                setup::launch(has("--hidden"))
+            } else {
+                Ok(())
+            };
+            installed.and(launched)
         };
         if let Err(e) = &res {
             eprintln!("{e}");

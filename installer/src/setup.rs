@@ -216,8 +216,14 @@ impl<F: Fn(&[Step])> Steps<F> {
 
 pub struct InstallOptions {
     pub desktop: bool,
-    pub autostart: bool,
+    pub autostart: Option<bool>,
     pub dir: Option<String>,
+}
+
+impl InstallOptions {
+    pub fn keep_current() -> Self {
+        Self { desktop: desktop_lnk().is_some_and(|p| p.exists()), autostart: None, dir: None }
+    }
 }
 
 pub fn install(opts: &InstallOptions, emit: impl Fn(&[Step]), pace: bool) -> Result<(), String> {
@@ -239,7 +245,9 @@ pub fn install(opts: &InstallOptions, emit: impl Fn(&[Step]), pace: bool) -> Res
     if opts.desktop {
         labels.push("Значок на рабочем столе".into());
     }
-    labels.push(if opts.autostart { "Автозапуск вместе с Windows" } else { "Без автозапуска" }.into());
+    if let Some(on) = opts.autostart {
+        labels.push(if on { "Автозапуск вместе с Windows" } else { "Без автозапуска" }.into());
+    }
     labels.push("Запись в «Приложениях» Windows".into());
     if old_dir.is_some() {
         labels.push("Убираю старую копию".into());
@@ -268,8 +276,10 @@ pub fn install(opts: &InstallOptions, emit: impl Fn(&[Step]), pace: bool) -> Res
     } else if let Some(p) = desktop_lnk() {
         let _ = fs::remove_file(p);
     }
-    st.run(i, || set_autostart(opts.autostart, &exe))?;
-    i += 1;
+    if let Some(on) = opts.autostart {
+        st.run(i, || set_autostart(on, &exe))?;
+        i += 1;
+    }
     st.run(i, || register(&dir))?;
     i += 1;
     if let Some(old) = old_dir {
@@ -509,14 +519,14 @@ fn remove_dir_retry(dir: &Path) -> Result<(), String> {
     Err(format!("Не удалось удалить {}: {last}", dir.display()))
 }
 
-pub fn launch() -> Result<(), String> {
+pub fn launch(hidden: bool) -> Result<(), String> {
     let dir = install_dir();
-    Command::new(dir.join(EXE))
-        .current_dir(&dir)
-        .env_remove("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS")
-        .spawn()
-        .map(|_| ())
-        .map_err(|e| format!("Не удалось запустить Next Day: {e}"))
+    let mut cmd = Command::new(dir.join(EXE));
+    cmd.current_dir(&dir).env_remove("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS");
+    if hidden {
+        cmd.arg("--hidden");
+    }
+    cmd.spawn().map(|_| ()).map_err(|e| format!("Не удалось запустить Next Day: {e}"))
 }
 
 pub fn relaunch_from_temp() -> bool {

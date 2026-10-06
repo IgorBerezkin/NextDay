@@ -1,7 +1,8 @@
+import { listen } from "@tauri-apps/api/event";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 import type { Nav } from "../App";
-import { api, type Settings } from "../api";
+import { api, type Settings, type UpdateStatus } from "../api";
 import { Button, Check, toast, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
 import { stamp } from "../util";
@@ -136,11 +137,72 @@ export function SettingsScreen({ nav }: { nav: Nav }) {
           </div>
         </section>
 
+        <UpdateCard auto={s.autoUpdate} onAuto={(v) => void save({ autoUpdate: v })} version={ov.version} />
+
         {ov.debug && <DebugCard nav={nav} />}
       </div>
-      <p className="about">Next Day 0.1 · шрифты Press Start 2P и Tiny5 (SIL OFL)</p>
+      <p className="about">Next Day {ov.version} · шрифты Press Start 2P и Tiny5 (SIL OFL)</p>
     </div>
   );
+}
+
+function UpdateCard({ auto, onAuto, version }: { auto: boolean; onAuto: (v: boolean) => void; version: string }) {
+  const [u, setU] = useState<UpdateStatus | null>(null);
+
+  useEffect(() => {
+    api.updateStatus().then(setU).catch(toastError);
+    const off = listen<UpdateStatus>("update-changed", (e) => setU(e.payload));
+    return () => void off.then((f) => f());
+  }, []);
+
+  const busy = u?.phase === "checking" || u?.phase === "downloading" || u?.phase === "installing";
+  const note = u ? updateNote(u, auto) : "";
+  return (
+    <section className="card">
+      <h2 className="card-title">
+        <Px name="refresh" scale={2} /> Обновления
+      </h2>
+      <Check checked={auto} disabled={!u?.allowed} onChange={onAuto} label="Обновлять автоматически" />
+      <p className="muted">
+        Раз в несколько часов Next Day смотрит, не вышла ли новая версия. Она скачивается сама и ставится, пока окно спрятано в
+        трей.
+      </p>
+      <div className="row">
+        <span>Версия {version}</span>
+        {u?.allowed && (
+          <Button kind="paper" small icon="refresh" disabled={busy} onClick={() => void api.checkUpdate().catch(toastError)}>
+            Проверить
+          </Button>
+        )}
+      </div>
+      {note && <p className={`update-note${u?.phase === "failed" ? " bad" : ""}`}>{note}</p>}
+      {u?.phase === "ready" && (
+        <Button kind="green" icon="refresh" onClick={() => void api.installUpdate().catch(toastError)}>
+          Обновить сейчас
+        </Button>
+      )}
+    </section>
+  );
+}
+
+function updateNote(u: UpdateStatus, auto: boolean) {
+  if (!u.allowed) return "Обновления работают только в установленной программе.";
+  switch (u.phase) {
+    case "checking":
+      return "Проверяю…";
+    case "downloading":
+      return `Скачиваю версию ${u.version}…`;
+    case "ready":
+      return auto ? `Версия ${u.version} скачана и встанет, когда окно спрячется в трей.` : `Версия ${u.version} скачана.`;
+    case "installing":
+      return "Ставлю обновление, Next Day сейчас перезапустится.";
+    case "latest":
+      return "У вас последняя версия.";
+    case "failed":
+      return u.error ?? "Обновиться не получилось.";
+    default:
+      return "";
+  }
 }
 
 function TimeField({ value, onChange }: { value: string; onChange: (v: string) => void }) {

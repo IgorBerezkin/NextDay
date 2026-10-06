@@ -7,6 +7,7 @@ mod notify;
 mod scheduler;
 mod store;
 mod tray;
+mod updater;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -240,6 +241,7 @@ pub fn run() {
             notify::setup(&dir);
             tray::build(app.handle())?;
             scheduler::refresh_tray(app.handle());
+            updater::start(app.handle());
 
             let hidden = std::env::args().any(|a| a == "--autostart" || a == "--hidden");
             if !hidden {
@@ -271,6 +273,9 @@ pub fn run() {
             commands::hide_to_tray,
             commands::quit_app,
             commands::take_pending_route,
+            commands::update_status,
+            commands::check_update,
+            commands::install_update,
             commands::debug_shift_time,
             commands::debug_tick,
         ])

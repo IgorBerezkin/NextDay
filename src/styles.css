@@ -1399,6 +1399,13 @@ button.yc:not(:disabled):hover {
   word-break: break-all;
   user-select: text;
 }
+.update-note {
+  margin: 0;
+  color: var(--teal);
+}
+.update-note.bad {
+  color: var(--red);
+}
 .about {
   color: var(--ink4);
   text-align: center;

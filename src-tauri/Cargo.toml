@@ -1,6 +1,6 @@
 [package]
 name = "next-day"
-version = "0.1.1"
+version = "0.1.2"
 description = "Next Day: вечером называешь завтрашний день, потом подводишь итоги"
 authors = ["IgorBerezkin"]
 edition = "2021"
@@ -20,6 +20,9 @@ tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+base64 = "0.22"
+minisign-verify = "0.3"
+ureq = { version = "3", default-features = false, features = ["native-tls"] }
 
 [target.'cfg(windows)'.dependencies]
 tauri-winrt-notification = "0.8"

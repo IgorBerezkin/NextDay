@@ -1,6 +1,6 @@
 [package]
 name = "next-day-setup"
-version = "0.1.1"
+version = "0.1.2"
 description = "Установщик Next Day"
 authors = ["IgorBerezkin"]
 edition = "2021"
