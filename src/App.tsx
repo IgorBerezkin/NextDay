@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errText, type Day, type Overview } from "./api";
 import { BoardScreen } from "./board/BoardScreen";
 import { ClockScreen } from "./screens/ClockScreen";
+import { MapScreen } from "./screens/MapScreen";
 import { DayScreen } from "./screens/DayScreen";
 import { HistoryScreen } from "./screens/HistoryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
@@ -17,6 +18,7 @@ export type Route =
   | { name: "today" }
   | { name: "tomorrow" }
   | { name: "clock" }
+  | { name: "map"; focus?: string }
   | { name: "history" }
   | { name: "day"; date: string }
   | { name: "board"; date: string }
@@ -34,6 +36,7 @@ function tabOf(r: Route, ov: Overview | null): TabKey | null {
     case "today":
     case "tomorrow":
     case "clock":
+    case "map":
     case "history":
     case "settings":
       return r.name;
@@ -133,6 +136,9 @@ export default function App() {
         break;
       case "clock":
         screen = <ClockScreen nav={nav} />;
+        break;
+      case "map":
+        screen = <MapScreen nav={nav} focus={route.focus} key={route.focus ?? "map"} />;
         break;
       case "history":
         screen = <HistoryScreen nav={nav} />;

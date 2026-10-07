@@ -74,7 +74,9 @@ export function DayScreen({ nav, date }: { nav: Nav; date: string }) {
             )}
           </DayHead>
           <Description text={plan.description} />
-          {plan.checklist && <ChecklistView items={plan.checklist} date={date} />}
+          {plan.checklist && (
+            <ChecklistView items={plan.checklist} date={date} onOpenMap={(it) => go({ name: "map", focus: `${date}/${it.id}` })} />
+          )}
         </div>
         <div className="col-side">
           <section className="card">

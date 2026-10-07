@@ -261,6 +261,7 @@ pub fn run() {
             commands::get_day,
             commands::get_board,
             commands::list_days,
+            commands::list_tasks,
             commands::save_plan,
             commands::set_check,
             commands::set_start,

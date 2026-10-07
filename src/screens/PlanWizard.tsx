@@ -1,15 +1,25 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type CheckItem, type Day, type Plan, type PlanInput } from "../api";
+import { api, type CheckItem, type Day, type Plan, type PlanInput, type TaskRef } from "../api";
 import { sfx } from "../sound";
 import { AttachChip, Button, Check, Linkify, toast, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
-import { hoursText, longDate, NAME_EXAMPLES, parseHours, uid } from "../util";
+import { dayMonth, hoursText, longDate, NAME_EXAMPLES, parseHours, uid } from "../util";
+import { TaskPicker } from "./TaskPicker";
 
 const MAX_SUBS = 3;
 
 type SubRow = { key: string; id?: string; text: string };
-type Row = { key: string; id?: string; text: string; hours: string; attach: string | null; subs: SubRow[]; start: number | null };
+type Row = {
+  key: string;
+  id?: string;
+  text: string;
+  hours: string;
+  attach: string | null;
+  subs: SubRow[];
+  start: number | null;
+  from: TaskRef | null;
+};
 
 const toRow = (i: CheckItem): Row => ({
   key: uid(),
@@ -19,6 +29,7 @@ const toRow = (i: CheckItem): Row => ({
   attach: i.attach,
   subs: (i.subs ?? []).map((s) => ({ key: uid(), id: s.id, text: s.text })),
   start: i.start ?? null,
+  from: i.from ?? null,
 });
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -38,7 +49,7 @@ function loadDraft(date: string): Draft | null {
     const raw = localStorage.getItem(draftKey(date));
     if (!raw) return null;
     const d = JSON.parse(raw) as Draft;
-    return { ...d, rows: d.rows.map((r) => ({ ...r, subs: r.subs ?? [], start: r.start ?? null })) };
+    return { ...d, rows: d.rows.map((r) => ({ ...r, subs: r.subs ?? [], start: r.start ?? null, from: r.from ?? null })) };
   } catch {
     return null;
   }
@@ -55,6 +66,7 @@ export function PlanWizard({
   mode,
   initial,
   carry = [],
+  carryDate,
   onSaved,
   onCancel,
 }: {
@@ -62,6 +74,7 @@ export function PlanWizard({
   mode: "tomorrow" | "today";
   initial?: Plan | null;
   carry?: CheckItem[];
+  carryDate?: string;
   onSaved: (d: Day) => void;
   onCancel?: () => void;
 }) {
@@ -73,6 +86,7 @@ export function PlanWizard({
   const [rows, setRows] = useState<Row[]>(() => initial?.checklist?.map(toRow) ?? draft?.rows ?? []);
   const [busy, setBusy] = useState(false);
   const [focusKey, setFocusKey] = useState<string | null>(null);
+  const [picking, setPicking] = useState<string | null>(null);
   const inputs = useRef(new Map<string, HTMLInputElement>());
   const example = useMemo(() => NAME_EXAMPLES[Math.floor(Math.random() * NAME_EXAMPLES.length)], []);
 
@@ -106,7 +120,7 @@ export function PlanWizard({
   const back = () => setStep((s) => Math.max(0, s - 1));
 
   const addRow = (after?: number, from?: Partial<Row>) => {
-    const r: Row = { key: uid(), text: "", hours: "", attach: null, subs: [], start: null, ...from };
+    const r: Row = { key: uid(), text: "", hours: "", attach: null, subs: [], start: null, from: null, ...from };
     setRows((rs) => {
       const c = [...rs];
       c.splice(after === undefined ? c.length : after + 1, 0, r);
@@ -141,7 +155,7 @@ export function PlanWizard({
   const parsed = rows.map((r) => parseHours(r.hours));
   const badHours = rows.some((r, i) => r.text.trim() && parsed[i] !== null && okHours(r.hours) === null);
   const total = rows.reduce((s, r) => s + (r.text.trim() ? (okHours(r.hours) ?? 0) : 0), 0);
-  const carryLeft = carry.filter((c) => !rows.some((r) => r.text.trim() === c.text.trim()));
+  const carryLeft = carry.filter((c) => !rows.some((r) => r.text.trim() === c.text.trim() || r.from?.id === c.id));
 
   const save = async () => {
     if (!canNext) {
@@ -169,6 +183,7 @@ export function PlanWizard({
               attach: r.attach,
               subs: r.subs.filter((s) => s.text.trim()).map((s) => ({ id: s.id, text: s.text.trim() })),
               start: r.start,
+              from: r.from,
             }))
         : null,
     };
@@ -327,6 +342,19 @@ export function PlanWizard({
                           onKeyDown={(e) => itemKey(e, r, i)}
                         />
                         {r.attach && <AttachChip target={r.attach} onRemove={() => update(r.key, { attach: null })} />}
+                        {r.from && (
+                          <span className="chip from-chip" title="Этот пункт продолжает задачу из прошлого">
+                            <span className="chip-main">
+                              <Px name="link" scale={1.5} />
+                              <span>
+                                продолжает «<Linkify inert text={r.from.text} />», {dayMonth(r.from.date)}
+                              </span>
+                            </span>
+                            <button className="chip-x" onClick={() => update(r.key, { from: null })} title="Убрать связь">
+                              <Px name="cross" scale={1} />
+                            </button>
+                          </span>
+                        )}
                       </div>
                       <input
                         className={`field hours${bad ? " bad" : ""}`}
@@ -338,7 +366,7 @@ export function PlanWizard({
                         onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addRow(i))}
                       />
                       <select
-                        className={`field select start${r.start == null ? " empty" : ""}`}
+                        className={`field select start${r.start == null ? " unset" : ""}`}
                         value={r.start ?? ""}
                         title="Во сколько начать, необязательно"
                         onChange={(e) => update(r.key, { start: e.target.value === "" ? null : Number(e.target.value) })}
@@ -357,6 +385,9 @@ export function PlanWizard({
                         onClick={() => addSub(r)}
                       >
                         <Px name="sub" scale={2} />
+                      </button>
+                      <button className="icon-btn" title="Продолжает задачу из прошлого" onClick={() => setPicking(r.key)}>
+                        <Px name="link" scale={2} />
                       </button>
                       <button className="icon-btn" title="Прикрепить файл" onClick={() => void pickFile(r.key)}>
                         <Px name="folder" scale={2} />
@@ -410,15 +441,16 @@ export function PlanWizard({
                       className="chip-add"
                       onClick={() => {
                         sfx.pop();
-                        const from = {
+                        const carried = {
                           text: c.text,
                           hours: c.hours != null ? hoursText(c.hours) : "",
                           attach: c.attach,
                           subs: (c.subs ?? []).filter((s) => !s.done).map((s) => ({ key: uid(), text: s.text })),
+                          from: carryDate ? { date: carryDate, id: c.id, text: c.text } : null,
                         };
                         const blank = rows.find((r) => !r.text.trim() && !r.subs.some((s) => s.text.trim()));
-                        if (blank) update(blank.key, from);
-                        else addRow(undefined, from);
+                        if (blank) update(blank.key, carried);
+                        else addRow(undefined, carried);
                       }}
                     >
                       + <Linkify inert text={c.text} />
@@ -430,6 +462,19 @@ export function PlanWizard({
           )}
           {!need && <p className="hint">Можно и без чеклиста: имени и описания бывает достаточно.</p>}
         </div>
+      )}
+
+      {picking && (
+        <TaskPicker
+          before={date}
+          onClose={() => setPicking(null)}
+          onPick={(t) => {
+            const r = rows.find((x) => x.key === picking);
+            update(picking, { from: { date: t.date, id: t.id, text: t.text }, ...(r && !r.text.trim() ? { text: t.text } : {}) });
+            setPicking(null);
+            sfx.pop();
+          }}
+        />
       )}
 
       <div className="wiz-foot">

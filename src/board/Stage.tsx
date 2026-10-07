@@ -54,6 +54,11 @@ export function useZoom(bw: number, bh: number, canPan: (e: React.PointerEvent) 
 
   const reset = () => setView({ s: null, x: 0, y: 0 });
 
+  const focus = (x: number, y: number, s = scale) =>
+    setView({ s, x: box.w / 2 - x * s - (box.w - bw * s) / 2, y: box.h / 2 - y * s - (box.h - bh * s) / 2 });
+
+  const showEnd = (s: number) => setView({ s, x: (box.w - bw * s) / 2 - 16, y: Math.max(0, 16 - (box.h - bh * s) / 2) });
+
   useEffect(() => {
     const el = wrapRef.current!;
     const onWheel = (e: WheelEvent) => {
@@ -95,7 +100,23 @@ export function useZoom(bw: number, bh: number, canPan: (e: React.PointerEvent) 
     },
   };
 
-  return { wrapRef, scale, fitted: view.s === null, left, top, panning, zoomCenter, anchor, reset, handlers, isPanning: () => !!pan.current?.moved };
+  return {
+    wrapRef,
+    scale,
+    fitScale,
+    fitted: view.s === null,
+    ready: box.w > 0,
+    left,
+    top,
+    panning,
+    zoomCenter,
+    anchor,
+    reset,
+    focus,
+    showEnd,
+    handlers,
+    isPanning: () => !!pan.current?.moved,
+  };
 }
 
 export type Zoom = ReturnType<typeof useZoom>;
@@ -104,7 +125,15 @@ type BoardProps = React.HTMLAttributes<HTMLDivElement>;
 
 export const ZoomStage = forwardRef<
   HTMLDivElement,
-  { bw: number; bh: number; zoom: Zoom; className?: string; editing?: boolean; boardProps?: BoardProps; children: (scale: number) => ReactNode }
+  {
+    bw: number;
+    bh: number;
+    zoom: Zoom;
+    className?: string;
+    editing?: boolean;
+    boardProps?: BoardProps;
+    children: (scale: number) => ReactNode;
+  }
 >(function ZoomStage({ bw, bh, zoom, className, editing, boardProps, children }, boardRef) {
   const s = zoom.scale;
   return (
@@ -114,7 +143,10 @@ export const ZoomStage = forwardRef<
       {...zoom.handlers}
       onPointerCancel={zoom.handlers.onPointerUp}
     >
-      <div className="stage-box" style={{ left: zoom.left, top: zoom.top, width: bw * s, height: bh * s, visibility: s ? undefined : "hidden" }}>
+      <div
+        className="stage-box"
+        style={{ left: zoom.left, top: zoom.top, width: bw * s, height: bh * s, visibility: s ? undefined : "hidden" }}
+      >
         <div
           className={`board${editing ? " editing" : ""}`}
           ref={boardRef}
@@ -128,7 +160,21 @@ export const ZoomStage = forwardRef<
   );
 });
 
-function FitStage({ bw, bh, area, className, onClick, children }: { bw: number; bh: number; area: Rect; className?: string; onClick?: () => void; children: ReactNode }) {
+function FitStage({
+  bw,
+  bh,
+  area,
+  className,
+  onClick,
+  children,
+}: {
+  bw: number;
+  bh: number;
+  area: Rect;
+  className?: string;
+  onClick?: () => void;
+  children: ReactNode;
+}) {
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   useLayoutEffect(() => {
@@ -145,7 +191,12 @@ function FitStage({ bw, bh, area, className, onClick, children }: { bw: number; 
       <div className="stage-box" style={{ width: area.w * s, height: area.h * s, visibility: s ? undefined : "hidden" }} onClick={onClick}>
         <div
           className="board"
-          style={{ width: bw, height: bh, transform: `translate(${-area.x * s}px, ${-area.y * s}px) scale(${s})`, ["--s" as string]: s || 1 }}
+          style={{
+            width: bw,
+            height: bh,
+            transform: `translate(${-area.x * s}px, ${-area.y * s}px) scale(${s})`,
+            ["--s" as string]: s || 1,
+          }}
         >
           {children}
         </div>
@@ -171,7 +222,14 @@ export function ItemView({
   hint?: string;
   onImageClick?: (it: ImageItem) => void;
 }) {
-  const style: React.CSSProperties = { left: it.x, top: it.y, width: it.w, height: it.h, zIndex: it.z, visibility: hidden ? "hidden" : undefined };
+  const style: React.CSSProperties = {
+    left: it.x,
+    top: it.y,
+    width: it.w,
+    height: it.h,
+    zIndex: it.z,
+    visibility: hidden ? "hidden" : undefined,
+  };
   if (it.kind === "note" || it.kind === "task") {
     delete style.height;
     if (it.kind === "note") style.minHeight = it.h;

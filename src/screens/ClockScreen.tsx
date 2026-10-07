@@ -137,7 +137,12 @@ export function ClockScreen({ nav }: { nav: Nav }) {
 
   const onDialDown = (e: React.PointerEvent) => {
     const hour = markAt(e.clientX, e.clientY);
-    if (hour !== null) startDrag(e, timed.filter((x) => x.at === hour).map((x) => x.it), true);
+    if (hour !== null)
+      startDrag(
+        e,
+        timed.filter((x) => x.at === hour).map((x) => x.it),
+        true,
+      );
   };
 
   const onDialMove = (e: React.PointerEvent) => {
@@ -213,10 +218,15 @@ export function ClockScreen({ nav }: { nav: Nav }) {
                   </>
                 ) : upcoming ? (
                   <>
-                    <b>Дальше:</b> «<Linkify inert text={upcoming.it.text} />» в {hh(upcoming.at)}, через {duration((upcoming.when - t) / 1000)}
+                    <b>Дальше:</b> «<Linkify inert text={upcoming.it.text} />» в {hh(upcoming.at)}, через{" "}
+                    {duration((upcoming.when - t) / 1000)}
                   </>
                 ) : timed.length ? (
-                  live.length ? "Задачи со временем на сегодня позади." : "Все задачи со временем сделаны."
+                  live.length ? (
+                    "Задачи со временем на сегодня позади."
+                  ) : (
+                    "Все задачи со временем сделаны."
+                  )
                 ) : (
                   "Поставь задачам время, и часы подскажут, когда начинать."
                 )}
@@ -254,7 +264,9 @@ export function ClockScreen({ nav }: { nav: Nav }) {
               })}
             </ul>
             {editable && (
-              <p className="hint">Перетащи пункт на нужный час или выбери время справа. Метку можно утащить с часов, тогда время сбросится.</p>
+              <p className="hint">
+                Перетащи пункт на нужный час или выбери время справа. Метку можно утащить с часов, тогда время сбросится.
+              </p>
             )}
           </>
         )}

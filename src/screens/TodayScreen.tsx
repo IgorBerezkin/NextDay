@@ -128,7 +128,15 @@ export function TodayScreen({ nav }: { nav: Nav }) {
         <div className="col-main">
           <DayHead label="Сегодня" date={day.date} plan={plan} />
           <Description text={plan.description} />
-          {plan.checklist && <ChecklistView items={plan.checklist} date={day.date} tickable={!r.sealed} onDay={patchDay} />}
+          {plan.checklist && (
+            <ChecklistView
+              items={plan.checklist}
+              date={day.date}
+              tickable={!r.sealed}
+              onDay={patchDay}
+              onOpenMap={(it) => go({ name: "map", focus: `${day.date}/${it.id}` })}
+            />
+          )}
         </div>
         <div className="col-side">
           {ov.evening && <RitualCard nav={nav} pending={pending} onSeal={() => setSealing(day)} />}

@@ -16,6 +16,22 @@ export type CheckItem = {
   doneAt: string | null;
   subs?: SubItem[];
   start?: number | null;
+  from?: TaskRef | null;
+};
+
+export type TaskRef = { date: string; id: string; text: string };
+
+export type TaskNode = {
+  date: string;
+  id: string;
+  text: string;
+  done: boolean;
+  hours: number | null;
+  subsTotal: number;
+  subsDone: number;
+  dayName: string;
+  from: TaskRef | null;
+  note: string | null;
 };
 
 export type Plan = {
@@ -98,7 +114,15 @@ export type DaySummary = {
 };
 
 export type SubInput = { id?: string; text: string };
-export type ItemInput = { id?: string; text: string; hours: number | null; attach: string | null; subs: SubInput[]; start: number | null };
+export type ItemInput = {
+  id?: string;
+  text: string;
+  hours: number | null;
+  attach: string | null;
+  subs: SubInput[];
+  start: number | null;
+  from: TaskRef | null;
+};
 export type PlanInput = { name: string; description: string; checklist: ItemInput[] | null };
 export type AssetInfo = { file: string; path: string };
 
@@ -107,6 +131,7 @@ export const api = {
   day: (date: string) => invoke<Day | null>("get_day", { date }),
   board: (date: string) => invoke<unknown | null>("get_board", { date }),
   days: () => invoke<DaySummary[]>("list_days"),
+  tasks: () => invoke<TaskNode[]>("list_tasks"),
   savePlan: (date: string, plan: PlanInput) => invoke<Day>("save_plan", { date, plan }),
   setCheck: (date: string, itemId: string, done: boolean) => invoke<Day>("set_check", { date, itemId, done }),
   setStart: (date: string, itemId: string, hour: number | null) => invoke<Day>("set_start", { date, itemId, hour }),

@@ -3,7 +3,7 @@ import { api, type CheckItem, type Day, type Plan } from "../api";
 import { sfx } from "../sound";
 import { Px, Face } from "../ui/Px";
 import { AttachChip, Button, Check, Linkify, Modal, Progress, toast, toastError } from "../ui/kit";
-import { hoursText, longDate, plural, RATING_LABELS, stamp } from "../util";
+import { dayMonth, hoursText, longDate, plural, RATING_LABELS, stamp } from "../util";
 
 export function DayHead({ label, date, plan, children }: { label: string; date: string; plan: Plan; children?: React.ReactNode }) {
   return (
@@ -41,12 +41,14 @@ export function ChecklistView({
   tickable,
   preview,
   onDay,
+  onOpenMap,
 }: {
   items: CheckItem[];
   date: string;
   tickable?: boolean;
   preview?: boolean;
   onDay?: (d: Day) => void;
+  onOpenMap?: (it: CheckItem) => void;
 }) {
   const done = items.filter((i) => i.done).length;
   const hTotal = items.reduce((s, i) => s + (i.hours ?? 0), 0);
@@ -102,6 +104,14 @@ export function ChecklistView({
                   {it.start != null && <span className="cl-start">{String(it.start).padStart(2, "0")}:00</span>}
                   <Linkify text={it.text} />
                 </span>
+                {it.from && (
+                  <button className="cl-from" disabled={!onOpenMap} onClick={() => onOpenMap?.(it)} title="Открыть на карте задач">
+                    <Px name="link" scale={1} />
+                    <span>
+                      продолжает «<Linkify inert text={it.from.text} />», {dayMonth(it.from.date)}
+                    </span>
+                  </button>
+                )}
                 {it.attach && <AttachChip target={it.attach} />}
                 {subs.length > 0 && (
                   <ul className="cl-subs">

@@ -7,7 +7,7 @@ import { ChecklistView, DayHead, Description } from "./parts";
 import { PlanWizard } from "./PlanWizard";
 
 export function TomorrowScreen({ nav }: { nav: Nav }) {
-  const { ov, refresh, patchDay } = nav;
+  const { ov, go, refresh, patchDay } = nav;
   const day = ov.tomorrowDay;
   const [editing, setEditing] = useState(false);
   const [stampText, setStampText] = useState<string | null>(null);
@@ -22,6 +22,7 @@ export function TomorrowScreen({ nav }: { nav: Nav }) {
           mode="tomorrow"
           initial={day?.plan}
           carry={carry}
+          carryDate={ov.today}
           onSaved={(d) => {
             const wasEdit = !!day?.plan;
             patchDay(d);
@@ -43,7 +44,14 @@ export function TomorrowScreen({ nav }: { nav: Nav }) {
         <div className="col-main">
           <DayHead label="Завтра" date={day.date} plan={plan} />
           <Description text={plan.description} />
-          {plan.checklist && <ChecklistView items={plan.checklist} date={day.date} preview />}
+          {plan.checklist && (
+            <ChecklistView
+              items={plan.checklist}
+              date={day.date}
+              preview
+              onOpenMap={(it) => go({ name: "map", focus: `${day.date}/${it.id}` })}
+            />
+          )}
           {!plan.checklist && !plan.description && <p className="muted">Только имя? Это тоже план.</p>}
         </div>
         <div className="col-side">

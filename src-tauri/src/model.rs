@@ -17,6 +17,17 @@ pub struct CheckItem {
     pub subs: Vec<SubItem>,
     #[serde(default)]
     pub start: Option<u8>,
+    #[serde(default)]
+    pub from: Option<TaskRef>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskRef {
+    pub date: String,
+    pub id: String,
+    #[serde(default)]
+    pub text: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -205,6 +216,8 @@ pub struct CheckItemInput {
     pub subs: Vec<SubItemInput>,
     #[serde(default)]
     pub start: Option<u8>,
+    #[serde(default)]
+    pub from: Option<TaskRef>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -213,6 +226,21 @@ pub struct SubItemInput {
     #[serde(default)]
     pub id: Option<String>,
     pub text: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskNode {
+    pub date: String,
+    pub id: String,
+    pub text: String,
+    pub done: bool,
+    pub hours: Option<f64>,
+    pub subs_total: u32,
+    pub subs_done: u32,
+    pub day_name: String,
+    pub from: Option<TaskRef>,
+    pub note: Option<String>,
 }
 
 #[derive(Serialize, Debug)]

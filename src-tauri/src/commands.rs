@@ -25,6 +25,11 @@ pub fn get_board(store: State<'_, Store>, date: String) -> Option<Value> {
 }
 
 #[tauri::command]
+pub fn list_tasks(store: State<'_, Store>) -> Vec<TaskNode> {
+    logic::list_tasks(&store)
+}
+
+#[tauri::command]
 pub fn list_days(store: State<'_, Store>) -> Vec<DaySummary> {
     logic::list_days(&store, clock::now())
 }

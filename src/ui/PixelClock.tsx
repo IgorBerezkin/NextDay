@@ -157,7 +157,7 @@ function frame(ctx: Ctx, layers: { bg: HTMLCanvasElement; dial: HTMLCanvasElemen
   const t = now.getTime() / 1000;
   ctx.drawImage(layers.bg, 0, 0);
   for (const s of layers.stars) {
-    const level = Math.floor((((t / s.period + s.phase) % 1) + 1) % 1 * 4);
+    const level = Math.floor(((((t / s.period + s.phase) % 1) + 1) % 1) * 4);
     const color = STAR_LEVELS[level];
     rect(ctx, s.x, s.y, 1, 1, color);
     if (s.big && level >= 2) {
@@ -186,5 +186,13 @@ export function PixelClock({ now, marks, scale }: { now: Date; marks: ClockMark[
     const ctx = ref.current?.getContext("2d");
     if (ctx) frame(ctx, layers, now, marks);
   }, [layers, now, marks]);
-  return <canvas ref={ref} className="pixel-clock" width={CLOCK_PX} height={CLOCK_PX} style={{ width: CLOCK_PX * scale, height: CLOCK_PX * scale }} />;
+  return (
+    <canvas
+      ref={ref}
+      className="pixel-clock"
+      width={CLOCK_PX}
+      height={CLOCK_PX}
+      style={{ width: CLOCK_PX * scale, height: CLOCK_PX * scale }}
+    />
+  );
 }
