@@ -16,6 +16,7 @@ const SPARKS = 50;
 
 export type Tone = "done" | "now" | "next" | "todo";
 export type ClockMark = { hour: number; label: string; tone: Tone };
+export type Slot = { hour: number; label: string };
 type Swap = { from: number; to: number; start: number };
 export type DayNight = { turn: number; swap: Swap | null; paints: Set<() => void> };
 
@@ -376,19 +377,38 @@ function dial() {
   );
 }
 
-function mark(ctx: Ctx, m: ClockMark, blink: boolean) {
-  const [x, y] = polar(MARK_R, (m.hour % 12) / 12);
-  const w = m.label.length * 4 + 3;
+function badge(ctx: Ctx, label: string, tone: Tone, cx: number, cy: number, lit: boolean) {
+  const w = label.length * 4 + 3;
   const h = 9;
-  const x0 = Math.round(x - w / 2);
-  const y0 = Math.round(y - h / 2);
+  const x0 = Math.round(cx - w / 2);
+  const y0 = Math.round(cy - h / 2);
   rect(ctx, x0, y0 - 1, w, 1, COLORS.w);
   rect(ctx, x0, y0 + h, w, 1, COLORS.w);
   rect(ctx, x0 - 1, y0, 1, h, COLORS.w);
   rect(ctx, x0 + w, y0, 1, h, COLORS.w);
-  const lit = (m.tone === "now" || m.tone === "next") && blink;
-  rect(ctx, x0, y0, w, h, lit ? COLORS.w : TONES[m.tone]);
-  digits(ctx, m.label, x0 + w / 2, y0 + h / 2, COLORS.k);
+  rect(ctx, x0, y0, w, h, lit ? COLORS.w : TONES[tone]);
+  digits(ctx, label, x0 + w / 2, y0 + h / 2, COLORS.k);
+}
+
+function mark(ctx: Ctx, m: ClockMark, blink: boolean) {
+  const [x, y] = polar(MARK_R, (m.hour % 12) / 12);
+  badge(ctx, m.label, m.tone, x, y, (m.tone === "now" || m.tone === "next") && blink);
+}
+
+function ring(ctx: Ctx, x: number, y: number, w: number, h: number, color: string) {
+  rect(ctx, x + 1, y, w - 2, 1, color);
+  rect(ctx, x + 1, y + h - 1, w - 2, 1, color);
+  rect(ctx, x, y + 1, 1, h - 2, color);
+  rect(ctx, x + w - 1, y + 1, 1, h - 2, color);
+}
+
+function slotFrame(ctx: Ctx, slot: Slot) {
+  const [x, y] = polar(MARK_R, (slot.hour % 12) / 12);
+  const w = slot.label.length * 4 + 3;
+  const x0 = Math.round(x - w / 2);
+  const y0 = Math.round(y - 4.5);
+  ring(ctx, x0 - 4, y0 - 4, w + 8, 17, COLORS.k);
+  ring(ctx, x0 - 3, y0 - 3, w + 6, 15, COLORS.y);
 }
 
 function drawStars(ctx: Ctx, stars: Star[], t: number) {
@@ -450,12 +470,13 @@ function drawSky(ctx: Ctx, sky: SkyLayers, bed: Bed, at: [number, number] | null
   ctx.globalAlpha = 1;
 }
 
-function drawClock(ctx: Ctx, face: HTMLCanvasElement, now: Date, marks: ClockMark[], turn: number) {
+function drawClock(ctx: Ctx, face: HTMLCanvasElement, now: Date, marks: ClockMark[], slot: Slot | null, turn: number) {
   const t = now.getTime() / 1000;
   ctx.clearRect(0, 0, CLOCK_PX, CLOCK_PX);
   ctx.drawImage(face, 0, 0);
   const blink = Math.floor(t / 0.6) % 2 === 0;
   for (const m of marks) mark(ctx, m, blink);
+  if (slot) slotFrame(ctx, slot);
   const h = now.getHours();
   const min = now.getMinutes();
   const sec = now.getSeconds();
@@ -515,21 +536,34 @@ function usePaints(dn: DayNight, paint: () => void) {
   }, [dn, paint]);
 }
 
-export function PixelClock({ dn, now, marks, scale }: { dn: DayNight; now: Date; marks: ClockMark[]; scale: number }) {
+export function PixelClock({
+  dn,
+  now,
+  marks,
+  slot,
+  scale,
+}: {
+  dn: DayNight;
+  now: Date;
+  marks: ClockMark[];
+  slot: Slot | null;
+  scale: number;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   const face = useMemo(dial, []);
-  const latest = useRef({ now, marks });
+  const latest = useRef({ now, marks, slot });
 
   const paint = useCallback(() => {
     advance(dn, performance.now());
     const ctx = ref.current?.getContext("2d");
-    if (ctx) drawClock(ctx, face, latest.current.now, latest.current.marks, dn.turn);
+    const v = latest.current;
+    if (ctx) drawClock(ctx, face, v.now, v.marks, v.slot, dn.turn);
   }, [dn, face]);
 
   useEffect(() => {
-    latest.current = { now, marks };
+    latest.current = { now, marks, slot };
     paint();
-  }, [now, marks, paint]);
+  }, [now, marks, slot, paint]);
   usePaints(dn, paint);
 
   return (
@@ -583,4 +617,18 @@ export function ClockSky({ dn, now, scale, anchor }: { dn: DayNight; now: Date; 
   usePaints(dn, paint);
 
   return <canvas ref={ref} className="clk-sky" width={w} height={h} style={{ width: w * scale, height: h * scale }} />;
+}
+
+export function MarkBadge({ label, tone, scale }: { label: string; tone: Tone; scale: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const w = label.length * 4 + 5;
+
+  useEffect(() => {
+    const ctx = ref.current?.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, w, 11);
+    badge(ctx, label, tone, w / 2, 5.5, false);
+  }, [label, tone, w]);
+
+  return <canvas ref={ref} className="mark-badge" width={w} height={11} style={{ width: w * scale, height: 11 * scale }} />;
 }

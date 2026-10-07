@@ -38,6 +38,13 @@ fn ensure_open(c: &Ctx, date: NaiveDate) -> Result<(), String> {
     Ok(())
 }
 
+fn arranged(mut day: Day, day_start: u32) -> Day {
+    if let Some(items) = day.plan.as_mut().and_then(|p| p.checklist.as_mut()) {
+        items.sort_by_key(|i| i.start.map_or(u32::MAX, |h| (u32::from(h) + 24 - day_start) % 24));
+    }
+    day
+}
+
 fn open_day(store: &Store, c: &Ctx, date_s: &str) -> Result<Day, String> {
     let date = date_arg(date_s)?;
     ensure_open(c, date)?;
@@ -48,7 +55,7 @@ fn open_day(store: &Store, c: &Ctx, date_s: &str) -> Result<Day, String> {
     if day.result.sealed {
         return Err("День запечатан, его можно только смотреть.".into());
     }
-    Ok(day)
+    Ok(arranged(day, c.settings.day_start_hour))
 }
 
 pub fn save_plan(store: &Store, at: NaiveDateTime, date_s: &str, input: PlanInput) -> Result<Day, String> {
@@ -156,6 +163,7 @@ pub fn save_plan(store: &Store, at: NaiveDateTime, date_s: &str, input: PlanInpu
             })
         }
     }
+    let day = arranged(day, c.settings.day_start_hour);
     store.save_day(&day)?;
     Ok(day)
 }
@@ -215,6 +223,7 @@ pub fn set_start(store: &Store, at: NaiveDateTime, date_s: &str, item_id: &str, 
         .and_then(|items| items.iter_mut().find(|i| i.id == item_id))
         .ok_or("Пункт не найден.")?;
     item.start = hour;
+    let day = arranged(day, c.settings.day_start_hour);
     store.save_day(&day)?;
     Ok(day)
 }
@@ -433,9 +442,8 @@ pub fn overview(store: &Store, at: NaiveDateTime, autostart: bool, debug: bool) 
     let c = ctx(store, at);
     let dsh = c.settings.day_start_hour;
     let (today, tomorrow, yesterday) = (c.today, next(c.today), prev(c.today));
-    let today_day = store.load_day(&fmt_date(today)).filter(|d| d.has_plan());
-    let tomorrow_day = store.load_day(&fmt_date(tomorrow)).filter(|d| d.has_plan());
-    let yesterday_day = store.load_day(&fmt_date(yesterday)).filter(|d| d.has_plan());
+    let load = |date: NaiveDate| store.load_day(&fmt_date(date)).filter(|d| d.has_plan()).map(|d| arranged(d, dsh));
+    let (today_day, tomorrow_day, yesterday_day) = (load(today), load(tomorrow), load(yesterday));
     let evening_at = clock::moment_in(today, clock::parse_hm(&c.settings.evening_time).unwrap_or((21, 0)), dsh);
     let next_start = clock::day_start(tomorrow, dsh);
     let dates = planned_dates(store);
@@ -506,7 +514,7 @@ pub fn get_day(store: &Store, at: NaiveDateTime, date_s: &str) -> Option<Day> {
     if date > next(c.today) {
         return None;
     }
-    store.load_day(date_s).filter(|d| d.has_plan())
+    store.load_day(date_s).filter(|d| d.has_plan()).map(|d| arranged(d, c.settings.day_start_hour))
 }
 
 pub fn get_board(store: &Store, date_s: &str) -> Option<Value> {
@@ -678,6 +686,26 @@ mod tests {
         let mut bad = plan("x", &[("y", None)]);
         bad.checklist.as_mut().unwrap()[0].start = Some(30);
         assert!(save_plan(&s, at("2026-10-07T21:00:00"), "2026-10-08", bad).is_err());
+    }
+
+    #[test]
+    fn checklist_follows_start_hours() {
+        let s = tmp_store("order");
+        let mut p = plan("День", &[("a", None), ("b", None), ("c", None), ("d", None)]);
+        for (it, h) in p.checklist.as_mut().unwrap().iter_mut().zip([None, Some(21), Some(9), Some(1)]) {
+            it.start = h;
+        }
+        let texts = |d: &Day| d.plan.as_ref().unwrap().checklist.as_ref().unwrap().iter().map(|i| i.text.clone()).collect::<Vec<_>>();
+        let d = save_plan(&s, at("2026-10-06T21:00:00"), "2026-10-07", p).unwrap();
+        assert_eq!(texts(&d), ["c", "b", "d", "a"]);
+        let a = d.plan.unwrap().checklist.unwrap().remove(3).id;
+        let d = set_start(&s, at("2026-10-06T22:00:00"), "2026-10-07", &a, Some(12)).unwrap();
+        assert_eq!(texts(&d), ["c", "a", "b", "d"]);
+        let mut settings = s.load_settings();
+        settings.day_start_hour = 0;
+        save_settings(&s, settings).unwrap();
+        let d = get_day(&s, at("2026-10-06T22:00:00"), "2026-10-07").unwrap();
+        assert_eq!(texts(&d), ["d", "c", "a", "b"]);
     }
 
     #[test]

@@ -1594,11 +1594,17 @@ button.yc:not(:disabled):hover {
   align-items: flex-start;
   gap: 10px;
 }
-.clk-ghost b {
-  margin-left: 4px;
-  padding: 1px 4px;
-  color: var(--paper-hi);
-  background: var(--navy);
+.clk-ghost {
+  position: fixed;
+  z-index: 80;
+  line-height: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 var(--p) 0 rgba(26, 28, 44, 0.45));
+}
+.mark-badge {
+  display: block;
+  image-rendering: pixelated;
 }
 
 .from-chip {

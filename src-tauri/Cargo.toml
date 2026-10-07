@@ -1,6 +1,6 @@
 [package]
 name = "next-day"
-version = "0.4.2"
+version = "0.4.3"
 description = "Next Day: вечером называешь завтрашний день, потом подводишь итоги"
 authors = ["IgorBerezkin"]
 edition = "2021"
