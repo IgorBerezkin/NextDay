@@ -38,7 +38,7 @@ export function ClockScreen({ nav }: { nav: Nav }) {
   const [scale, setScale] = useState(2);
   const leftRef = useRef<HTMLDivElement>(null);
   const dialRef = useRef<HTMLDivElement>(null);
-  const dn = useDayNight(half === "pm");
+  const dn = useDayNight(half === "am");
 
   useLayoutEffect(() => {
     const el = leftRef.current!;
@@ -182,10 +182,10 @@ export function ClockScreen({ nav }: { nav: Nav }) {
         </div>
         <div className="seg">
           <button className={half === "am" ? "on" : ""} onClick={() => setHalf("am")}>
-            <Px name="sunColor" scale={1.5} /> До полудня
+            <Px name="moonColor" scale={1.5} /> До полудня
           </button>
           <button className={half === "pm" ? "on" : ""} onClick={() => setHalf("pm")}>
-            <Px name="moonColor" scale={1.5} /> После полудня
+            <Px name="sunColor" scale={1.5} /> После полудня
           </button>
         </div>
       </div>
