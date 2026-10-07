@@ -44,6 +44,13 @@ pub fn set_check(app: AppHandle, store: State<'_, Store>, date: String, item_id:
 }
 
 #[tauri::command]
+pub fn set_start(app: AppHandle, store: State<'_, Store>, date: String, item_id: String, hour: Option<u8>) -> Result<Day, String> {
+    let day = logic::set_start(&store, clock::now(), &date, &item_id, hour)?;
+    scheduler::refresh_tray(&app);
+    Ok(day)
+}
+
+#[tauri::command]
 pub fn save_board(store: State<'_, Store>, date: String, board: Value) -> Result<String, String> {
     logic::save_board(&store, clock::now(), &date, &board)
 }

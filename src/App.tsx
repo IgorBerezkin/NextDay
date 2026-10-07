@@ -2,6 +2,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errText, type Day, type Overview } from "./api";
 import { BoardScreen } from "./board/BoardScreen";
+import { ClockScreen } from "./screens/ClockScreen";
 import { DayScreen } from "./screens/DayScreen";
 import { HistoryScreen } from "./screens/HistoryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
@@ -15,6 +16,7 @@ import { TitleBar, type TabKey } from "./ui/TitleBar";
 export type Route =
   | { name: "today" }
   | { name: "tomorrow" }
+  | { name: "clock" }
   | { name: "history" }
   | { name: "day"; date: string }
   | { name: "board"; date: string }
@@ -31,6 +33,7 @@ function tabOf(r: Route, ov: Overview | null): TabKey | null {
   switch (r.name) {
     case "today":
     case "tomorrow":
+    case "clock":
     case "history":
     case "settings":
       return r.name;
@@ -76,6 +79,7 @@ export default function App() {
       const o = await refresh();
       if (where === "results" && o?.todayDay && !o.todayDay.result.sealed) setRoute({ name: "board", date: o.today });
       else if (where === "tomorrow") setRoute({ name: "tomorrow" });
+      else if (where === "clock") setRoute({ name: "clock" });
       else if (where === "history") setRoute({ name: "history" });
       else if (where === "settings") setRoute({ name: "settings" });
       else setRoute({ name: "today" });
@@ -126,6 +130,9 @@ export default function App() {
         break;
       case "tomorrow":
         screen = <TomorrowScreen nav={nav} />;
+        break;
+      case "clock":
+        screen = <ClockScreen nav={nav} />;
         break;
       case "history":
         screen = <HistoryScreen nav={nav} />;

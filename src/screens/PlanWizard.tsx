@@ -9,7 +9,7 @@ import { hoursText, longDate, NAME_EXAMPLES, parseHours, uid } from "../util";
 const MAX_SUBS = 3;
 
 type SubRow = { key: string; id?: string; text: string };
-type Row = { key: string; id?: string; text: string; hours: string; attach: string | null; subs: SubRow[] };
+type Row = { key: string; id?: string; text: string; hours: string; attach: string | null; subs: SubRow[]; start: number | null };
 
 const toRow = (i: CheckItem): Row => ({
   key: uid(),
@@ -18,7 +18,10 @@ const toRow = (i: CheckItem): Row => ({
   hours: i.hours != null ? hoursText(i.hours) : "",
   attach: i.attach,
   subs: (i.subs ?? []).map((s) => ({ key: uid(), id: s.id, text: s.text })),
+  start: i.start ?? null,
 });
+
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
 
 const okHours = (s: string) => {
   const h = parseHours(s);
@@ -35,7 +38,7 @@ function loadDraft(date: string): Draft | null {
     const raw = localStorage.getItem(draftKey(date));
     if (!raw) return null;
     const d = JSON.parse(raw) as Draft;
-    return { ...d, rows: d.rows.map((r) => ({ ...r, subs: r.subs ?? [] })) };
+    return { ...d, rows: d.rows.map((r) => ({ ...r, subs: r.subs ?? [], start: r.start ?? null })) };
   } catch {
     return null;
   }
@@ -103,7 +106,7 @@ export function PlanWizard({
   const back = () => setStep((s) => Math.max(0, s - 1));
 
   const addRow = (after?: number, from?: Partial<Row>) => {
-    const r: Row = { key: uid(), text: "", hours: "", attach: null, subs: [], ...from };
+    const r: Row = { key: uid(), text: "", hours: "", attach: null, subs: [], start: null, ...from };
     setRows((rs) => {
       const c = [...rs];
       c.splice(after === undefined ? c.length : after + 1, 0, r);
@@ -165,6 +168,7 @@ export function PlanWizard({
               hours: okHours(r.hours),
               attach: r.attach,
               subs: r.subs.filter((s) => s.text.trim()).map((s) => ({ id: s.id, text: s.text.trim() })),
+              start: r.start,
             }))
         : null,
     };
@@ -333,6 +337,19 @@ export function PlanWizard({
                         onChange={(e) => update(r.key, { hours: e.target.value })}
                         onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addRow(i))}
                       />
+                      <select
+                        className={`field select start${r.start == null ? " empty" : ""}`}
+                        value={r.start ?? ""}
+                        title="Во сколько начать, необязательно"
+                        onChange={(e) => update(r.key, { start: e.target.value === "" ? null : Number(e.target.value) })}
+                      >
+                        <option value="">--:--</option>
+                        {HOURS.map((h) => (
+                          <option key={h} value={h}>
+                            {String(h).padStart(2, "0")}:00
+                          </option>
+                        ))}
+                      </select>
                       <button
                         className="icon-btn"
                         title="Подпункт, до трёх"

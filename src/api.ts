@@ -15,6 +15,7 @@ export type CheckItem = {
   done: boolean;
   doneAt: string | null;
   subs?: SubItem[];
+  start?: number | null;
 };
 
 export type Plan = {
@@ -51,6 +52,7 @@ export type Settings = {
   autostartWanted: boolean;
   trayHintShown: boolean;
   autoUpdate: boolean;
+  taskAlerts: boolean;
 };
 
 export type Overview = {
@@ -96,7 +98,7 @@ export type DaySummary = {
 };
 
 export type SubInput = { id?: string; text: string };
-export type ItemInput = { id?: string; text: string; hours: number | null; attach: string | null; subs: SubInput[] };
+export type ItemInput = { id?: string; text: string; hours: number | null; attach: string | null; subs: SubInput[]; start: number | null };
 export type PlanInput = { name: string; description: string; checklist: ItemInput[] | null };
 export type AssetInfo = { file: string; path: string };
 
@@ -107,6 +109,7 @@ export const api = {
   days: () => invoke<DaySummary[]>("list_days"),
   savePlan: (date: string, plan: PlanInput) => invoke<Day>("save_plan", { date, plan }),
   setCheck: (date: string, itemId: string, done: boolean) => invoke<Day>("set_check", { date, itemId, done }),
+  setStart: (date: string, itemId: string, hour: number | null) => invoke<Day>("set_start", { date, itemId, hour }),
   saveBoard: (date: string, board: unknown) => invoke<string>("save_board", { date, board }),
   importImage: (date: string, ext: string, bytes: Uint8Array) =>
     invoke<AssetInfo>("import_image", bytes, { headers: { "x-date": date, "x-ext": ext } }),

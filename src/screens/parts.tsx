@@ -99,6 +99,7 @@ export function ChecklistView({
               {tickable ? <Check checked={it.done} onChange={(v) => void toggle(it.id, v)} /> : <Mark done={it.done} />}
               <div className="cl-body">
                 <span className="cl-text">
+                  {it.start != null && <span className="cl-start">{String(it.start).padStart(2, "0")}:00</span>}
                   <Linkify text={it.text} />
                 </span>
                 {it.attach && <AttachChip target={it.attach} />}

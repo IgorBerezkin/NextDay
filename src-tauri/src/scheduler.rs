@@ -1,5 +1,5 @@
 use crate::clock::{self, fmt_date, next, parse_dt, parse_hm, prev};
-use crate::model::Day;
+use crate::model::{CheckItem, Day, NotifyState};
 use crate::store::Store;
 use crate::{logic, notify, tray};
 use chrono::{Duration, NaiveDate};
@@ -176,6 +176,10 @@ pub fn tick(app: &AppHandle) {
             changed = true;
         }
 
+        if task_alerts(app, &c, &s, &mut ns) {
+            changed = true;
+        }
+
         if changed {
             let _ = store.save_notify(&ns);
         }
@@ -212,6 +216,45 @@ fn morning_toast(app: &AppHandle, s: &Status) {
         body.push_str("\nВчерашний день ждёт итогов.");
     }
     notify::show(app, &title, &body, "today", &[("Открыть", "open:today")]);
+}
+
+fn task_alerts(app: &AppHandle, c: &logic::Ctx, s: &Status, ns: &mut NotifyState) -> bool {
+    let today_s = fmt_date(c.today);
+    let mut changed = false;
+    if ns.task_alerts_for.as_deref() != Some(today_s.as_str()) {
+        ns.task_alerts_for = Some(today_s);
+        ns.task_alerts_sent.clear();
+        changed = true;
+    }
+    if !c.settings.task_alerts {
+        return changed;
+    }
+    let Some(day) = s.today.as_ref().filter(|d| !d.result.sealed) else {
+        return changed;
+    };
+    let items = day.plan.as_ref().and_then(|p| p.checklist.as_deref()).unwrap_or(&[]);
+    for it in items {
+        let Some(hour) = it.start else { continue };
+        if it.done || ns.task_alerts_sent.contains(&it.id) {
+            continue;
+        }
+        let start = clock::moment_in(c.today, (hour as u32, 0), c.settings.day_start_hour);
+        if c.at >= start && c.at < start + Duration::minutes(60) {
+            task_toast(app, it, hour);
+            ns.task_alerts_sent.push(it.id.clone());
+            changed = true;
+        }
+    }
+    changed
+}
+
+fn task_toast(app: &AppHandle, it: &CheckItem, hour: u8) {
+    let mut body = format!("По плану на {hour:02}:00.");
+    if let Some(h) = it.hours {
+        body.push_str(&format!(" Примерно {} ч.", hours_text(h)));
+    }
+    let title = format!("Пора: «{}»", short(&pretty_links(&it.text), 60));
+    notify::show(app, &title, &body, "clock", &[("Открыть", "open:clock")]);
 }
 
 fn evening_toast(app: &AppHandle, s: &Status) {

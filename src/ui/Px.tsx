@@ -3,6 +3,10 @@ import { COLORS, FACE_COLORS, ICONS, type IconDef, type IconName } from "./icons
 
 type Run = { x: number; y: number; w: number; fill: string };
 
+export function iconRuns(name: IconName, palette: Record<string, string> = {}): Run[] {
+  return runs(ICONS[name], palette);
+}
+
 function runs(def: IconDef, palette: Record<string, string>): Run[] {
   const h = def.map.length;
   const w = def.map[0].length;

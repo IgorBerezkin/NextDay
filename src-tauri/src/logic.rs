@@ -123,7 +123,8 @@ pub fn save_plan(store: &Store, at: NaiveDateTime, date_s: &str, input: PlanInpu
                 if subs.len() > MAX_SUBS {
                     return Err("У пункта может быть не больше трёх подпунктов.".into());
                 }
-                out.push(CheckItem { id, text, hours, attach, done: false, done_at: None, subs });
+                let start = check_hour(it.start)?;
+                out.push(CheckItem { id, text, hours, attach, done: false, done_at: None, subs, start });
             }
             if out.len() > 40 {
                 return Err("В чеклисте может быть не больше 40 пунктов.".into());
@@ -192,6 +193,36 @@ pub fn set_check(store: &Store, at: NaiveDateTime, date_s: &str, item_id: &str, 
     }
     store.save_day(&day)?;
     Ok(day)
+}
+
+pub fn set_start(store: &Store, at: NaiveDateTime, date_s: &str, item_id: &str, hour: Option<u8>) -> Result<Day, String> {
+    let _g = store.lock();
+    let c = ctx(store, at);
+    let date = date_arg(date_s)?;
+    let hour = check_hour(hour)?;
+    let mut day = if date == next(c.today) {
+        store.load_day(date_s).filter(|d| d.has_plan()).ok_or("У этого дня нет плана.")?
+    } else if date == c.today {
+        open_day(store, &c, date_s)?
+    } else {
+        return Err("Время задач можно ставить только на сегодня и завтра.".into());
+    };
+    let item = day
+        .plan
+        .as_mut()
+        .and_then(|p| p.checklist.as_mut())
+        .and_then(|items| items.iter_mut().find(|i| i.id == item_id))
+        .ok_or("Пункт не найден.")?;
+    item.start = hour;
+    store.save_day(&day)?;
+    Ok(day)
+}
+
+fn check_hour(hour: Option<u8>) -> Result<Option<u8>, String> {
+    match hour {
+        Some(h) if h > 23 => Err("Час задачи должен быть от 0 до 23.".into()),
+        h => Ok(h),
+    }
 }
 
 fn unique_id(given: Option<String>, prefix: &str, seen: &mut HashSet<String>) -> String {
@@ -468,7 +499,7 @@ mod tests {
             checklist: Some(
                 items
                     .iter()
-                    .map(|(t, h)| CheckItemInput { id: None, text: t.to_string(), hours: *h, attach: None, subs: vec![] })
+                    .map(|(t, h)| CheckItemInput { id: None, text: t.to_string(), hours: *h, attach: None, subs: vec![], start: None })
                     .collect(),
             ),
         }
@@ -546,6 +577,7 @@ mod tests {
                 hours: Some(3.0),
                 attach: None,
                 subs: subs.iter().map(|t| SubItemInput { id: None, text: t.to_string() }).collect(),
+                start: None,
             }]),
         }
     }
@@ -572,6 +604,25 @@ mod tests {
         let d = set_check(&s, t, "2026-10-07", &item.id, false).unwrap();
         let it = d.plan.unwrap().checklist.unwrap().remove(0);
         assert!(!it.done && it.subs.iter().all(|x| !x.done));
+    }
+
+    #[test]
+    fn start_hours_for_today_and_tomorrow() {
+        let s = tmp_store("start");
+        let mut p = plan("День", &[("работа", None)]);
+        p.checklist.as_mut().unwrap()[0].start = Some(10);
+        let d = save_plan(&s, at("2026-10-06T21:00:00"), "2026-10-07", p).unwrap();
+        let item = d.plan.unwrap().checklist.unwrap().remove(0);
+        assert_eq!(item.start, Some(10));
+        let d = set_start(&s, at("2026-10-06T22:00:00"), "2026-10-07", &item.id, Some(14)).unwrap();
+        assert_eq!(d.plan.unwrap().checklist.unwrap()[0].start, Some(14));
+        assert!(set_start(&s, at("2026-10-06T22:00:00"), "2026-10-07", &item.id, Some(24)).is_err());
+        let d = set_start(&s, at("2026-10-07T12:00:00"), "2026-10-07", &item.id, None).unwrap();
+        assert_eq!(d.plan.unwrap().checklist.unwrap()[0].start, None);
+        assert!(set_start(&s, at("2026-10-09T12:00:00"), "2026-10-07", &item.id, Some(9)).is_err());
+        let mut bad = plan("x", &[("y", None)]);
+        bad.checklist.as_mut().unwrap()[0].start = Some(30);
+        assert!(save_plan(&s, at("2026-10-07T21:00:00"), "2026-10-08", bad).is_err());
     }
 
     #[test]

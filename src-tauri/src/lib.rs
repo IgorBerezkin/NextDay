@@ -263,6 +263,7 @@ pub fn run() {
             commands::list_days,
             commands::save_plan,
             commands::set_check,
+            commands::set_start,
             commands::save_board,
             commands::import_image,
             commands::import_image_path,

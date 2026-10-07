@@ -102,6 +102,8 @@ export function SettingsScreen({ nav }: { nav: Nav }) {
             <TimeField value={s.morningTime} onChange={(t) => void save({ morningTime: t })} />
           </div>
           <p className="muted">Как называется сегодняшний день и сколько в нём пунктов.</p>
+          <Check checked={s.taskAlerts} onChange={(v) => void save({ taskAlerts: v })} label="Когда наступает час задачи" />
+          <p className="muted">Если у пункта чеклиста стоит время, в этот час придёт напоминание «Пора».</p>
           <Button
             kind="paper"
             icon="bell"

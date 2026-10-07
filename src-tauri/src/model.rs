@@ -15,6 +15,8 @@ pub struct CheckItem {
     pub done_at: Option<String>,
     #[serde(default)]
     pub subs: Vec<SubItem>,
+    #[serde(default)]
+    pub start: Option<u8>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -102,6 +104,7 @@ pub struct Settings {
     pub autostart_wanted: bool,
     pub tray_hint_shown: bool,
     pub auto_update: bool,
+    pub task_alerts: bool,
 }
 
 impl Default for Settings {
@@ -117,6 +120,7 @@ impl Default for Settings {
             autostart_wanted: true,
             tray_hint_shown: false,
             auto_update: true,
+            task_alerts: true,
         }
     }
 }
@@ -130,6 +134,8 @@ pub struct NotifyState {
     pub snooze_until: Option<String>,
     pub last_version: Option<String>,
     pub update_tried: Option<String>,
+    pub task_alerts_for: Option<String>,
+    pub task_alerts_sent: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -197,6 +203,8 @@ pub struct CheckItemInput {
     pub attach: Option<String>,
     #[serde(default)]
     pub subs: Vec<SubItemInput>,
+    #[serde(default)]
+    pub start: Option<u8>,
 }
 
 #[derive(Deserialize, Debug)]
