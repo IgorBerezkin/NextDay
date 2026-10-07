@@ -95,7 +95,12 @@ export function DayScreen({ nav, date }: { nav: Nav; date: string }) {
           <h2 className="card-title">
             <Px name="image" scale={2} /> Доска итогов
           </h2>
-          <BoardView board={board} date={date} dataDir={ov.dataDir} fit="width" />
+          <BoardView
+            board={board}
+            date={date}
+            dataDir={ov.dataDir}
+            doneRefs={new Set((plan.checklist ?? []).filter((c) => c.done).map((c) => c.id))}
+          />
         </section>
       )}
     </div>

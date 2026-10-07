@@ -127,10 +127,88 @@
 .sticker-btn:hover {
   background: var(--paper2);
 }
-.bd-stage {
+.bd-main {
   flex: 1;
   min-height: 0;
+  display: flex;
+  gap: 10px;
+}
+.bd-stage {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   position: relative;
+}
+.bd-done {
+  width: 210px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  margin: var(--p);
+  overflow-y: auto;
+  background: var(--paper2);
+  box-shadow: var(--border);
+}
+.bd-done-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 16px/1.2 var(--head);
+  color: var(--green);
+}
+.bd-done .muted {
+  font-size: 18px;
+}
+.done-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  padding: 7px 9px;
+  font: 20px/1.15 var(--font);
+  color: var(--ink);
+  background: #a7f070;
+  box-shadow: var(--border);
+  cursor: grab;
+  overflow-wrap: anywhere;
+  animation: rise 0.2s steps(3);
+}
+.done-card:hover {
+  background: #c4f79c;
+}
+.task-ghost {
+  position: fixed;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 6px 10px;
+  font: 20px/1.15 var(--font);
+  color: var(--ink);
+  background: #a7f070;
+  box-shadow: var(--border), 0 calc(var(--p) * 3) 0 0 rgba(13, 14, 26, 0.35);
+  transform: translate(-50%, -50%) rotate(-3deg);
+  pointer-events: none;
+}
+.zoom-bar {
+  position: absolute;
+  right: 12px;
+  bottom: 16px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  background: var(--paper2);
+  box-shadow: var(--border);
+}
+.zoom-pct {
+  min-width: 54px;
+  text-align: center;
+  color: var(--ink2);
 }
 .bd-stage.drop::after {
   content: "Отпустите, и картинка ляжет на доску";
@@ -173,6 +251,24 @@
   margin: 6px 6px 12px;
   box-shadow: var(--border), 0 calc(var(--p) * 3) 0 0 var(--paper3);
 }
+.fit-width .stage-box {
+  overflow: hidden;
+}
+.stage-wrap.zoomable {
+  display: block;
+}
+.zoomable .stage-box {
+  position: absolute;
+  margin: 0;
+}
+.stage-wrap.zoomable.tool-select .board,
+.stage-wrap.viewer .board {
+  cursor: grab;
+}
+.stage-wrap.panning,
+.stage-wrap.panning * {
+  cursor: grabbing !important;
+}
 .stage-wrap.clickable .stage-box {
   cursor: pointer;
 }
@@ -183,8 +279,6 @@
   position: absolute;
   left: 0;
   top: 0;
-  width: 1280px;
-  height: 800px;
   transform-origin: 0 0;
   overflow: hidden;
   background-color: #fbf6e6;
@@ -198,12 +292,13 @@
   inset: 0;
   z-index: 1;
 }
+.board.editing {
+  overflow: visible;
+}
 .ink {
   position: absolute;
   left: 0;
   top: 0;
-  width: 1280px;
-  height: 800px;
   z-index: 2;
   image-rendering: pixelated;
   pointer-events: none;
@@ -221,22 +316,96 @@
 .bi {
   position: absolute;
 }
-.bi.note {
-  padding: 18px 20px;
-  font: 30px/1.25 var(--font);
+.text-16 {
+  --fs: 16px;
+  --py: 9px;
+  --px: 11px;
+  --bd: 2px;
+}
+.text-30 {
+  --fs: 30px;
+  --py: 18px;
+  --px: 20px;
+  --bd: 4px;
+}
+.text-50 {
+  --fs: 50px;
+  --py: 26px;
+  --px: 30px;
+  --bd: 6px;
+}
+.bi.note,
+.bi.task {
+  font: var(--fs) / 1.25 var(--font);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   overflow: hidden;
-  box-shadow: 0 -4px 0 0 #1a1c2c, 0 4px 0 0 #1a1c2c, -4px 0 0 0 #1a1c2c, 4px 0 0 0 #1a1c2c, 8px 12px 0 0 rgba(26, 28, 44, 0.2);
+  box-shadow:
+    0 calc(var(--bd) * -1) 0 0 #1a1c2c,
+    0 var(--bd) 0 0 #1a1c2c,
+    calc(var(--bd) * -1) 0 0 0 #1a1c2c,
+    var(--bd) 0 0 0 #1a1c2c,
+    calc(var(--bd) * 2) calc(var(--bd) * 3) 0 0 rgba(26, 28, 44, 0.2);
 }
-.bi.note.big {
-  font-size: 50px;
-  line-height: 1.2;
+.bi.note {
+  padding: var(--py) var(--px);
 }
-.bi.note .link {
+.bi.task {
+  display: flex;
+  flex-direction: column;
+}
+.task-head {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(var(--fs) * 0.35);
+  padding: var(--py) var(--px) calc(var(--py) * 0.6);
+  background: rgba(26, 28, 44, 0.13);
+}
+.task-head:last-child {
+  padding-bottom: var(--py);
+}
+.task-head svg {
+  margin-top: calc(var(--fs) * 0.08);
+}
+.task-head span {
+  flex: 1;
+  min-width: 0;
+}
+.task-text {
+  padding: calc(var(--py) * 0.6) var(--px) var(--py);
+}
+.task-text.hint {
+  opacity: 0.45;
+}
+.task-edit {
+  z-index: 5;
+  pointer-events: auto;
+  box-shadow:
+    0 0 0 calc(4px / var(--s)) var(--blue),
+    calc(var(--bd) * 2) calc(var(--bd) * 3) 0 0 rgba(26, 28, 44, 0.2) !important;
+}
+.task-edit textarea {
+  display: block;
+  width: 100%;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  font: inherit;
   color: inherit;
-  text-decoration-thickness: 4px;
-  text-underline-offset: 6px;
+  background: transparent;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.task-edit textarea::placeholder {
+  color: inherit;
+  opacity: 0.45;
+}
+.bi.note .link,
+.bi.task .link {
+  color: inherit;
+  text-decoration-thickness: calc(var(--fs) * 0.13);
+  text-underline-offset: calc(var(--fs) * 0.2);
 }
 .bi.image {
   background: #1a1c2c;
@@ -304,8 +473,8 @@
 .note-edit {
   position: absolute;
   z-index: 5;
-  padding: 18px 20px;
-  font: 30px/1.25 var(--font);
+  padding: var(--py) var(--px);
+  font: var(--fs) / 1.25 var(--font);
   border: 0;
   outline: none;
   resize: none;
@@ -314,10 +483,6 @@
   user-select: text;
   -webkit-user-select: text;
   box-shadow: 0 0 0 calc(4px / var(--s)) var(--blue), 8px 12px 0 0 rgba(26, 28, 44, 0.2);
-}
-.note-edit.big {
-  font-size: 50px;
-  line-height: 1.2;
 }
 .note-edit::placeholder {
   color: inherit;

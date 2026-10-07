@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Nav } from "../App";
 import type { Day } from "../api";
-import { BoardThumb } from "../board/BoardThumb";
+import { BoardThumb, useBoard } from "../board/BoardThumb";
 import { Button, StampOverlay } from "../ui/kit";
 import { Px } from "../ui/Px";
 import { ChecklistView, DayHead, Description, SealDialog, SealInfo } from "./parts";
@@ -13,6 +13,12 @@ export function TodayScreen({ nav }: { nav: Nav }) {
   const [wizard, setWizard] = useState(false);
   const [sealing, setSealing] = useState<Day | null>(null);
   const [stampText, setStampText] = useState<string | null>(null);
+  const board = useBoard(ov.today, day?.result.updatedAt ?? "");
+  const checklist = day?.plan?.checklist ?? [];
+  const doneRefs = new Set(checklist.filter((c) => c.done).map((c) => c.id));
+  const placed = new Set(board?.items.flatMap((i) => (i.kind === "task" ? [i.ref] : [])) ?? []);
+  const pending = board === undefined || day?.result.sealed ? 0 : checklist.filter((c) => c.done && !placed.has(c.id)).length;
+  const flash = useFlash(pending, board !== undefined);
 
   const sealed = (d: Day) => {
     patchDay(d);
@@ -125,19 +131,22 @@ export function TodayScreen({ nav }: { nav: Nav }) {
           {plan.checklist && <ChecklistView items={plan.checklist} date={day.date} tickable={!r.sealed} onDay={patchDay} />}
         </div>
         <div className="col-side">
-          {ov.evening && <RitualCard nav={nav} onSeal={() => setSealing(day)} />}
-          <section className="card">
+          {ov.evening && <RitualCard nav={nav} pending={pending} onSeal={() => setSealing(day)} />}
+          <section className={`card${flash ? " flash" : ""}`}>
             <h2 className="card-title">
               <Px name="image" scale={2} /> Итоги дня
             </h2>
             <SealInfo day={day} />
             {hasBoard ? (
-              <BoardThumb
-                date={day.date}
-                dataDir={ov.dataDir}
-                version={r.updatedAt ?? ""}
-                onOpen={() => go(r.sealed ? { name: "day", date: day.date } : { name: "board", date: day.date })}
-              />
+              board && (
+                <BoardThumb
+                  board={board}
+                  date={day.date}
+                  dataDir={ov.dataDir}
+                  doneRefs={doneRefs}
+                  onOpen={() => go(r.sealed ? { name: "day", date: day.date } : { name: "board", date: day.date })}
+                />
+              )
             ) : (
               !r.sealed && (
                 <p className="muted">
@@ -154,6 +163,7 @@ export function TodayScreen({ nav }: { nav: Nav }) {
               <div className="row">
                 <Button icon="pencil" onClick={() => go({ name: "board", date: day.date })}>
                   Доска итогов
+                  <NewBadge count={pending} />
                 </Button>
                 <Button kind="green" icon="lock" onClick={() => setSealing(day)}>
                   Запечатать
@@ -168,7 +178,31 @@ export function TodayScreen({ nav }: { nav: Nav }) {
   );
 }
 
-function RitualCard({ nav, onSeal }: { nav: Nav; onSeal: () => void }) {
+function useFlash(count: number, ready: boolean) {
+  const [flash, setFlash] = useState(false);
+  const prev = useRef<number | null>(null);
+  useEffect(() => {
+    if (!ready) return;
+    const before = prev.current;
+    prev.current = count;
+    if (before === null || count <= before) return;
+    setFlash(true);
+    const t = setTimeout(() => setFlash(false), 1600);
+    return () => clearTimeout(t);
+  }, [count, ready]);
+  return flash;
+}
+
+function NewBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="new-badge" title="Сделанные пункты, которых ещё нет на доске">
+      +{count}
+    </span>
+  );
+}
+
+function RitualCard({ nav, pending, onSeal }: { nav: Nav; pending: number; onSeal: () => void }) {
   const { ov, go } = nav;
   const today = ov.todayDay;
   const resultsDone = !today?.plan || today.result.sealed;
@@ -186,6 +220,7 @@ function RitualCard({ nav, onSeal }: { nav: Nav; onSeal: () => void }) {
             <div className="rs-actions">
               <Button small kind="paper" icon="image" onClick={() => go({ name: "board", date: ov.today })}>
                 Доска
+                <NewBadge count={pending} />
               </Button>
               <Button small kind="green" icon="lock" onClick={onSeal}>
                 Печать

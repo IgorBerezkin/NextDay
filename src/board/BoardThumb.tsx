@@ -3,18 +3,37 @@ import { api } from "../api";
 import { parseBoard, type Board } from "./model";
 import { BoardView } from "./Stage";
 
-export function BoardThumb({ date, dataDir, version, onOpen }: { date: string; dataDir: string; version: string; onOpen: () => void }) {
-  const [board, setBoard] = useState<Board | null>(null);
+export function useBoard(date: string, version: string) {
+  const [board, setBoard] = useState<Board | null | undefined>(undefined);
   useEffect(() => {
+    let alive = true;
     api
       .board(date)
-      .then((b) => setBoard(b ? parseBoard(b) : null))
-      .catch(() => setBoard(null));
+      .then((b) => alive && setBoard(b ? parseBoard(b) : null))
+      .catch(() => alive && setBoard(null));
+    return () => {
+      alive = false;
+    };
   }, [date, version]);
-  if (!board) return null;
+  return board;
+}
+
+export function BoardThumb({
+  board,
+  date,
+  dataDir,
+  doneRefs,
+  onOpen,
+}: {
+  board: Board;
+  date: string;
+  dataDir: string;
+  doneRefs: Set<string>;
+  onOpen: () => void;
+}) {
   return (
     <div className="thumb" title="Открыть доску">
-      <BoardView board={board} date={date} dataDir={dataDir} fit="width" onClick={onOpen} />
+      <BoardView board={board} date={date} dataDir={dataDir} doneRefs={doneRefs} onClick={onOpen} />
     </div>
   );
 }

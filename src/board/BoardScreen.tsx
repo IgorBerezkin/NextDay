@@ -3,35 +3,45 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Nav } from "../App";
-import { api, assetUrl, type Day } from "../api";
+import { api, assetUrl, type CheckItem, type Day } from "../api";
 import { SealDialog } from "../screens/parts";
 import { sfx } from "../sound";
 import { STICKERS, type IconName } from "../ui/icons";
-import { Button, fileName, openTarget, StampOverlay, toast, toastError } from "../ui/kit";
+import { Button, fileName, Linkify, openTarget, StampOverlay, toast, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
-import { flood, inkEmpty, line, loadInk, stampCell } from "./ink";
+import { flood, inkEmpty, line, loadInk, resizeInk, stampCell } from "./ink";
 import {
-  BH,
-  BW,
+  BASE_H,
+  BASE_W,
   CELL,
   clampItem,
   emptyBoard,
   fitImage,
-  INK_H,
-  INK_W,
+  GROW_H,
+  GROW_W,
+  grownSize,
+  isText,
+  MAX_H,
+  MAX_W,
   newId,
   PALETTE,
   parseBoard,
+  TASK_COLOR,
+  TEXT_SIZES,
   textOn,
   topZ,
+  type Board,
   type ImageItem,
   type Item,
   type NoteItem,
+  type TaskItem,
+  type TextSize,
 } from "./model";
-import { BoardView, ItemView, Stage } from "./Stage";
+import { BoardViewer, CardHead, ItemView, useZoom, ZoomBar, ZoomStage } from "./Stage";
 
 type Tool = "select" | "note" | "pen" | "eraser" | "fill";
-type Snap = { items: Item[]; ink: ImageData };
+type Size = { w: number; h: number };
+type Snap = { items: Item[]; ink: ImageData; size: Size };
 type Pt = { x: number; y: number };
 
 const TOOLS: { key: Tool; icon: IconName; label: string; code: string; hk: string }[] = [
@@ -42,19 +52,34 @@ const TOOLS: { key: Tool; icon: IconName; label: string; code: string; hk: strin
   { key: "fill", icon: "bucket", label: "Заливка", code: "KeyG", hk: "G" },
 ];
 
+const SIZE_LABELS = ["Мелкий текст", "Обычный текст", "Крупный текст"];
+const SIZE_GLYPH = [14, 20, 28];
+const NOTE_W = { 16: 220, 30: 380, 50: 560 } as const;
+const CARD_W = { 16: 220, 30: 360, 50: 520 } as const;
 const IMG_RE = /\.(png|jpe?g|gif|webp|bmp)$/i;
+
+const minW = (s: TextSize) => s * 5;
+const minH = (s: TextSize) => Math.round(s * 2.6);
+const historyCap = (s: Size) => Math.max(10, Math.min(80, Math.floor(64e6 / ((s.w / CELL) * (s.h / CELL) * 4))));
 
 export function BoardScreen({ nav, date }: { nav: Nav; date: string }) {
   const { ov, go } = nav;
   const day = date === ov.today ? ov.todayDay : date === ov.yesterday ? ov.yesterdayDay : null;
   if (day?.plan && !day.result.sealed) return <Editor nav={nav} date={date} day={day} />;
-  return <Closed nav={nav} date={date} onBack={() => go(day?.plan ? { name: "day", date } : { name: "today" })} />;
+  return <Closed nav={nav} date={date} day={day} onBack={() => go(day?.plan ? { name: "day", date } : { name: "today" })} />;
 }
 
-function Closed({ nav, date, onBack }: { nav: Nav; date: string; onBack: () => void }) {
-  const [board, setBoard] = useState(emptyBoard());
+function doneSet(day: Day | null | undefined) {
+  return new Set((day?.plan?.checklist ?? []).filter((c) => c.done).map((c) => c.id));
+}
+
+function Closed({ nav, date, day, onBack }: { nav: Nav; date: string; day: Day | null | undefined; onBack: () => void }) {
+  const [board, setBoard] = useState<Board | null>(null);
   useEffect(() => {
-    api.board(date).then((b) => setBoard(parseBoard(b))).catch(toastError);
+    api
+      .board(date)
+      .then((b) => setBoard(parseBoard(b)))
+      .catch(toastError);
   }, [date]);
   return (
     <div className="screen board-screen">
@@ -67,9 +92,7 @@ function Closed({ nav, date, onBack }: { nav: Nav; date: string; onBack: () => v
           <Px name="lock" scale={1.5} /> только просмотр
         </span>
       </div>
-      <div className="bd-stage">
-        <BoardView board={board} date={date} dataDir={nav.ov.dataDir} />
-      </div>
+      <div className="bd-stage">{board && <BoardViewer board={board} date={date} dataDir={nav.ov.dataDir} doneRefs={doneSet(day)} />}</div>
     </div>
   );
 }
@@ -80,12 +103,15 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
   const [items, setItems] = useState<Item[]>([]);
   const itemsRef = useRef<Item[]>([]);
   itemsRef.current = items;
+  const [size, setSize] = useState<Size>({ w: BASE_W, h: BASE_H });
+  const sizeRef = useRef(size);
   const [ready, setReady] = useState(false);
   const readyRef = useRef(false);
   readyRef.current = ready;
   const [tool, setTool] = useState<Tool>("select");
   const [penColor, setPenColor] = useState(0);
   const [noteColor, setNoteColor] = useState(4);
+  const [textSize, setTextSize] = useState<TextSize>(30);
   const [brush, setBrush] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -93,6 +119,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
   const [stickers, setStickers] = useState(false);
   const [dropHint, setDropHint] = useState(false);
   const [hover, setHover] = useState<{ cx: number; cy: number } | null>(null);
+  const [ghost, setGhost] = useState<{ item: CheckItem; x: number; y: number } | null>(null);
   const [sealOpen, setSealOpen] = useState(false);
   const [stampText, setStampText] = useState<string | null>(null);
   const [, setHistTick] = useState(0);
@@ -115,9 +142,13 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
   }>(null);
   const editStart = useRef<{ id: string; text: string; isNew: boolean } | null>(null);
   const editRef = useRef<HTMLTextAreaElement>(null);
+  const cardEditRef = useRef<HTMLDivElement>(null);
   const sealedDay = useRef<Day | null>(null);
 
+  const zoom = useZoom(size.w, size.h, (e) => tool === "select" && !(e.target as HTMLElement).closest("[data-id], [data-handle], .note-edit, .task-edit"));
+
   const ink = () => inkRef.current!.getContext("2d", { willReadFrequently: true })!;
+  const inkData = () => ink().getImageData(0, 0, inkRef.current!.width, inkRef.current!.height);
 
   const flush = useCallback(async () => {
     if (saveTimer.current) {
@@ -128,7 +159,8 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     dirty.current = false;
     setSaveState("saving");
     try {
-      await api.saveBoard(date, { v: 1, items: itemsRef.current, ink: inkUrl.current });
+      const { w, h } = sizeRef.current;
+      await api.saveBoard(date, { v: 1, w, h, items: itemsRef.current, ink: inkUrl.current });
       setSaveState(dirty.current ? "dirty" : "saved");
     } catch (e) {
       dirty.current = true;
@@ -158,13 +190,23 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     (async () => {
       const raw = await api.board(date).catch(() => null);
       const b = raw ? parseBoard(raw) : emptyBoard();
-      if (!alive || !inkRef.current) return;
+      const canvas = inkRef.current;
+      if (!alive || !canvas) return;
+      canvas.width = b.w / CELL;
+      canvas.height = b.h / CELL;
       await loadInk(ink(), b.ink);
       inkUrl.current = b.ink;
+      sizeRef.current = { w: b.w, h: b.h };
+      setSize(sizeRef.current);
       setItems(b.items);
       itemsRef.current = b.items;
-      hist.current = { stack: [{ items: b.items, ink: ink().getImageData(0, 0, INK_W, INK_H) }], i: 0 };
+      hist.current = { stack: [{ items: b.items, ink: inkData(), size: sizeRef.current }], i: 0 };
       setReady(true);
+      requestAnimationFrame(() => {
+        const next = itemsRef.current.map((i) => (i.kind === "task" ? fitText(i) : i));
+        setItems(next);
+        itemsRef.current = next;
+      });
     })();
     return () => {
       alive = false;
@@ -172,26 +214,38 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
   }, [date]);
 
   const syncInkUrl = () => {
-    const c = inkRef.current!;
-    inkUrl.current = inkEmpty(ink()) ? "" : c.toDataURL("image/png");
+    inkUrl.current = inkEmpty(ink()) ? "" : inkRef.current!.toDataURL("image/png");
   };
 
-  const commit = (next: Item[], inkChanged = false) => {
-    if (inkChanged) syncInkUrl();
+  const applySize = (s: Size, keepFit = false) => {
+    if (!(keepFit && zoom.fitted)) zoom.anchor(s.w, s.h);
+    resizeInk(ink(), s.w / CELL, s.h / CELL);
+    sizeRef.current = s;
+    setSize(s);
+  };
+
+  const commit = (next: Item[], inkChanged = false, forced?: Size) => {
+    const cur = sizeRef.current;
+    const target = forced ?? grownSize(next, cur.w, cur.h);
+    const resized = target.w !== cur.w || target.h !== cur.h;
+    if (resized) applySize(target);
+    if (inkChanged || resized) syncInkUrl();
     setItems(next);
     itemsRef.current = next;
     const h = hist.current;
-    const prevInk = h.stack[h.i]?.ink;
-    const snapInk = inkChanged || !prevInk ? ink().getImageData(0, 0, INK_W, INK_H) : prevInk;
+    const prev = h.stack[h.i];
+    const snapInk = inkChanged || resized || !prev ? inkData() : prev.ink;
     h.stack = h.stack.slice(0, h.i + 1);
-    h.stack.push({ items: next, ink: snapInk });
-    if (h.stack.length > 80) h.stack.shift();
+    h.stack.push({ items: next, ink: snapInk, size: sizeRef.current });
+    const cap = historyCap(sizeRef.current);
+    if (h.stack.length > cap) h.stack.splice(0, h.stack.length - cap);
     h.i = h.stack.length - 1;
     setHistTick((n) => n + 1);
     markDirty();
   };
 
   const restore = (s: Snap) => {
+    if (s.size.w !== sizeRef.current.w || s.size.h !== sizeRef.current.h) applySize(s.size, true);
     setItems(s.items);
     itemsRef.current = s.items;
     ink().putImageData(s.ink, 0, 0);
@@ -218,14 +272,24 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
 
   const toBoard = (e: { clientX: number; clientY: number }): Pt => {
     const r = boardRef.current!.getBoundingClientRect();
-    const s = r.width / BW;
+    const s = r.width / sizeRef.current.w;
     return { x: (e.clientX - r.left) / s, y: (e.clientY - r.top) / s };
   };
 
-  const center = (): Pt => ({ x: BW / 2 + (Math.random() - 0.5) * 120, y: BH / 2 + (Math.random() - 0.5) * 80 });
+  const center = (): Pt => {
+    const wr = zoom.wrapRef.current!.getBoundingClientRect();
+    const p = toBoard({ clientX: wr.left + wr.width / 2, clientY: wr.top + wr.height / 2 });
+    const { w, h } = sizeRef.current;
+    return {
+      x: Math.min(w - 120, Math.max(120, p.x)) + (Math.random() - 0.5) * 60,
+      y: Math.min(h - 80, Math.max(80, p.y)) + (Math.random() - 0.5) * 40,
+    };
+  };
+
+  const clamp = <T extends Item>(it: T) => clampItem(it, sizeRef.current.w, sizeRef.current.h);
 
   const add = (it: Item) => {
-    const next = [...itemsRef.current, clampItem({ ...it, z: topZ(itemsRef.current) + 1 })];
+    const next = [...itemsRef.current, clamp({ ...it, z: topZ(itemsRef.current) + 1 })];
     commit(next);
     setSelected(it.id);
   };
@@ -245,17 +309,30 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     }
   };
 
+  const fitText = (it: Item): Item => {
+    if (!isText(it)) return it;
+    const el = boardRef.current?.querySelector<HTMLElement>(`[data-id="${it.id}"]`);
+    if (!el) return it;
+    return { ...it, h: it.kind === "task" ? el.offsetHeight : Math.max(minH(it.size), el.scrollHeight) };
+  };
+
+  const refit = (id: string) =>
+    requestAnimationFrame(() => {
+      const it = itemsRef.current.find((i) => i.id === id);
+      if (it) patch(id, { h: fitText(it).h }, false);
+    });
+
   const addImageFile = async (file: string, at?: Pt) => {
     const url = assetUrl(ov.dataDir, date, file);
-    const size = await new Promise<{ nw: number; nh: number }>((res, rej) => {
+    const dims = await new Promise<{ nw: number; nh: number }>((res, rej) => {
       const img = new Image();
       img.onload = () => res({ nw: img.naturalWidth || 400, nh: img.naturalHeight || 300 });
       img.onerror = () => rej(new Error("Картинка не открылась."));
       img.src = url;
     });
-    const { w, h } = fitImage(size.nw, size.nh);
+    const { w, h } = fitImage(dims.nw, dims.nh);
     const c = at ?? center();
-    const it: ImageItem = { id: newId("i"), kind: "image", src: file, ...size, w, h, x: c.x - w / 2, y: c.y - h / 2, z: 0 };
+    const it: ImageItem = { id: newId("i"), kind: "image", src: file, ...dims, w, h, x: c.x - w / 2, y: c.y - h / 2, z: 0 };
     add(it);
     setTool("select");
     sfx.pop();
@@ -305,16 +382,18 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
       kind: "note",
       text,
       color: noteColor,
+      size: textSize,
       x: Math.round(p.x - 24),
       y: Math.round(p.y - 24),
-      w: 380,
-      h: 120,
+      w: NOTE_W[textSize],
+      h: minH(textSize) + 40,
       z: topZ(itemsRef.current) + 1,
     };
-    const next = [...itemsRef.current, clampItem(it)];
+    const next = [...itemsRef.current, clamp(it)];
     if (text) {
       commit(next);
       setSelected(it.id);
+      refit(it.id);
       return;
     }
     setItems(next);
@@ -323,6 +402,28 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     setEditing(it.id);
     editStart.current = { id: it.id, text: "", isNew: true };
     setTool("select");
+  };
+
+  const addCard = (ci: CheckItem, p: Pt) => {
+    const w = CARD_W[textSize];
+    const it: TaskItem = {
+      id: newId("t"),
+      kind: "task",
+      ref: ci.id,
+      title: ci.text,
+      text: "",
+      color: TASK_COLOR,
+      size: textSize,
+      x: Math.round(p.x - w / 2),
+      y: Math.round(p.y - 30),
+      w,
+      h: minH(textSize),
+      z: 0,
+    };
+    add(it);
+    setTool("select");
+    sfx.pop();
+    refit(it.id);
   };
 
   const addSticker = (icon: IconName) => {
@@ -335,7 +436,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
 
   const startEdit = (id: string) => {
     const it = itemsRef.current.find((i) => i.id === id);
-    if (it?.kind !== "note") return;
+    if (!it || !isText(it)) return;
     editStart.current = { id, text: it.text, isNew: false };
     setSelected(id);
     setEditing(id);
@@ -346,9 +447,9 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     editStart.current = null;
     setEditing(null);
     if (!st) return;
-    const it = itemsRef.current.find((i) => i.id === st.id) as NoteItem | undefined;
-    if (!it) return;
-    if (!it.text.trim()) {
+    const it = itemsRef.current.find((i) => i.id === st.id);
+    if (!it || !isText(it)) return;
+    if (it.kind === "note" && !it.text.trim()) {
       const next = itemsRef.current.filter((i) => i.id !== st.id);
       if (st.isNew) {
         setItems(next);
@@ -357,18 +458,25 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
       setSelected(null);
       return;
     }
-    if (st.isNew || it.text !== st.text) commit([...itemsRef.current]);
+    if (st.isNew || it.text !== st.text) commit(itemsRef.current.map((i) => (i.id === it.id ? fitText(i) : i)));
+    else refit(it.id);
   };
 
   useEffect(() => {
     const ta = editRef.current;
     if (!ta || !editing) return;
     const it = itemsRef.current.find((i) => i.id === editing);
-    if (!it) return;
+    if (!it || !isText(it)) return;
     ta.style.height = "0px";
-    const need = Math.max(80, ta.scrollHeight);
-    ta.style.height = `${Math.max(need, it.h)}px`;
-    if (need > it.h) patch(it.id, { h: need }, false);
+    if (it.kind === "note") {
+      const need = Math.max(minH(it.size), ta.scrollHeight);
+      ta.style.height = `${Math.max(need, it.h)}px`;
+      if (need > it.h) patch(it.id, { h: need }, false);
+    } else {
+      ta.style.height = `${ta.scrollHeight}px`;
+      const need = cardEditRef.current?.offsetHeight ?? it.h;
+      if (need !== it.h) patch(it.id, { h: need }, false);
+    }
   });
 
   const resizeItem = (o: Item, handle: string, dx: number, dy: number): Item => {
@@ -376,13 +484,13 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     const south = handle.includes("s");
     let w = o.w + (east ? dx : -dx);
     let h = o.h + (south ? dy : -dy);
-    if (o.kind === "note") {
-      w = Math.max(160, w);
-      h = Math.max(80, h);
+    if (isText(o)) {
+      w = Math.max(minW(o.size), w);
+      h = o.kind === "task" ? o.h : Math.max(minH(o.size), h);
     } else {
       const ratio = o.kind === "image" ? o.nw / o.nh : 1;
-      w = Math.max(o.kind === "sticker" ? 24 : 40, w);
-      if (o.kind === "sticker") w = Math.max(24, Math.round(w / 12) * 12);
+      w = Math.max(o.kind === "sticker" ? 12 : 16, w);
+      if (o.kind === "sticker") w = Math.max(12, Math.round(w / 12) * 12);
       h = w / ratio;
     }
     const x = east ? o.x : o.x + o.w - w;
@@ -390,10 +498,20 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     return { ...o, x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
   };
 
-  const noteFits = (it: Item): Item => {
-    if (it.kind !== "note") return it;
-    const el = boardRef.current?.querySelector<HTMLElement>(`[data-id="${it.id}"]`);
-    return el ? { ...it, h: Math.max(it.h, el.scrollHeight) } : it;
+  const chooseSize = (s: TextSize) => {
+    sfx.click();
+    setTextSize(s);
+    const it = itemsRef.current.find((i) => i.id === selected);
+    if (it && isText(it) && it.size !== s) {
+      patch(it.id, { size: s, w: Math.max(minW(s), it.w), h: minH(s) });
+      refit(it.id);
+    }
+  };
+
+  const growBoard = () => {
+    commit(itemsRef.current, false, { w: Math.min(MAX_W, sizeRef.current.w + GROW_W), h: Math.min(MAX_H, sizeRef.current.h + GROW_H) });
+    zoom.reset();
+    sfx.pop();
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -401,7 +519,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     setStickers(false);
     const p = toBoard(e);
     const target = e.target as HTMLElement;
-    if (target.closest(".note-edit")) return;
+    if (target.closest(".note-edit, .task-edit")) return;
     if (tool === "pen" || tool === "eraser") {
       const cx = Math.floor(p.x / CELL);
       const cy = Math.floor(p.y / CELL);
@@ -486,7 +604,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
       return;
     }
     if (d.changed && d.id) {
-      commit(itemsRef.current.map((i) => (i.id === d.id ? clampItem(noteFits(i)) : i)));
+      commit(itemsRef.current.map((i) => (i.id === d.id ? clamp(fitText(i)) : i)));
     } else if (d.link) {
       void openTarget(d.link);
     }
@@ -494,9 +612,30 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
 
   const onDoubleClick = (e: React.MouseEvent) => {
     if (tool !== "select") return;
-    const t = e.target as HTMLElement;
-    const el = t.closest<HTMLElement>("[data-id]");
-    if (el?.dataset.id && !t.closest(".link")) startEdit(el.dataset.id);
+    const top = document.elementsFromPoint(e.clientX, e.clientY).find((h) => h.closest("[data-id]"));
+    const id = top?.closest<HTMLElement>("[data-id]")?.dataset.id;
+    if (top && id && !top.closest(".link")) startEdit(id);
+  };
+
+  const startCardDrag = (e: React.PointerEvent, ci: CheckItem) => {
+    if (e.button !== 0 || !ready) return;
+    e.preventDefault();
+    const start = { x: e.clientX, y: e.clientY };
+    let moved = false;
+    const move = (ev: PointerEvent) => {
+      if (!moved && Math.abs(ev.clientX - start.x) + Math.abs(ev.clientY - start.y) < 5) return;
+      moved = true;
+      setGhost({ item: ci, x: ev.clientX, y: ev.clientY });
+    };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setGhost(null);
+      if (!moved) addCard(ci, center());
+      else if (document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".bd-stage")) addCard(ci, toBoard(ev));
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
   };
 
   const keyState = useRef({ selected, editing, tool });
@@ -518,6 +657,21 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
         redo();
         return;
       }
+      if (e.ctrlKey && (e.code === "Equal" || e.code === "NumpadAdd")) {
+        e.preventDefault();
+        zoom.zoomCenter(1.25);
+        return;
+      }
+      if (e.ctrlKey && (e.code === "Minus" || e.code === "NumpadSubtract")) {
+        e.preventDefault();
+        zoom.zoomCenter(1 / 1.25);
+        return;
+      }
+      if (e.ctrlKey && (e.code === "Digit0" || e.code === "Numpad0")) {
+        e.preventDefault();
+        zoom.reset();
+        return;
+      }
       if (typing) return;
       if ((e.key === "Delete" || e.key === "Backspace") && sel) {
         e.preventDefault();
@@ -528,10 +682,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
       } else if (e.ctrlKey && e.code === "KeyD" && sel) {
         e.preventDefault();
         const it = itemsRef.current.find((i) => i.id === sel);
-        if (it) {
-          const copy = { ...it, id: newId(it.kind[0]), x: it.x + 24, y: it.y + 24 };
-          add(copy);
-        }
+        if (it && it.kind !== "task") add({ ...it, id: newId(it.kind[0]), x: it.x + 24, y: it.y + 24 });
       } else if (sel && e.key.startsWith("Arrow")) {
         e.preventDefault();
         const step = e.shiftKey ? 16 : 4;
@@ -539,7 +690,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
         if (!it) return;
         const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
         const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
-        patch(sel, clampItem({ ...it, x: it.x + dx, y: it.y + dy }));
+        patch(sel, clamp({ ...it, x: it.x + dx, y: it.y + dy }));
       } else if (sel && e.key === "Enter") {
         e.preventDefault();
         startEdit(sel);
@@ -594,7 +745,8 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
           if (!readyRef.current) return;
           const dpr = window.devicePixelRatio || 1;
           const at = boardRef.current ? toBoard({ clientX: p.position.x / dpr, clientY: p.position.y / dpr }) : undefined;
-          const inside = at && at.x >= 0 && at.y >= 0 && at.x <= BW && at.y <= BH;
+          const { w, h } = sizeRef.current;
+          const inside = at && at.x >= 0 && at.y >= 0 && at.x <= w && at.y <= h;
           void addImagePaths(p.paths, inside ? at : undefined);
         }
       })
@@ -608,18 +760,23 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     };
   }, [date]);
 
+  const checklist = plan.checklist ?? [];
+  const doneRefs = new Set(checklist.filter((c) => c.done).map((c) => c.id));
+  const placed = new Set(items.flatMap((i) => (i.kind === "task" ? [i.ref] : [])));
+  const waiting = checklist.filter((c) => c.done && !placed.has(c.id));
+
   const selItem = items.find((i) => i.id === selected) ?? null;
-  const selNote = selItem?.kind === "note" ? selItem : null;
+  const selText = selItem && isText(selItem) ? selItem : null;
   const inkTool = tool === "pen" || tool === "fill" || tool === "eraser";
-  const activeColor = inkTool ? penColor : selNote ? selNote.color : noteColor;
+  const activeColor = inkTool ? penColor : selText ? selText.color : noteColor;
   const pickColor = (i: number) => {
     sfx.click();
     if (inkTool) {
       setPenColor(i);
       if (tool === "eraser") setTool("pen");
-    } else if (selNote) {
-      setNoteColor(i);
-      patch(selNote.id, { color: i });
+    } else if (selText) {
+      if (selText.kind === "note") setNoteColor(i);
+      patch(selText.id, { color: i });
     } else if (tool === "note") setNoteColor(i);
     else {
       setPenColor(i);
@@ -627,7 +784,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     }
   };
 
-  const editingItem = editing ? (items.find((i) => i.id === editing) as NoteItem | undefined) : undefined;
+  const editingItem = editing ? items.find((i) => i.id === editing) : undefined;
   const empty = ready && items.length === 0 && !inkUrl.current;
   const saveLabel = { saved: "сохранено", dirty: "…", saving: "сохраняю…", error: "не сохранилось" }[saveState];
 
@@ -640,6 +797,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
           icon="arrowL"
           onClick={async () => {
             await flush();
+            void refresh();
             go({ name: "today" });
           }}
         >
@@ -711,11 +869,18 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
             ))}
           </div>
         )}
-        {selNote && (
+        {(selText || tool === "note") && (
           <div className="tool-group">
-            <button className={`tool text${selNote.big ? " on" : ""}`} title="Крупный текст" onClick={() => patch(selNote.id, { big: !selNote.big })}>
-              Аа
-            </button>
+            {TEXT_SIZES.map((t, i) => (
+              <button
+                key={t}
+                className={`tool text${(selText?.size ?? textSize) === t ? " on" : ""}`}
+                title={SIZE_LABELS[i]}
+                onClick={() => chooseSize(t)}
+              >
+                <span style={{ fontSize: SIZE_GLYPH[i] }}>А</span>
+              </button>
+            ))}
           </div>
         )}
         <span className="grow" />
@@ -732,89 +897,162 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
         </div>
       </div>
 
-      <div className={`bd-stage${dropHint ? " drop" : ""}`}>
-        <Stage
-          ref={boardRef}
-          className={`tool-${tool}`}
-          boardProps={{
-            onPointerDown,
-            onPointerMove,
-            onPointerUp,
-            onPointerCancel: onPointerUp,
-            onPointerLeave: () => setHover(null),
-            onDoubleClick,
-          }}
-        >
-          {(scale) => (
-            <>
-              <div className="bd-items">
-                {items.map((it) => (
-                  <ItemView key={it.id} it={it} date={date} dataDir={ov.dataDir} hidden={it.id === editing} />
-                ))}
-              </div>
-              <canvas ref={inkRef} className={`ink${inkTool ? " live" : ""}`} width={INK_W} height={INK_H} />
-              <div className="overlay">
-                {selItem && !editing && (
-                  <div className="sel" style={{ left: selItem.x, top: selItem.y, width: selItem.w, height: selItem.h }}>
-                    {["nw", "ne", "sw", "se"].map((hd) => (
-                      <i key={hd} data-handle={hd} className={`hd hd-${hd}`} />
-                    ))}
-                  </div>
-                )}
-                {editingItem && (
-                  <textarea
-                    ref={editRef}
-                    className={`note-edit${editingItem.big ? " big" : ""}`}
-                    autoFocus
-                    value={editingItem.text}
-                    maxLength={2000}
-                    placeholder="Что получилось?"
-                    style={{
-                      left: editingItem.x,
-                      top: editingItem.y,
-                      width: editingItem.w,
-                      background: PALETTE[editingItem.color],
-                      color: textOn(editingItem.color),
-                    }}
-                    onChange={(e) => patch(editingItem.id, { text: e.target.value }, false)}
-                    onBlur={finishEdit}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape" || (e.key === "Enter" && e.ctrlKey)) {
-                        e.preventDefault();
-                        (e.target as HTMLTextAreaElement).blur();
-                      }
-                    }}
-                  />
-                )}
-                {hover && inkTool && (
-                  <div
-                    className="brush-cursor"
-                    style={{
-                      left: (hover.cx - Math.floor(((tool === "fill" ? 1 : brush) - 1) / 2)) * CELL,
-                      top: (hover.cy - Math.floor(((tool === "fill" ? 1 : brush) - 1) / 2)) * CELL,
-                      width: (tool === "fill" ? 1 : brush) * CELL,
-                      height: (tool === "fill" ? 1 : brush) * CELL,
-                      outlineWidth: Math.max(1, 1.5 / scale),
-                    }}
-                  />
-                )}
-                {empty && (
-                  <div className="board-empty">
-                    <Px name="image" scale={4} />
-                    <p>Вставьте скриншот (Win+Shift+S, затем Ctrl+V), перетащите картинку из проводника,</p>
-                    <p>добавьте заметку (N) или порисуйте пиксельной кистью (B).</p>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </Stage>
+      <div className="bd-main">
+        {checklist.length > 0 && (
+          <aside className="bd-done">
+            <div className="bd-done-title">
+              <Px name="check" scale={1.5} /> Сделано
+            </div>
+            {waiting.map((c) => (
+              <button key={c.id} className="done-card" title="Перетащи на доску или просто нажми" onPointerDown={(e) => startCardDrag(e, c)}>
+                <Linkify inert text={c.text} />
+              </button>
+            ))}
+            {waiting.length === 0 && (
+              <p className="muted">{doneRefs.size ? "Все сделанные пункты уже на доске." : "Отметь пункт в чеклисте, и он появится здесь."}</p>
+            )}
+          </aside>
+        )}
+        <div className={`bd-stage${dropHint ? " drop" : ""}`}>
+          <ZoomStage
+            ref={boardRef}
+            bw={size.w}
+            bh={size.h}
+            zoom={zoom}
+            editing
+            className={`tool-${tool}`}
+            boardProps={{
+              onPointerDown,
+              onPointerMove,
+              onPointerUp,
+              onPointerCancel: onPointerUp,
+              onPointerLeave: () => setHover(null),
+              onDoubleClick,
+            }}
+          >
+            {(scale) => (
+              <>
+                <div className="bd-items">
+                  {items.map((it) => (
+                    <ItemView
+                      key={it.id}
+                      it={it}
+                      date={date}
+                      dataDir={ov.dataDir}
+                      hidden={it.id === editing}
+                      done={it.kind === "task" ? doneRefs.has(it.ref) : undefined}
+                      hint="Двойной клик: описание"
+                    />
+                  ))}
+                </div>
+                <canvas ref={inkRef} className={`ink${inkTool ? " live" : ""}`} style={{ width: size.w, height: size.h }} />
+                <div className="overlay">
+                  {selItem && !editing && (
+                    <div className="sel" style={{ left: selItem.x, top: selItem.y, width: selItem.w, height: selItem.h }}>
+                      {["nw", "ne", "sw", "se"].map((hd) => (
+                        <i key={hd} data-handle={hd} className={`hd hd-${hd}`} />
+                      ))}
+                    </div>
+                  )}
+                  {editingItem?.kind === "note" && (
+                    <textarea
+                      ref={editRef}
+                      className={`note-edit text-${editingItem.size}`}
+                      autoFocus
+                      value={editingItem.text}
+                      maxLength={2000}
+                      placeholder="Что получилось?"
+                      style={{
+                        left: editingItem.x,
+                        top: editingItem.y,
+                        width: editingItem.w,
+                        background: PALETTE[editingItem.color],
+                        color: textOn(editingItem.color),
+                      }}
+                      onChange={(e) => patch(editingItem.id, { text: e.target.value }, false)}
+                      onBlur={finishEdit}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape" || (e.key === "Enter" && e.ctrlKey)) {
+                          e.preventDefault();
+                          (e.target as HTMLTextAreaElement).blur();
+                        }
+                      }}
+                    />
+                  )}
+                  {editingItem?.kind === "task" && (
+                    <div
+                      ref={cardEditRef}
+                      className={`bi task task-edit text-${editingItem.size}`}
+                      style={{
+                        left: editingItem.x,
+                        top: editingItem.y,
+                        width: editingItem.w,
+                        background: PALETTE[editingItem.color],
+                        color: textOn(editingItem.color),
+                      }}
+                    >
+                      <CardHead title={editingItem.title} size={editingItem.size} done={doneRefs.has(editingItem.ref)} />
+                      <textarea
+                        ref={editRef}
+                        className="task-text"
+                        autoFocus
+                        value={editingItem.text}
+                        maxLength={2000}
+                        placeholder="Что получилось?"
+                        onChange={(e) => patch(editingItem.id, { text: e.target.value }, false)}
+                        onBlur={finishEdit}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape" || (e.key === "Enter" && e.ctrlKey)) {
+                            e.preventDefault();
+                            (e.target as HTMLTextAreaElement).blur();
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                  {hover && inkTool && (
+                    <div
+                      className="brush-cursor"
+                      style={{
+                        left: (hover.cx - Math.floor(((tool === "fill" ? 1 : brush) - 1) / 2)) * CELL,
+                        top: (hover.cy - Math.floor(((tool === "fill" ? 1 : brush) - 1) / 2)) * CELL,
+                        width: (tool === "fill" ? 1 : brush) * CELL,
+                        height: (tool === "fill" ? 1 : brush) * CELL,
+                        outlineWidth: Math.max(1, 1.5 / scale),
+                      }}
+                    />
+                  )}
+                  {empty && (
+                    <div className="board-empty">
+                      <Px name="image" scale={4} />
+                      <p>Вставьте скриншот (Win+Shift+S, затем Ctrl+V), перетащите картинку из проводника,</p>
+                      <p>добавьте заметку (N) или порисуйте пиксельной кистью (B).</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </ZoomStage>
+          <ZoomBar zoom={zoom}>
+            <button className="tool" title="Расширить доску" disabled={size.w >= MAX_W && size.h >= MAX_H} onClick={growBoard}>
+              <Px name="grow" scale={2} />
+            </button>
+          </ZoomBar>
+        </div>
       </div>
 
       <div className="bd-hint">
-        Ctrl+V: скриншот или текст · двойной клик: править заметку · Delete: удалить · Ctrl+Z: отменить
+        Ctrl+V: вставить · двойной клик: править · Ctrl+колесо: масштаб · тяни пустое место: двигать доску
       </div>
 
+      {ghost && (
+        <div className="task-ghost" style={{ left: ghost.x, top: ghost.y }}>
+          <Px name="check" scale={1.5} />
+          <span>
+            <Linkify inert text={ghost.item.text} />
+          </span>
+        </div>
+      )}
       {sealOpen && (
         <SealDialog
           day={day}
