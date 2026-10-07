@@ -1419,10 +1419,21 @@ button.yc:not(:disabled):hover {
 .screen.clock-screen {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(320px, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 26px;
   overflow: hidden;
 }
+.clk-sky {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
 .clk-left {
+  position: relative;
+  z-index: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -1433,7 +1444,6 @@ button.yc:not(:disabled):hover {
 .clk-dial {
   line-height: 0;
   margin: var(--p);
-  box-shadow: var(--border), 0 calc(var(--p) * 3) 0 0 var(--paper3);
   touch-action: none;
 }
 .pixel-clock {
@@ -1443,12 +1453,14 @@ button.yc:not(:disabled):hover {
 .clk-time {
   margin-top: 8px;
   font: 24px/1 var(--head);
-  color: var(--ink);
+  color: var(--paper-hi);
+  text-shadow: var(--p) var(--p) 0 var(--ink);
 }
 .clk-caption {
   min-height: 25px;
   max-width: 100%;
-  color: var(--ink2);
+  color: var(--paper-hi);
+  text-shadow: var(--p) var(--p) 0 var(--ink);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -1479,13 +1491,33 @@ button.yc:not(:disabled):hover {
   background: var(--yellow);
 }
 .clk-right {
+  position: relative;
+  z-index: 1;
+  align-self: center;
   min-height: 0;
+  max-height: calc(100% - var(--p) * 5);
+  margin: var(--p) var(--p) calc(var(--p) * 4);
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
-.clk-right > .seg {
-  align-self: flex-start;
+.clk-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px 4px 18px;
+}
+.clk-head h2 {
+  margin: 0;
+  font: 16px/1.3 var(--head);
+}
+.clk-body {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 14px 12px 16px;
 }
 .clk-next {
   margin: var(--p);
@@ -1497,7 +1529,6 @@ button.yc:not(:disabled):hover {
   list-style: none;
   margin: 0;
   padding: 0 4px 4px 0;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 6px;

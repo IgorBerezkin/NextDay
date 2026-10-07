@@ -3,7 +3,7 @@ import type { Nav } from "../App";
 import { api, type CheckItem } from "../api";
 import { sfx } from "../sound";
 import { Button, Linkify, toastError } from "../ui/kit";
-import { CENTER, CLOCK_PX, MARK_R, PixelClock, polar, type ClockMark, type Tone } from "../ui/PixelClock";
+import { CENTER, CLOCK_PX, ClockSky, MARK_R, PixelClock, polar, useDayNight, type ClockMark, type Tone } from "../ui/PixelClock";
 import { Px } from "../ui/Px";
 import { duration, longDate, plural } from "../util";
 
@@ -38,6 +38,7 @@ export function ClockScreen({ nav }: { nav: Nav }) {
   const [scale, setScale] = useState(2);
   const leftRef = useRef<HTMLDivElement>(null);
   const dialRef = useRef<HTMLDivElement>(null);
+  const dn = useDayNight(half === "pm");
 
   useLayoutEffect(() => {
     const el = leftRef.current!;
@@ -167,7 +168,7 @@ export function ClockScreen({ nav }: { nav: Nav }) {
           onPointerMove={onDialMove}
           onPointerLeave={() => !ghost && setHoverHour(null)}
         >
-          <PixelClock now={now} marks={marks} scale={scale} />
+          <PixelClock dn={dn} now={now} marks={marks} scale={scale} />
         </div>
         <div className="clk-time">{now.toTimeString().slice(0, 5)}</div>
         <div className="clk-caption">
@@ -189,88 +190,95 @@ export function ClockScreen({ nav }: { nav: Nav }) {
         </div>
       </div>
 
-      <div className="clk-right">
-        <div className="seg">
-          <button className={which === "today" ? "on" : ""} onClick={() => switchDay("today")}>
-            Сегодня
-          </button>
-          <button className={which === "tomorrow" ? "on" : ""} onClick={() => switchDay("tomorrow")}>
-            Завтра
-          </button>
+      <section className="clk-right panel">
+        <div className="clk-head">
+          <h2>Расписание</h2>
+          <div className="seg">
+            <button className={which === "today" ? "on" : ""} onClick={() => switchDay("today")}>
+              Сегодня
+            </button>
+            <button className={which === "tomorrow" ? "on" : ""} onClick={() => switchDay("tomorrow")}>
+              Завтра
+            </button>
+          </div>
         </div>
 
-        {!day?.plan ? (
-          <div className="clk-empty">
-            <p className="muted">{which === "today" ? "У сегодняшнего дня нет плана." : "Завтрашний день ещё не назван."}</p>
-            <Button kind="paper" icon={which === "today" ? "sun" : "moon"} onClick={() => go({ name: which })}>
-              {which === "today" ? "К сегодняшнему дню" : "Назвать завтрашний день"}
-            </Button>
-          </div>
-        ) : items.length === 0 ? (
-          <p className="muted clk-empty">В плане нет чеклиста. Время ставится пунктам чеклиста.</p>
-        ) : (
-          <>
-            {which === "today" && (
-              <p className="clk-next">
-                {current ? (
-                  <>
-                    <b>Сейчас:</b> «<Linkify inert text={current.it.text} />»
-                  </>
-                ) : upcoming ? (
-                  <>
-                    <b>Дальше:</b> «<Linkify inert text={upcoming.it.text} />» в {hh(upcoming.at)}, через{" "}
-                    {duration((upcoming.when - t) / 1000)}
-                  </>
-                ) : timed.length ? (
-                  live.length ? (
-                    "Задачи со временем на сегодня позади."
+        <div className="clk-body">
+          {!day?.plan ? (
+            <div className="clk-empty">
+              <p className="muted">{which === "today" ? "У сегодняшнего дня нет плана." : "Завтрашний день ещё не назван."}</p>
+              <Button kind="paper" icon={which === "today" ? "sun" : "moon"} onClick={() => go({ name: which })}>
+                {which === "today" ? "К сегодняшнему дню" : "Назвать завтрашний день"}
+              </Button>
+            </div>
+          ) : items.length === 0 ? (
+            <p className="muted clk-empty">В плане нет чеклиста. Время ставится пунктам чеклиста.</p>
+          ) : (
+            <>
+              {which === "today" && (
+                <p className="clk-next">
+                  {current ? (
+                    <>
+                      <b>Сейчас:</b> «<Linkify inert text={current.it.text} />»
+                    </>
+                  ) : upcoming ? (
+                    <>
+                      <b>Дальше:</b> «<Linkify inert text={upcoming.it.text} />» в {hh(upcoming.at)}, через{" "}
+                      {duration((upcoming.when - t) / 1000)}
+                    </>
+                  ) : timed.length ? (
+                    live.length ? (
+                      "Задачи со временем на сегодня позади."
+                    ) : (
+                      "Все задачи со временем сделаны."
+                    )
                   ) : (
-                    "Все задачи со временем сделаны."
-                  )
-                ) : (
-                  "Поставь задачам время, и часы подскажут, когда начинать."
-                )}
-              </p>
-            )}
-            <ul className="clk-list">
-              {items.map((it, i) => {
-                const x = timed.find((y) => y.it.id === it.id);
-                return (
-                  <li
-                    key={it.id}
-                    className={`clk-item${it.done ? " done" : ""}${x && x.at === hoverHour ? " hot" : ""}${editable ? " draggable" : ""}`}
-                    onPointerDown={(e) => startDrag(e, [it], false)}
-                  >
-                    <span className={`clk-num tone-${x ? toneOf(x) : "none"}`}>{i + 1}</span>
-                    <span className="clk-text">
-                      <Linkify inert text={it.text} />
-                    </span>
-                    <select
-                      className="field select clk-hour"
-                      value={it.start ?? ""}
-                      disabled={!editable}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onChange={(e) => void setHour([it], e.target.value === "" ? null : Number(e.target.value))}
+                    "Поставь задачам время, и часы подскажут, когда начинать."
+                  )}
+                </p>
+              )}
+              <ul className="clk-list">
+                {items.map((it, i) => {
+                  const x = timed.find((y) => y.it.id === it.id);
+                  return (
+                    <li
+                      key={it.id}
+                      className={`clk-item${it.done ? " done" : ""}${x && x.at === hoverHour ? " hot" : ""}${editable ? " draggable" : ""}`}
+                      onPointerDown={(e) => startDrag(e, [it], false)}
                     >
-                      <option value="">--:--</option>
-                      {HOURS.map((h) => (
-                        <option key={h} value={h}>
-                          {hh(h)}
-                        </option>
-                      ))}
-                    </select>
-                  </li>
-                );
-              })}
-            </ul>
-            {editable && (
-              <p className="hint">
-                Перетащи пункт на нужный час или выбери время справа. Метку можно утащить с часов, тогда время сбросится.
-              </p>
-            )}
-          </>
-        )}
-      </div>
+                      <span className={`clk-num tone-${x ? toneOf(x) : "none"}`}>{i + 1}</span>
+                      <span className="clk-text">
+                        <Linkify inert text={it.text} />
+                      </span>
+                      <select
+                        className="field select clk-hour"
+                        value={it.start ?? ""}
+                        disabled={!editable}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onChange={(e) => void setHour([it], e.target.value === "" ? null : Number(e.target.value))}
+                      >
+                        <option value="">--:--</option>
+                        {HOURS.map((h) => (
+                          <option key={h} value={h}>
+                            {hh(h)}
+                          </option>
+                        ))}
+                      </select>
+                    </li>
+                  );
+                })}
+              </ul>
+              {editable && (
+                <p className="hint">
+                  Перетащи пункт на нужный час или выбери время справа. Метку можно утащить с часов, тогда время сбросится.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </section>
+
+      <ClockSky dn={dn} now={now} scale={scale} anchor={dialRef} />
 
       {ghost && (
         <div className="task-ghost clk-ghost" style={{ left: ghost.x, top: ghost.y }}>

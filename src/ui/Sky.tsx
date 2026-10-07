@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 
 type Phase = "night" | "dawn" | "day" | "dusk";
 
-const BANDS: Record<Phase, string[]> = {
+export const BANDS: Record<Phase, string[]> = {
   night: ["#0d0e1a", "#11132a", "#151a36", "#1a2043", "#1f2750", "#242f5c"],
   dawn: ["#29366f", "#3b5dc9", "#6d7fcf", "#b98aa6", "#ef9d77", "#ffcd75"],
   day: ["#2f6fd8", "#3b86e8", "#41a6f6", "#56b8f7", "#6ccaf7", "#94dcf6"],
