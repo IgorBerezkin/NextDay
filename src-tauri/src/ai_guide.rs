@@ -20,7 +20,7 @@ The rhythm of the app:
 | Transport | How |
 |---|---|
 | Streamable HTTP | `POST http://127.0.0.1:{port}/mcp`, default port 47328, header `Authorization: Bearer {token}`. Responses are plain JSON, never SSE. `GET` returns 405, notifications return 202. Requests with a foreign `Origin` are rejected. |
-| stdio | Run `next-day.exe --mcp`. The bridge relays JSON-RPC lines to the running app, reading the port and token from `%APPDATA%\ru.igorberezkin.nextday\mcp.json`. When the app is not running, the bridge still answers the handshake, the lists and this guide; data calls fail with "Next Day is not reachable". |
+| stdio | Run `Next Day.exe --mcp` from the install folder (`next-day.exe` in development builds). The bridge relays JSON-RPC lines to the running app, reading the port and token from `%APPDATA%\ru.igorberezkin.nextday\mcp.json`. When the app is not running, the bridge still answers the handshake, the lists and this guide; data calls fail with "Next Day is not reachable". |
 
 - The user turns the server on in Settings (card "ИИ через MCP"). The card shows the URL and copies ready-made setups for Claude Code and Claude Desktop.
 - Protocol versions: `2026-07-28` (stateless: `server/discover`, version in `_meta`) and `2025-11-25`, `2025-06-18`, `2025-03-26` through `initialize`.
