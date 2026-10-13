@@ -4,6 +4,7 @@ import { sfx } from "../sound";
 import { Px, Face } from "../ui/Px";
 import { AttachChip, Button, Check, Linkify, Modal, Progress, toast, toastError } from "../ui/kit";
 import { dayMonth, hoursText, longDate, plural, RATING_LABELS, stamp } from "../util";
+import { useTaskIndex, type TaskHit } from "./goalKit";
 
 export function DayHead({ label, date, plan, children }: { label: string; date: string; plan: Plan; children?: React.ReactNode }) {
   return (
@@ -35,21 +36,35 @@ export function Description({ text }: { text: string }) {
   );
 }
 
+function GoalChip({ hit, onOpen }: { hit: TaskHit; onOpen?: (focus: string) => void }) {
+  return (
+    <button className="cl-from cl-goal" disabled={!onOpen} onClick={() => onOpen?.(`${hit.goal.id}/${hit.topic.id}`)} title="Открыть тему на карте">
+      <Px name="flag" scale={1} />
+      <span>
+        цель «<Linkify inert text={hit.goal.title} />»: {hit.topic.title}
+      </span>
+    </button>
+  );
+}
+
 export function ChecklistView({
   items,
   date,
   tickable,
   preview,
   onDay,
-  onOpenMap,
+  onOpenFrom,
+  onOpenGoal,
 }: {
   items: CheckItem[];
   date: string;
   tickable?: boolean;
   preview?: boolean;
   onDay?: (d: Day) => void;
-  onOpenMap?: (it: CheckItem) => void;
+  onOpenFrom?: (date: string) => void;
+  onOpenGoal?: (focus: string) => void;
 }) {
+  const goalTasks = useTaskIndex(items.some((i) => i.goal));
   const done = items.filter((i) => i.done).length;
   const hTotal = items.reduce((s, i) => s + (i.hours ?? 0), 0);
   const hDone = items.reduce((s, i) => s + (i.done ? (i.hours ?? 0) : 0), 0);
@@ -105,12 +120,15 @@ export function ChecklistView({
                   <Linkify text={it.text} />
                 </span>
                 {it.from && (
-                  <button className="cl-from" disabled={!onOpenMap} onClick={() => onOpenMap?.(it)} title="Открыть на карте задач">
+                  <button className="cl-from" disabled={!onOpenFrom} onClick={() => onOpenFrom?.(it.from!.date)} title="Открыть день, где задача началась">
                     <Px name="link" scale={1} />
                     <span>
                       продолжает «<Linkify inert text={it.from.text} />», {dayMonth(it.from.date)}
                     </span>
                   </button>
+                )}
+                {it.goal && goalTasks.get(`${it.goal.goal}/${it.goal.task}`) && (
+                  <GoalChip hit={goalTasks.get(`${it.goal.goal}/${it.goal.task}`)!} onOpen={onOpenGoal} />
                 )}
                 {it.attach && <AttachChip target={it.attach} />}
                 {subs.length > 0 && (

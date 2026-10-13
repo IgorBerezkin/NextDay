@@ -1,7 +1,11 @@
+mod ai_guide;
 mod autostart;
 mod clock;
 mod commands;
+mod goals;
+mod insights;
 mod logic;
+pub mod mcp;
 mod model;
 mod notify;
 mod scheduler;
@@ -11,12 +15,70 @@ mod updater;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::window::Color;
 use tauri::{AppHandle, Emitter, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 #[derive(Default)]
 pub struct PendingRoute(pub Mutex<Option<String>>);
+
+#[derive(Default)]
+pub struct McpRun {
+    pub server: Option<Arc<tiny_http::Server>>,
+    pub port: u16,
+    pub token: String,
+    pub error: Option<String>,
+}
+
+#[derive(Default)]
+pub struct McpState(pub Mutex<McpRun>);
+
+pub fn mcp_start(app: &AppHandle) {
+    let state = app.state::<McpState>();
+    let mut run = state.0.lock().unwrap_or_else(|e| e.into_inner());
+    if run.server.is_some() {
+        return;
+    }
+    let store = app.state::<store::Store>();
+    let mut cfg: mcp::McpConfig = store.load_json(mcp::CONFIG_FILE).unwrap_or_default();
+    if cfg.token.len() < 32 {
+        cfg.token = mcp::token();
+    }
+    let preferred = if cfg.port == 0 { mcp::DEFAULT_PORT } else { cfg.port };
+    match mcp::bind(preferred) {
+        Ok((server, port)) => {
+            cfg.port = port;
+            if let Err(e) = store.save_json(mcp::CONFIG_FILE, &cfg) {
+                eprintln!("mcp.json: {e}");
+            }
+            let server = Arc::new(server);
+            *run = McpRun { server: Some(server.clone()), port, token: cfg.token.clone(), error: None };
+            let app = app.clone();
+            let token = cfg.token;
+            std::thread::spawn(move || {
+                let notify = app.clone();
+                let changed = move || {
+                    let _ = notify.emit("data-changed", ());
+                    scheduler::refresh_tray(&notify);
+                };
+                for req in server.incoming_requests() {
+                    let store = app.state::<store::Store>();
+                    mcp::serve_one(&store, &changed, &token, req);
+                }
+            });
+        }
+        Err(e) => run.error = Some(e),
+    }
+}
+
+pub fn mcp_stop(app: &AppHandle) {
+    let state = app.state::<McpState>();
+    let mut run = state.0.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(s) = run.server.take() {
+        s.unblock();
+    }
+    run.error = None;
+}
 
 #[derive(Clone, Copy)]
 struct Bounds {
@@ -202,8 +264,9 @@ fn manage_autostart() -> bool {
 
 pub fn run() {
     clock::init_from_env();
-    tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+    let mut builder = tauri::Builder::default();
+    if std::env::var_os("NEXTDAY_DATA_DIR").is_none() {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if argv.iter().any(|a| a == "--quit") {
                 quit_gracefully(app);
                 return;
@@ -211,10 +274,13 @@ pub fn run() {
             if !argv.iter().any(|a| a == "--autostart") {
                 show_main(app, None);
             }
-        }))
+        }));
+    }
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(PendingRoute::default())
+        .manage(McpState::default())
         .manage(WinBounds::default())
         .setup(|app| {
             if std::env::args().any(|a| a == "--quit") {
@@ -240,8 +306,12 @@ pub fn run() {
             app.asset_protocol_scope().allow_directory(dir.join("assets"), true)?;
             notify::setup(&dir);
             tray::build(app.handle())?;
+            goals::autoplan(&app.state::<store::Store>(), clock::now());
             scheduler::refresh_tray(app.handle());
             updater::start(app.handle());
+            if app.state::<store::Store>().load_settings().mcp_enabled {
+                mcp_start(app.handle());
+            }
 
             let hidden = std::env::args().any(|a| a == "--autostart" || a == "--hidden");
             if !hidden {
@@ -278,6 +348,14 @@ pub fn run() {
             commands::update_status,
             commands::check_update,
             commands::install_update,
+            commands::list_goals,
+            commands::save_goal,
+            commands::set_goal_status,
+            commands::delete_goal,
+            commands::edit_topics,
+            commands::record_task_result,
+            commands::mcp_info,
+            commands::set_mcp_enabled,
             commands::debug_shift_time,
             commands::debug_tick,
         ])

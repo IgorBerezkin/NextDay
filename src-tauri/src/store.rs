@@ -1,4 +1,4 @@
-use crate::model::{Day, NotifyState, Settings};
+use crate::model::{Day, Goal, NotifyState, Settings};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
@@ -15,7 +15,7 @@ pub struct Store {
 
 impl Store {
     pub fn open(dir: PathBuf) -> Result<Self, String> {
-        for sub in ["days", "boards", "assets"] {
+        for sub in ["days", "boards", "assets", "goals"] {
             fs::create_dir_all(dir.join(sub))
                 .map_err(|e| format!("Не удалось создать папку {}: {e}", dir.join(sub).display()))?;
         }
@@ -46,6 +46,14 @@ impl Store {
         write_json(&self.day_path(&day.date), day)
     }
 
+    pub fn delete_day(&self, date: &str) -> Result<(), String> {
+        let p = self.day_path(date);
+        if p.exists() {
+            fs::remove_file(&p).map_err(|e| format!("Не удалось удалить день: {e}"))?;
+        }
+        Ok(())
+    }
+
     pub fn load_board(&self, date: &str) -> Option<Value> {
         read_json(&self.board_path(date))
     }
@@ -68,6 +76,49 @@ impl Store {
         }
         out.sort();
         out
+    }
+
+    fn goal_path(&self, id: &str) -> Option<PathBuf> {
+        let ok = !id.is_empty() && id.len() <= 40 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        ok.then(|| self.dir.join("goals").join(format!("{id}.json")))
+    }
+
+    pub fn load_goal(&self, id: &str) -> Option<Goal> {
+        read_json(&self.goal_path(id)?)
+    }
+
+    pub fn save_goal(&self, goal: &Goal) -> Result<(), String> {
+        let p = self.goal_path(&goal.id).ok_or("Неправильный идентификатор цели.")?;
+        write_json(&p, goal)
+    }
+
+    pub fn delete_goal(&self, id: &str) -> Result<(), String> {
+        let p = self.goal_path(id).ok_or("Неправильный идентификатор цели.")?;
+        fs::remove_file(&p).map_err(|e| format!("Не удалось удалить цель: {e}"))
+    }
+
+    pub fn list_goals(&self) -> Vec<Goal> {
+        let mut out: Vec<Goal> = Vec::new();
+        if let Ok(rd) = fs::read_dir(self.dir.join("goals")) {
+            for e in rd.flatten() {
+                let name = e.file_name().to_string_lossy().to_string();
+                if let Some(id) = name.strip_suffix(".json") {
+                    if let Some(g) = self.load_goal(id) {
+                        out.push(g);
+                    }
+                }
+            }
+        }
+        out.sort_by(|a, b| a.created_at.cmp(&b.created_at).then_with(|| a.id.cmp(&b.id)));
+        out
+    }
+
+    pub fn load_json<T: DeserializeOwned>(&self, name: &str) -> Option<T> {
+        read_json(&self.dir.join(name))
+    }
+
+    pub fn save_json<T: Serialize>(&self, name: &str, v: &T) -> Result<(), String> {
+        write_json(&self.dir.join(name), v)
     }
 
     pub fn settings_exist(&self) -> bool {

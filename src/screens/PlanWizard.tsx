@@ -1,10 +1,11 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type CheckItem, type Day, type Plan, type PlanInput, type TaskRef } from "../api";
+import { api, type CheckItem, type Day, type GoalRef, type Plan, type PlanInput, type TaskRef } from "../api";
 import { sfx } from "../sound";
 import { AttachChip, Button, Check, Linkify, toast, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
 import { dayMonth, hoursText, longDate, NAME_EXAMPLES, parseHours, uid } from "../util";
+import { useTaskIndex } from "./goalKit";
 import { TaskPicker } from "./TaskPicker";
 
 const MAX_SUBS = 3;
@@ -19,6 +20,7 @@ type Row = {
   subs: SubRow[];
   start: number | null;
   from: TaskRef | null;
+  goal: GoalRef | null;
 };
 
 const toRow = (i: CheckItem): Row => ({
@@ -30,6 +32,7 @@ const toRow = (i: CheckItem): Row => ({
   subs: (i.subs ?? []).map((s) => ({ key: uid(), id: s.id, text: s.text })),
   start: i.start ?? null,
   from: i.from ?? null,
+  goal: i.goal ?? null,
 });
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -49,7 +52,7 @@ function loadDraft(date: string): Draft | null {
     const raw = localStorage.getItem(draftKey(date));
     if (!raw) return null;
     const d = JSON.parse(raw) as Draft;
-    return { ...d, rows: d.rows.map((r) => ({ ...r, subs: r.subs ?? [], start: r.start ?? null, from: r.from ?? null })) };
+    return { ...d, rows: d.rows.map((r) => ({ ...r, subs: r.subs ?? [], start: r.start ?? null, from: r.from ?? null, goal: r.goal ?? null })) };
   } catch {
     return null;
   }
@@ -120,7 +123,7 @@ export function PlanWizard({
   const back = () => setStep((s) => Math.max(0, s - 1));
 
   const addRow = (after?: number, from?: Partial<Row>) => {
-    const r: Row = { key: uid(), text: "", hours: "", attach: null, subs: [], start: null, from: null, ...from };
+    const r: Row = { key: uid(), text: "", hours: "", attach: null, subs: [], start: null, from: null, goal: null, ...from };
     setRows((rs) => {
       const c = [...rs];
       c.splice(after === undefined ? c.length : after + 1, 0, r);
@@ -156,24 +159,26 @@ export function PlanWizard({
   const badHours = rows.some((r, i) => r.text.trim() && parsed[i] !== null && okHours(r.hours) === null);
   const total = rows.reduce((s, r) => s + (r.text.trim() ? (okHours(r.hours) ?? 0) : 0), 0);
   const carryLeft = carry.filter((c) => !rows.some((r) => r.text.trim() === c.text.trim() || r.from?.id === c.id));
+  const goalTasks = useTaskIndex(rows.some((r) => r.goal));
+  const hasGoals = rows.some((r) => r.goal);
 
   const save = async () => {
     if (!canNext) {
       setStep(0);
       return;
     }
-    if (need && badHours) {
+    if ((need || hasGoals) && badHours) {
       toast("Проверьте часы: число от 0,25 до 24, например 1,5 или 90м.", "error");
       return;
     }
-    if (need && rows.some((r) => !r.text.trim() && r.subs.some((s) => s.text.trim()))) {
+    if ((need || hasGoals) && rows.some((r) => !r.text.trim() && r.subs.some((s) => s.text.trim()))) {
       toast("У подпунктов должен быть пункт: заполните его.", "error");
       return;
     }
     const input: PlanInput = {
       name: name.trim(),
       description: desc.trim(),
-      checklist: need
+      checklist: need || hasGoals
         ? rows
             .filter((r) => r.text.trim())
             .map((r) => ({
@@ -184,6 +189,7 @@ export function PlanWizard({
               subs: r.subs.filter((s) => s.text.trim()).map((s) => ({ id: s.id, text: s.text.trim() })),
               start: r.start,
               from: r.from,
+              goal: r.goal,
             }))
         : null,
     };
@@ -316,19 +322,26 @@ export function PlanWizard({
           <h1 className="q">Нужен чеклист?</h1>
           <Check
             className="big"
-            checked={need}
+            checked={need || hasGoals}
+            disabled={hasGoals}
             onChange={(v) => {
               setNeed(v);
               if (v && rows.length === 0) addRow();
             }}
             label="Нужен чеклист"
           />
-          {need && (
+          {hasGoals && (
+            <p className="hint">
+              Задачи целей ставятся сами и здесь не удаляются. Можно поменять им время. Чтобы освободить день, поставь цель на паузу.
+            </p>
+          )}
+          {(need || hasGoals) && (
             <div className="items">
               {rows.map((r, i) => {
                 const bad = r.text.trim() && parsed[i] !== null && okHours(r.hours) === null;
+                const hit = r.goal ? goalTasks.get(`${r.goal.goal}/${r.goal.task}`) : undefined;
                 return (
-                  <div className="item" key={r.key}>
+                  <div className={`item${r.goal ? " goal-item" : ""}`} key={r.key}>
                     <div className="item-row">
                       <span className="item-num">{i + 1}</span>
                       <div className="item-main">
@@ -336,6 +349,7 @@ export function PlanWizard({
                           className="field"
                           ref={bindInput(r.key)}
                           value={r.text}
+                          readOnly={!!r.goal}
                           maxLength={300}
                           placeholder={i === 0 ? "Например: посмотреть урок по Blockbench https://…" : "Ещё пункт"}
                           onChange={(e) => update(r.key, { text: e.target.value })}
@@ -355,10 +369,21 @@ export function PlanWizard({
                             </button>
                           </span>
                         )}
+                        {hit && (
+                          <span className="chip from-chip goal-chip" title="Задача цели: ставится сама">
+                            <span className="chip-main">
+                              <Px name="flag" scale={1.5} />
+                              <span>
+                                цель «<Linkify inert text={hit.goal.title} />»: {hit.topic.title}
+                              </span>
+                            </span>
+                          </span>
+                        )}
                       </div>
                       <input
                         className={`field hours${bad ? " bad" : ""}`}
                         value={r.hours}
+                        readOnly={!!r.goal}
                         maxLength={6}
                         placeholder="ч"
                         title="Часы на пункт, необязательно: 1,5 или 90м"
@@ -386,13 +411,18 @@ export function PlanWizard({
                       >
                         <Px name="sub" scale={2} />
                       </button>
-                      <button className="icon-btn" title="Продолжает задачу из прошлого" onClick={() => setPicking(r.key)}>
+                      <button className="icon-btn" title="Продолжает задачу из прошлого" disabled={!!r.goal} onClick={() => setPicking(r.key)}>
                         <Px name="link" scale={2} />
                       </button>
                       <button className="icon-btn" title="Прикрепить файл" onClick={() => void pickFile(r.key)}>
                         <Px name="folder" scale={2} />
                       </button>
-                      <button className="icon-btn" title="Удалить пункт" onClick={() => remove(r.key)}>
+                      <button
+                        className="icon-btn"
+                        title={r.goal ? "Задачу цели не удалить: поставь цель на паузу" : "Удалить пункт"}
+                        disabled={!!r.goal}
+                        onClick={() => remove(r.key)}
+                      >
                         <Px name="cross" scale={2} />
                       </button>
                     </div>
@@ -460,7 +490,7 @@ export function PlanWizard({
               )}
             </div>
           )}
-          {!need && <p className="hint">Можно и без чеклиста: имени и описания бывает достаточно.</p>}
+          {!need && !hasGoals && <p className="hint">Можно и без чеклиста: имени и описания бывает достаточно.</p>}
         </div>
       )}
 

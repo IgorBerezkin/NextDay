@@ -2,7 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 import type { Nav } from "../App";
-import { api, type Settings, type UpdateStatus } from "../api";
+import { api, type McpInfo, type Settings, type UpdateStatus } from "../api";
 import { Button, Check, toast, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
 import { stamp } from "../util";
@@ -140,11 +140,72 @@ export function SettingsScreen({ nav }: { nav: Nav }) {
         </section>
 
         <UpdateCard auto={s.autoUpdate} onAuto={(v) => void save({ autoUpdate: v })} version={ov.version} />
+        <McpCard />
 
         {ov.debug && <DebugCard nav={nav} />}
       </div>
       <p className="about">Next Day {ov.version} · шрифты Press Start 2P и Tiny5 (SIL OFL)</p>
     </div>
+  );
+}
+
+function McpCard() {
+  const [info, setInfo] = useState<McpInfo | null>(null);
+
+  useEffect(() => {
+    api.mcpInfo().then(setInfo, toastError);
+  }, []);
+
+  const toggle = async (v: boolean) => {
+    try {
+      setInfo(await api.setMcpEnabled(v));
+    } catch (e) {
+      toastError(e);
+    }
+  };
+
+  const copy = async (text: string, what: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(`${what} скопирована.`, "good");
+    } catch (e) {
+      toastError(e);
+    }
+  };
+
+  if (!info) return null;
+  const claudeCode =
+    info.url && info.token ? `claude mcp add --scope user --transport http next-day ${info.url} --header "Authorization: Bearer ${info.token}"` : "";
+  const desktop = JSON.stringify({ mcpServers: { "next-day": { command: info.exe, args: ["--mcp"] } } }, null, 2);
+  return (
+    <section className="card">
+      <h2 className="card-title">
+        <Px name="flag" scale={2} /> ИИ через MCP
+      </h2>
+      <Check checked={info.enabled} label="Разрешить ИИ работать с Next Day" onChange={(v) => void toggle(v)} />
+      <p className="muted">
+        Claude и другие ИИ-клиенты смогут читать историю дней, составлять черновики целей, править карту тем и записывать результаты.
+        Черновик цели заработает, только когда ты его примешь. Всё, что ИИ прочитает, попадёт в его чат.
+      </p>
+      {info.error && <p className="mcp-error">{info.error}</p>}
+      {info.running && info.url && (
+        <>
+          <p className="muted">Сервер работает на {info.url} и доступен только с этого компьютера.</p>
+          <div className="mcp-actions">
+            <Button kind="paper" small icon="link" onClick={() => void copy(claudeCode, "Команда для Claude Code")}>
+              Команда для Claude Code
+            </Button>
+            <Button kind="paper" small icon="folder" onClick={() => void copy(desktop, "Настройка для Claude Desktop")}>
+              Настройка для Claude Desktop
+            </Button>
+          </div>
+          <p className="hint">
+            Команду выполни в терминале, настройку добавь в claude_desktop_config.json. Потом попроси Claude: «составь мне цель в
+            Next Day».
+          </p>
+        </>
+      )}
+    </section>
   );
 }
 

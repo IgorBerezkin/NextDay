@@ -11,7 +11,7 @@ export function TomorrowScreen({ nav }: { nav: Nav }) {
   const day = ov.tomorrowDay;
   const [editing, setEditing] = useState(false);
   const [stampText, setStampText] = useState<string | null>(null);
-  const carry = (ov.todayDay?.plan?.checklist ?? []).filter((i) => !i.done);
+  const carry = (ov.todayDay?.plan?.checklist ?? []).filter((i) => !i.done && !i.goal);
 
   if (!day?.plan || editing) {
     return (
@@ -49,12 +49,27 @@ export function TomorrowScreen({ nav }: { nav: Nav }) {
               items={plan.checklist}
               date={day.date}
               preview
-              onOpenMap={(it) => go({ name: "map", focus: `${day.date}/${it.id}` })}
+              onOpenFrom={(date) => go({ name: "day", date })}
+              onOpenGoal={(focus) => go({ name: "map", focus })}
             />
           )}
           {!plan.checklist && !plan.description && <p className="muted">Только имя? Это тоже план.</p>}
         </div>
         <div className="col-side">
+          {plan.auto && (
+            <section className="card auto-card">
+              <h2 className="card-title">
+                <Px name="flag" scale={2} /> План от целей
+              </h2>
+              <p>
+                Этот день составился сам из задач твоих целей. Назови его по-своему и добавь свои пункты, если хочешь: задачи целей останутся
+                на месте.
+              </p>
+              <Button kind="paper" icon="pencil" onClick={() => setEditing(true)}>
+                Назвать день
+              </Button>
+            </section>
+          )}
           <section className="card">
             <h2 className="card-title">
               <Px name="clock" scale={2} /> До начала дня

@@ -17,21 +17,103 @@ export type CheckItem = {
   subs?: SubItem[];
   start?: number | null;
   from?: TaskRef | null;
+  goal?: GoalRef | null;
 };
 
 export type TaskRef = { date: string; id: string; text: string };
+export type GoalRef = { goal: string; task: string };
+
+export type GoalStatus = "draft" | "active" | "paused" | "done" | "archived";
+export type TaskKind = "learn" | "practice" | "review" | "check";
+export type TaskStatus = "todo" | "planned" | "done" | "skipped";
+export type Author = "user" | "ai";
+
+export type TaskResult = {
+  minutes: number | null;
+  score: number | null;
+  confidence: number | null;
+  note: string;
+  at: string;
+  by: Author;
+};
+export type GoalTask = {
+  id: string;
+  text: string;
+  minutes: number | null;
+  kind: TaskKind;
+  doneWhen: string;
+  status: TaskStatus;
+  plannedFor: string | null;
+  doneAt: string | null;
+  result: TaskResult | null;
+};
+export type Topic = { id: string; title: string; note: string; requires: string[]; tasks: GoalTask[] };
+export type GoalProgress = {
+  topicsTotal: number;
+  topicsDone: number;
+  tasksTotal: number;
+  tasksDone: number;
+  tasksLeft: number;
+  minutesTotal: number;
+  minutesDone: number;
+  checksTotal: number;
+  checksDone: number;
+  readiness: number | null;
+};
+export type ForecastDay = { date: string; tasks: string[]; minutes: number };
+export type Goal = {
+  id: string;
+  title: string;
+  outcome: string;
+  note: string;
+  deadline: string | null;
+  minutesPerDay: number | null;
+  days: number[];
+  startHour: number | null;
+  status: GoalStatus;
+  author: Author;
+  topics: Topic[];
+  createdAt: string;
+  updatedAt: string;
+  progress: GoalProgress;
+  forecast: ForecastDay[];
+  finish: string | null;
+};
+export type GoalTaskInput = { id?: string; text: string; minutes: number | null; kind: TaskKind; doneWhen: string };
+export type TopicInput = { id?: string; title?: string; note?: string; requires?: string[]; tasks?: GoalTaskInput[] };
+export type GoalInput = {
+  id?: string;
+  title: string;
+  outcome: string;
+  note: string;
+  deadline: string | null;
+  minutesPerDay: number | null;
+  days: number[];
+  startHour: number | null;
+  topics: TopicInput[];
+};
+export type ResultInput = {
+  status?: TaskStatus | null;
+  minutes?: number | null;
+  score?: number | null;
+  confidence?: number | null;
+  note?: string | null;
+};
+export type McpInfo = {
+  enabled: boolean;
+  running: boolean;
+  url: string | null;
+  token: string | null;
+  exe: string;
+  error: string | null;
+};
 
 export type TaskNode = {
   date: string;
   id: string;
   text: string;
   done: boolean;
-  hours: number | null;
-  subsTotal: number;
-  subsDone: number;
   dayName: string;
-  from: TaskRef | null;
-  note: string | null;
 };
 
 export type Plan = {
@@ -42,6 +124,7 @@ export type Plan = {
   updatedAt: string;
   late: boolean;
   edits: number;
+  auto?: boolean;
 };
 
 export type DayResult = {
@@ -69,6 +152,7 @@ export type Settings = {
   trayHintShown: boolean;
   autoUpdate: boolean;
   taskAlerts: boolean;
+  mcpEnabled: boolean;
 };
 
 export type Overview = {
@@ -122,6 +206,7 @@ export type ItemInput = {
   subs: SubInput[];
   start: number | null;
   from: TaskRef | null;
+  goal?: GoalRef | null;
 };
 export type PlanInput = { name: string; description: string; checklist: ItemInput[] | null };
 export type AssetInfo = { file: string; path: string };
@@ -149,6 +234,14 @@ export const api = {
   updateStatus: () => invoke<UpdateStatus>("update_status"),
   checkUpdate: () => invoke<void>("check_update"),
   installUpdate: () => invoke<void>("install_update"),
+  goals: () => invoke<Goal[]>("list_goals"),
+  saveGoal: (goal: GoalInput) => invoke<Goal>("save_goal", { goal }),
+  setGoalStatus: (id: string, status: GoalStatus) => invoke<Goal>("set_goal_status", { id, status }),
+  deleteGoal: (id: string) => invoke<void>("delete_goal", { id }),
+  editTopics: (goalId: string, upsert: TopicInput[], remove: string[] = []) => invoke<Goal>("edit_topics", { goalId, upsert, remove }),
+  recordTaskResult: (goalId: string, taskId: string, result: ResultInput) => invoke<Goal>("record_task_result", { goalId, taskId, result }),
+  mcpInfo: () => invoke<McpInfo>("mcp_info"),
+  setMcpEnabled: (enabled: boolean) => invoke<McpInfo>("set_mcp_enabled", { enabled }),
   debugShift: (minutes: number) => invoke<string>("debug_shift_time", { minutes }),
   debugTick: () => invoke<void>("debug_tick"),
 };

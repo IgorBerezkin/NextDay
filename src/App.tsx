@@ -5,6 +5,7 @@ import { BoardScreen } from "./board/BoardScreen";
 import { ClockScreen } from "./screens/ClockScreen";
 import { MapScreen } from "./screens/MapScreen";
 import { DayScreen } from "./screens/DayScreen";
+import { GoalsScreen } from "./screens/GoalsScreen";
 import { HistoryScreen } from "./screens/HistoryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { TodayScreen } from "./screens/TodayScreen";
@@ -19,6 +20,7 @@ export type Route =
   | { name: "tomorrow" }
   | { name: "clock" }
   | { name: "map"; focus?: string }
+  | { name: "goals"; focus?: string }
   | { name: "history" }
   | { name: "day"; date: string }
   | { name: "board"; date: string }
@@ -37,6 +39,7 @@ function tabOf(r: Route, ov: Overview | null): TabKey | null {
     case "tomorrow":
     case "clock":
     case "map":
+    case "goals":
     case "history":
     case "settings":
       return r.name;
@@ -83,6 +86,7 @@ export default function App() {
       if (where === "results" && o?.todayDay && !o.todayDay.result.sealed) setRoute({ name: "board", date: o.today });
       else if (where === "tomorrow") setRoute({ name: "tomorrow" });
       else if (where === "clock") setRoute({ name: "clock" });
+      else if (where === "goals") setRoute({ name: "goals" });
       else if (where === "history") setRoute({ name: "history" });
       else if (where === "settings") setRoute({ name: "settings" });
       else setRoute({ name: "today" });
@@ -102,6 +106,7 @@ export default function App() {
       }),
       listen("day-changed", () => void refresh()),
       listen("settings-changed", () => void refresh()),
+      listen("data-changed", () => void refresh()),
     ];
     const timer = window.setInterval(() => void refresh(), 30_000);
     const wake = () => {
@@ -139,6 +144,9 @@ export default function App() {
         break;
       case "map":
         screen = <MapScreen nav={nav} focus={route.focus} key={route.focus ?? "map"} />;
+        break;
+      case "goals":
+        screen = <GoalsScreen nav={nav} focus={route.focus} key={route.focus ?? "goals"} />;
         break;
       case "history":
         screen = <HistoryScreen nav={nav} />;

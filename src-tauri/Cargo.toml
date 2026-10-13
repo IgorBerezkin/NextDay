@@ -1,6 +1,6 @@
 [package]
 name = "next-day"
-version = "0.4.3"
+version = "0.5.0"
 description = "Next Day: вечером называешь завтрашний день, потом подводишь итоги"
 authors = ["IgorBerezkin"]
 edition = "2021"
@@ -23,6 +23,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 base64 = "0.22"
 minisign-verify = "0.3"
 ureq = { version = "3", default-features = false, features = ["native-tls"] }
+tiny_http = "0.12"
 
 [target.'cfg(windows)'.dependencies]
 tauri-winrt-notification = "0.8"

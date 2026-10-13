@@ -1,9 +1,10 @@
 use crate::model::*;
 use crate::store::Store;
-use crate::{autostart, clock, logic, notify, scheduler, updater, PendingRoute};
+use crate::{autostart, clock, goals, logic, notify, scheduler, updater, McpState, PendingRoute};
+use serde::Serialize;
 use serde_json::Value;
 use tauri::ipc::{InvokeBody, Request};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 pub fn debug_mode() -> bool {
     std::env::var("NEXTDAY_DEBUG").is_ok_and(|v| v == "1")
@@ -166,4 +167,101 @@ pub fn debug_tick(app: AppHandle) -> Result<(), String> {
     }
     scheduler::tick(&app);
     Ok(())
+}
+
+#[tauri::command]
+pub fn list_goals(store: State<'_, Store>) -> Vec<GoalView> {
+    goals::views(&store, clock::now())
+}
+
+fn goal_changed(app: &AppHandle, store: &Store, id: &str) -> Result<GoalView, String> {
+    scheduler::refresh_tray(app);
+    let _ = app.emit("data-changed", ());
+    goals::view(store, clock::now(), id).ok_or_else(|| "Цель не найдена.".into())
+}
+
+#[tauri::command]
+pub fn save_goal(app: AppHandle, store: State<'_, Store>, goal: GoalInput) -> Result<GoalView, String> {
+    let g = goals::save(&store, clock::now(), goal, Author::User)?;
+    goal_changed(&app, &store, &g.id)
+}
+
+#[tauri::command]
+pub fn edit_topics(
+    app: AppHandle,
+    store: State<'_, Store>,
+    goal_id: String,
+    upsert: Vec<TopicInput>,
+    remove: Vec<String>,
+) -> Result<GoalView, String> {
+    goals::edit_topics(&store, clock::now(), &goal_id, upsert, remove)?;
+    goal_changed(&app, &store, &goal_id)
+}
+
+#[tauri::command]
+pub fn set_goal_status(app: AppHandle, store: State<'_, Store>, id: String, status: GoalStatus) -> Result<GoalView, String> {
+    goals::set_status(&store, clock::now(), &id, status)?;
+    goal_changed(&app, &store, &id)
+}
+
+#[tauri::command]
+pub fn delete_goal(app: AppHandle, store: State<'_, Store>, id: String) -> Result<(), String> {
+    goals::delete(&store, clock::now(), &id)?;
+    scheduler::refresh_tray(&app);
+    let _ = app.emit("data-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn record_task_result(
+    app: AppHandle,
+    store: State<'_, Store>,
+    goal_id: String,
+    task_id: String,
+    result: ResultInput,
+) -> Result<GoalView, String> {
+    goals::record(&store, clock::now(), &goal_id, &task_id, result, Author::User)?;
+    goal_changed(&app, &store, &goal_id)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpInfo {
+    pub enabled: bool,
+    pub running: bool,
+    pub url: Option<String>,
+    pub token: Option<String>,
+    pub exe: String,
+    pub error: Option<String>,
+}
+
+#[tauri::command]
+pub fn mcp_info(app: AppHandle, store: State<'_, Store>) -> McpInfo {
+    let run = app.state::<McpState>();
+    let run = run.0.lock().unwrap_or_else(|e| e.into_inner());
+    let running = run.server.is_some();
+    McpInfo {
+        enabled: store.load_settings().mcp_enabled,
+        running,
+        url: running.then(|| format!("http://127.0.0.1:{}/mcp", run.port)),
+        token: running.then(|| run.token.clone()),
+        exe: std::env::current_exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
+        error: run.error.clone(),
+    }
+}
+
+#[tauri::command]
+pub fn set_mcp_enabled(app: AppHandle, store: State<'_, Store>, enabled: bool) -> Result<McpInfo, String> {
+    {
+        let _g = store.lock();
+        let mut s = store.load_settings();
+        s.mcp_enabled = enabled;
+        store.save_settings(&s)?;
+    }
+    if enabled {
+        crate::mcp_start(&app);
+    } else {
+        crate::mcp_stop(&app);
+    }
+    Ok(mcp_info(app.clone(), store))
 }

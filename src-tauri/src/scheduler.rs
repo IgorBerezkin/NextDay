@@ -1,7 +1,7 @@
 use crate::clock::{self, fmt_date, next, parse_dt, parse_hm, prev};
 use crate::model::{CheckItem, Day, NotifyState};
 use crate::store::Store;
-use crate::{logic, notify, tray};
+use crate::{goals, logic, notify, tray};
 use chrono::{Duration, NaiveDate};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager};
@@ -71,6 +71,7 @@ struct Status {
     yesterday: Option<Day>,
     evening: bool,
     plan_missing: bool,
+    plan_auto: bool,
     result_open: bool,
 }
 
@@ -87,6 +88,7 @@ fn status(store: &Store, c: &logic::Ctx) -> Status {
     Status {
         evening: c.at >= evening_at,
         plan_missing: tomorrow.is_none(),
+        plan_auto: tomorrow.as_ref().and_then(|d| d.plan.as_ref()).is_some_and(|p| p.auto),
         result_open,
         today,
         tomorrow,
@@ -128,6 +130,10 @@ pub fn tick(app: &AppHandle) {
         }
     }
 
+    if goals::autoplan(&store, at) {
+        let _ = app.emit("data-changed", ());
+    }
+
     let s = status(&store, &c);
     let dsh = c.settings.day_start_hour;
     let today_s = fmt_date(c.today);
@@ -149,7 +155,7 @@ pub fn tick(app: &AppHandle) {
             }
         }
 
-        let pending = c.settings.evening_enabled && s.evening && (s.plan_missing || s.result_open);
+        let pending = c.settings.evening_enabled && s.evening && (s.plan_missing || s.result_open || s.plan_auto);
         if pending {
             let snooze = ns.snooze_until.as_deref().and_then(parse_dt);
             if let Some(until) = snooze {
@@ -164,6 +170,7 @@ pub fn tick(app: &AppHandle) {
                 ns.evening_for = Some(today_s.clone());
                 changed = true;
             } else if c.settings.evening_repeat_min > 0
+                && (s.plan_missing || s.result_open)
                 && ns.evening_repeat_for.as_deref() != Some(today_s.as_str())
                 && at >= evening_at + Duration::minutes(c.settings.evening_repeat_min as i64)
             {
@@ -269,6 +276,15 @@ fn evening_toast(app: &AppHandle, s: &Status) {
         (
             "Как назовём завтрашний день?".to_string(),
             "Пара минут на план, и завтра начнётся без раскачки.".to_string(),
+            "tomorrow",
+        )
+    } else if s.plan_auto && !s.result_open {
+        (
+            "Завтра уже расписано по целям".to_string(),
+            format!(
+                "План «{}» составился сам. Можно назвать день по-своему и добавить свои пункты.",
+                plan_name(s.tomorrow.as_ref(), 40).unwrap_or_default()
+            ),
             "tomorrow",
         )
     } else {

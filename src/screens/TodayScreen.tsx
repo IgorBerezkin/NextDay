@@ -134,7 +134,8 @@ export function TodayScreen({ nav }: { nav: Nav }) {
               date={day.date}
               tickable={!r.sealed}
               onDay={patchDay}
-              onOpenMap={(it) => go({ name: "map", focus: `${day.date}/${it.id}` })}
+              onOpenFrom={(date) => go({ name: "day", date })}
+              onOpenGoal={(focus) => go({ name: "map", focus })}
             />
           )}
         </div>

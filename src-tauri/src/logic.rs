@@ -1,4 +1,5 @@
 use crate::clock::{self, fmt_date, fmt_dt, next, parse_date, prev};
+use crate::goals;
 use crate::model::*;
 use crate::store::{uid, Store};
 use chrono::{NaiveDate, NaiveDateTime};
@@ -38,7 +39,7 @@ fn ensure_open(c: &Ctx, date: NaiveDate) -> Result<(), String> {
     Ok(())
 }
 
-fn arranged(mut day: Day, day_start: u32) -> Day {
+pub(crate) fn arranged(mut day: Day, day_start: u32) -> Day {
     if let Some(items) = day.plan.as_mut().and_then(|p| p.checklist.as_mut()) {
         items.sort_by_key(|i| i.start.map_or(u32::MAX, |h| (u32::from(h) + 24 - day_start) % 24));
     }
@@ -132,11 +133,12 @@ pub fn save_plan(store: &Store, at: NaiveDateTime, date_s: &str, input: PlanInpu
                 }
                 let start = check_hour(it.start)?;
                 let from = it.from.map(|r| resolve_ref(store, &r, date)).transpose()?;
-                out.push(CheckItem { id, text, hours, attach, done: false, done_at: None, subs, start, from });
+                out.push(CheckItem { id, text, hours, attach, done: false, done_at: None, subs, start, from, goal: it.goal });
             }
             if out.len() > 40 {
                 return Err("В чеклисте может быть не больше 40 пунктов.".into());
             }
+            goals::valid_refs(store, &mut out);
             Some(out)
         }
     };
@@ -150,6 +152,7 @@ pub fn save_plan(store: &Store, at: NaiveDateTime, date_s: &str, input: PlanInpu
             p.checklist = checklist;
             p.updated_at = now_s;
             p.edits += 1;
+            p.auto = false;
         }
         None => {
             day.plan = Some(Plan {
@@ -160,23 +163,25 @@ pub fn save_plan(store: &Store, at: NaiveDateTime, date_s: &str, input: PlanInpu
                 updated_at: now_s,
                 late,
                 edits: 0,
+                auto: false,
             })
         }
     }
     let day = arranged(day, c.settings.day_start_hour);
     store.save_day(&day)?;
-    Ok(day)
+    let linked = day.plan.as_ref().and_then(|p| p.checklist.as_deref()).unwrap_or(&[]);
+    goals::link_plan(store, date_s, linked);
+    goals::plan_ahead(store, &c);
+    Ok(store.load_day(date_s).map(|d| arranged(d, c.settings.day_start_hour)).unwrap_or(day))
 }
 
 pub fn set_check(store: &Store, at: NaiveDateTime, date_s: &str, item_id: &str, done: bool) -> Result<Day, String> {
     let _g = store.lock();
     let c = ctx(store, at);
     let mut day = open_day(store, &c, date_s)?;
-    let items = day
-        .plan
-        .as_mut()
-        .and_then(|p| p.checklist.as_mut())
-        .ok_or("В плане нет чеклиста.")?;
+    let plan = day.plan.as_mut().ok_or("У этого дня нет плана.")?;
+    plan.auto = false;
+    let items = plan.checklist.as_mut().ok_or("В плане нет чеклиста.")?;
     let stamp = done.then(|| fmt_dt(c.at));
     if let Some(it) = items.iter_mut().find(|i| i.id == item_id) {
         it.done = done;
@@ -200,7 +205,12 @@ pub fn set_check(store: &Store, at: NaiveDateTime, date_s: &str, item_id: &str, 
             it.done_at = all.then(|| fmt_dt(c.at));
         }
     }
+    let touched = items.iter().find(|i| i.id == item_id || i.subs.iter().any(|s| s.id == item_id)).cloned();
     store.save_day(&day)?;
+    if let Some(t) = touched {
+        goals::on_check(store, c.at, date_s, &t);
+    }
+    goals::plan_ahead(store, &c);
     Ok(day)
 }
 
@@ -216,10 +226,11 @@ pub fn set_start(store: &Store, at: NaiveDateTime, date_s: &str, item_id: &str, 
     } else {
         return Err("Время задач можно ставить только на сегодня и завтра.".into());
     };
-    let item = day
-        .plan
+    let plan = day.plan.as_mut().ok_or("У этого дня нет плана.")?;
+    plan.auto = false;
+    let item = plan
+        .checklist
         .as_mut()
-        .and_then(|p| p.checklist.as_mut())
         .and_then(|items| items.iter_mut().find(|i| i.id == item_id))
         .ok_or("Пункт не найден.")?;
     item.start = hour;
@@ -244,41 +255,11 @@ pub fn list_tasks(store: &Store) -> Vec<TaskNode> {
     let mut out = Vec::new();
     for date in store.list_dates() {
         let Some(plan) = store.load_day(&date).and_then(|d| d.plan) else { continue };
-        let items = plan.checklist.unwrap_or_default();
-        if items.is_empty() {
-            continue;
-        }
-        let notes = board_notes(store, &date);
-        for it in items {
-            out.push(TaskNode {
-                note: notes.iter().find(|(r, _)| *r == it.id).map(|(_, t)| t.clone()),
-                date: date.clone(),
-                subs_total: it.subs.len() as u32,
-                subs_done: it.subs.iter().filter(|s| s.done).count() as u32,
-                day_name: plan.name.clone(),
-                id: it.id,
-                text: it.text,
-                done: it.done,
-                hours: it.hours,
-                from: it.from,
-            });
+        for it in plan.checklist.unwrap_or_default() {
+            out.push(TaskNode { date: date.clone(), day_name: plan.name.clone(), id: it.id, text: it.text, done: it.done });
         }
     }
     out
-}
-
-fn board_notes(store: &Store, date: &str) -> Vec<(String, String)> {
-    let Some(board) = store.load_board(date) else { return Vec::new() };
-    let items = board.get("items").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-    items
-        .iter()
-        .filter(|i| i.get("kind").and_then(|k| k.as_str()) == Some("task"))
-        .filter_map(|i| {
-            let r = i.get("ref")?.as_str()?;
-            let t = i.get("text")?.as_str()?.trim();
-            (!t.is_empty()).then(|| (r.to_string(), t.to_string()))
-        })
-        .collect()
 }
 
 fn check_hour(hour: Option<u8>) -> Result<Option<u8>, String> {
@@ -377,8 +358,12 @@ pub fn seal(store: &Store, at: NaiveDateTime, date_s: &str, rating: u8, summary:
     day.result.sealed = true;
     day.result.sealed_at = Some(fmt_dt(c.at));
     day.result.auto_sealed = false;
+    if let Some(p) = day.plan.as_mut() {
+        p.auto = false;
+    }
     store.save_day(&day)?;
     store.gc_assets(date_s);
+    goals::plan_ahead(store, &c);
     Ok(day)
 }
 
@@ -434,8 +419,13 @@ pub fn streaks(dates: &[NaiveDate], today: NaiveDate) -> (u32, u32) {
     (cur, best)
 }
 
-fn planned_dates(store: &Store) -> Vec<NaiveDate> {
-    store.list_dates().iter().filter_map(|s| parse_date(s)).collect()
+pub(crate) fn planned_dates(store: &Store) -> Vec<NaiveDate> {
+    store
+        .list_dates()
+        .iter()
+        .filter(|s| !store.load_day(s).and_then(|d| d.plan).is_some_and(|p| p.auto))
+        .filter_map(|s| parse_date(s))
+        .collect()
 }
 
 pub fn overview(store: &Store, at: NaiveDateTime, autostart: bool, debug: bool) -> Overview {
@@ -535,7 +525,9 @@ pub fn save_settings(store: &Store, mut s: Settings) -> Result<Settings, String>
     }
     s.evening_repeat_min = s.evening_repeat_min.min(240);
     s.tray_hint_shown = old.tray_hint_shown;
+    s.mcp_enabled = old.mcp_enabled;
     store.save_settings(&s)?;
+    goals::plan_ahead(store, &ctx(store, clock::now()));
     Ok(s)
 }
 
@@ -561,7 +553,7 @@ mod tests {
             checklist: Some(
                 items
                     .iter()
-                    .map(|(t, h)| CheckItemInput { id: None, text: t.to_string(), hours: *h, attach: None, subs: vec![], start: None, from: None })
+                    .map(|(t, h)| CheckItemInput { id: None, text: t.to_string(), hours: *h, attach: None, subs: vec![], start: None, from: None, goal: None })
                     .collect(),
             ),
         }
@@ -641,6 +633,7 @@ mod tests {
                 subs: subs.iter().map(|t| SubItemInput { id: None, text: t.to_string() }).collect(),
                 start: None,
                 from: None,
+                goal: None,
             }]),
         }
     }
@@ -713,8 +706,6 @@ mod tests {
         let s = tmp_store("links");
         let d = save_plan(&s, at("2026-10-06T21:00:00"), "2026-10-07", plan("Первый", &[("Пример 1", None)])).unwrap();
         let first = d.plan.unwrap().checklist.unwrap().remove(0);
-        let board = serde_json::json!({ "v": 1, "items": [{ "id": "t1", "kind": "task", "ref": first.id, "text": "Сделал половину" }] });
-        save_board(&s, at("2026-10-07T12:00:00"), "2026-10-07", &board).unwrap();
         let mut p = plan("Второй", &[("Пример 2", None)]);
         p.checklist.as_mut().unwrap()[0].from = Some(TaskRef { date: "2026-10-07".into(), id: first.id.clone(), text: "подмена".into() });
         let d = save_plan(&s, at("2026-10-07T21:00:00"), "2026-10-08", p).unwrap();
@@ -728,8 +719,8 @@ mod tests {
         assert!(save_plan(&s, at("2026-10-07T21:00:00"), "2026-10-08", same_day).is_err());
         let nodes = list_tasks(&s);
         assert_eq!(nodes.len(), 2);
-        assert_eq!(nodes[0].note.as_deref(), Some("Сделал половину"));
-        assert_eq!(nodes[1].from.as_ref().map(|r| r.id.as_str()), Some(first.id.as_str()));
+        assert_eq!(nodes[0].id, first.id);
+        assert_eq!(nodes[1].day_name, "Второй");
     }
 
     #[test]
