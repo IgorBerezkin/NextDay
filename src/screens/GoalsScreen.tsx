@@ -63,12 +63,16 @@ export function GoalsScreen({ nav, focus }: { nav: Nav; focus?: string }) {
     <div className="screen goals-screen">
       <div className="goals-head">
         <h1 className="screen-title">Цели</h1>
-        <Button icon="plus" onClick={() => setView({ mode: "edit" })}>
-          Новая цель
-        </Button>
+        {goals.length > 0 && (
+          <Button icon="plus" onClick={() => setView({ mode: "edit" })}>
+            Новая цель
+          </Button>
+        )}
       </div>
       {goals.length === 0 ? (
-        <div className="goals-empty">
+        <div className="empty goals-empty">
+          <Px name="flag" scale={5} />
+          <h2 className="empty-title">Целей пока нет</h2>
           <p>
             Цель это большой результат, разложенный на темы: что нужно уметь и в каком порядке. У каждой темы свои задачи, от простых к
             сложным. Пока цель идёт, Next Day сам ставит её задачи в план на завтра, сколько помещается в твоё время на день.
@@ -77,9 +81,14 @@ export function GoalsScreen({ nav, focus }: { nav: Nav; focus?: string }) {
             Темы и задачи можно расписать самому на вкладке «Карта» или поручить ИИ: включи «ИИ через MCP» в настройках, и Claude составит
             карту по твоей истории. Его черновик появится здесь, останется только принять.
           </p>
-          <Button kind="paper" icon="gear" onClick={() => go({ name: "settings" })}>
-            Настройки ИИ
-          </Button>
+          <div className="row">
+            <Button icon="plus" onClick={() => setView({ mode: "edit" })}>
+              Новая цель
+            </Button>
+            <Button kind="paper" icon="gear" onClick={() => go({ name: "settings" })}>
+              Настройки ИИ
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="goals-list">
