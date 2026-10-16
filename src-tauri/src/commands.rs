@@ -1,8 +1,10 @@
+use crate::lock::{self, DrillRuntime};
 use crate::model::*;
 use crate::store::Store;
-use crate::{autostart, clock, goals, logic, notify, scheduler, updater, McpState, PendingRoute};
+use crate::{autostart, clock, drill, goals, logic, notify, scheduler, updater, McpState, PendingRoute};
 use serde::Serialize;
 use serde_json::Value;
+use std::collections::HashMap;
 use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -264,4 +266,251 @@ pub fn set_mcp_enabled(app: AppHandle, store: State<'_, Store>, enabled: bool) -
         crate::mcp_stop(&app);
     }
     Ok(mcp_info(app.clone(), store))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DrillOverview {
+    #[serde(flatten)]
+    pub base: drill::Overview,
+    pub active: Option<drill::SessionView>,
+}
+
+fn drill_changed(app: &AppHandle) {
+    let _ = app.emit("drill-changed", ());
+}
+
+#[tauri::command]
+pub fn drill_overview(store: State<'_, Store>, rt: State<'_, DrillRuntime>) -> DrillOverview {
+    let now = clock::now();
+    let active = rt.0.lock().unwrap_or_else(|e| e.into_inner()).as_ref().map(|s| drill::view(s, now));
+    DrillOverview { base: drill::overview(&store, now), active }
+}
+
+#[tauri::command]
+pub fn drill_deck(store: State<'_, Store>, id: String) -> Result<Value, String> {
+    drill::get_deck(&store, &id)
+}
+
+#[tauri::command]
+pub fn drill_save_deck(app: AppHandle, store: State<'_, Store>, deck: drill::DeckInput) -> Result<drill::Deck, String> {
+    let d = drill::save_deck(&store, clock::now(), deck, Author::User)?;
+    drill_changed(&app);
+    Ok(d)
+}
+
+#[tauri::command]
+pub fn drill_delete_deck(app: AppHandle, store: State<'_, Store>, id: String) -> Result<(), String> {
+    drill::delete_deck(&store, &id)?;
+    drill_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn drill_reset_progress(app: AppHandle, store: State<'_, Store>, deck: String) -> Result<(), String> {
+    drill::reset_progress(&store, &deck)?;
+    drill_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn drill_save_preset(app: AppHandle, store: State<'_, Store>, preset: drill::Preset, make_default: bool) -> Result<drill::Preset, String> {
+    let p = drill::save_preset(&store, preset, make_default)?;
+    drill_changed(&app);
+    Ok(p)
+}
+
+#[tauri::command]
+pub fn drill_delete_preset(app: AppHandle, store: State<'_, Store>, id: String) -> Result<(), String> {
+    drill::delete_preset(&store, &id)?;
+    drill_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn drill_set_default(app: AppHandle, store: State<'_, Store>, id: String) -> Result<(), String> {
+    drill::set_default(&store, &id)?;
+    drill_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn drill_set_prefs(app: AppHandle, store: State<'_, Store>, prefs: drill::BuiltinPrefs) -> Result<(), String> {
+    drill::set_prefs(&store, prefs)?;
+    drill_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn drill_set_topic(app: AppHandle, store: State<'_, Store>, deck: String, topic: String, open: bool) -> Result<(), String> {
+    drill::set_topic(&store, clock::now(), &deck, &topic, open)?;
+    drill_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn drill_start(app: AppHandle, preset_id: String, generated: Option<drill::Generated>) -> Result<drill::SessionView, String> {
+    let store = app.state::<Store>();
+    let rt = app.state::<DrillRuntime>();
+    let now = clock::now();
+    let (id, lock_screen, view) = {
+        let mut g = rt.0.lock().unwrap_or_else(|e| e.into_inner());
+        if g.as_ref().is_some_and(|s| s.ended.is_none()) {
+            return Err("Сеанс уже идёт.".into());
+        }
+        let s = drill::start(&store, now, &preset_id, generated.unwrap_or_default())?;
+        let out = (s.id.clone(), s.preset.screen == drill::Screen::Lock, drill::view(&s, now));
+        *g = Some(s);
+        out
+    };
+    if lock_screen {
+        if let Err(e) = lock::open(&app) {
+            rt.0.lock().unwrap_or_else(|e| e.into_inner()).take();
+            lock::close_windows(&app);
+            return Err(format!("Не удалось закрыть экран: {e}"));
+        }
+    }
+    lock::watch(app.clone(), id);
+    drill_changed(&app);
+    Ok(view)
+}
+
+#[tauri::command]
+pub fn drill_gen_sources(store: State<'_, Store>, preset_id: String) -> Result<Vec<drill::GenSource>, String> {
+    drill::gen_sources(&store, &preset_id)
+}
+
+#[tauri::command]
+pub fn drill_generator(store: State<'_, Store>, id: String) -> Result<drill::Generator, String> {
+    drill::get_generator(&store, &id)
+}
+
+#[tauri::command]
+pub fn drill_check_generator(topics: Vec<drill::BankTopic>, templates: Vec<drill::BankCard>, made: HashMap<String, Vec<drill::Variant>>) -> Result<drill::GenCheck, String> {
+    drill::check_generator(topics, templates, &made)
+}
+
+#[tauri::command]
+pub fn drill_save_generator(app: AppHandle, store: State<'_, Store>, generator: drill::GeneratorInput) -> Result<drill::Generator, String> {
+    let g = drill::save_generator(&store, clock::now(), generator, Author::User)?;
+    drill_changed(&app);
+    Ok(g)
+}
+
+#[tauri::command]
+pub fn drill_disable_generator(app: AppHandle, store: State<'_, Store>, id: String) -> Result<(), String> {
+    drill::disable_generator(&store, &id)?;
+    drill_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn drill_import_bank(app: AppHandle, text: String, replace: Option<String>) -> Result<drill::ImportReport, String> {
+    let store = app.state::<Store>();
+    let input = drill::parse_bank(&text)?;
+    let r = drill::import_bank(&store, clock::now(), input, replace.as_deref(), Author::User)?;
+    drill_changed(&app);
+    Ok(r)
+}
+
+#[tauri::command]
+pub fn drill_set_gate(app: AppHandle, store: State<'_, Store>, deck: String, gate: drill::Gate) -> Result<(), String> {
+    drill::set_gate(&store, &deck, gate)?;
+    drill_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn drill_session(rt: State<'_, DrillRuntime>) -> Option<drill::SessionView> {
+    let now = clock::now();
+    rt.0.lock().unwrap_or_else(|e| e.into_inner()).as_ref().map(|s| drill::view(s, now))
+}
+
+#[tauri::command]
+pub fn drill_reveal(rt: State<'_, DrillRuntime>) -> Result<drill::SessionView, String> {
+    let mut g = rt.0.lock().unwrap_or_else(|e| e.into_inner());
+    let s = g.as_mut().ok_or("Сеанса нет.")?;
+    drill::reveal(s)?;
+    Ok(drill::view(s, clock::now()))
+}
+
+#[tauri::command]
+pub fn drill_answer(store: State<'_, Store>, rt: State<'_, DrillRuntime>, input: drill::AnswerInput) -> Result<drill::AnswerView, String> {
+    let mut g = rt.0.lock().unwrap_or_else(|e| e.into_inner());
+    let s = g.as_mut().ok_or("Сеанса нет.")?;
+    drill::answer(&store, s, clock::now(), input)
+}
+
+#[tauri::command]
+pub async fn drill_escape(app: AppHandle) -> Result<drill::SessionRecord, String> {
+    let store = app.state::<Store>();
+    let rt = app.state::<DrillRuntime>();
+    let (rec, id) = {
+        let mut g = rt.0.lock().unwrap_or_else(|e| e.into_inner());
+        let s = g.as_mut().ok_or("Сеанса нет.")?;
+        if s.preset.screen == drill::Screen::Lock && s.preset.escape == drill::Escape::Off && s.ended.is_none() {
+            return Err("В этом режиме выхода нет: только ответы или потолок времени.".into());
+        }
+        let outcome = if s.preset.screen == drill::Screen::Lock { drill::Outcome::Escape } else { drill::Outcome::Stopped };
+        (drill::finish(&store, s, clock::now(), outcome), s.id.clone())
+    };
+    if rec.screen == drill::Screen::Lock {
+        lock::ended(&app, &id);
+    }
+    drill_changed(&app);
+    Ok(rec)
+}
+
+#[tauri::command]
+pub async fn drill_close(app: AppHandle) {
+    let rt = app.state::<DrillRuntime>();
+    let id = rt.0.lock().unwrap_or_else(|e| e.into_inner()).as_ref().filter(|s| s.ended.is_some()).map(|s| s.id.clone());
+    if let Some(id) = id {
+        lock::ended(&app, &id);
+    }
+}
+
+#[tauri::command]
+pub fn drill_dismiss(app: AppHandle, rt: State<'_, DrillRuntime>) {
+    let mut g = rt.0.lock().unwrap_or_else(|e| e.into_inner());
+    if g.as_ref().is_some_and(|s| s.ended.is_some()) {
+        *g = None;
+    }
+    drop(g);
+    drill_changed(&app);
+}
+
+#[tauri::command]
+pub fn drill_articles(store: State<'_, Store>) -> Vec<drill::Article> {
+    drill::articles(&store)
+}
+
+#[tauri::command]
+pub fn drill_save_article(app: AppHandle, store: State<'_, Store>, article: drill::ArticleInput) -> Result<drill::Article, String> {
+    let a = drill::save_article(&store, clock::now(), article, Author::User)?;
+    drill_changed(&app);
+    Ok(a)
+}
+
+#[tauri::command]
+pub fn drill_delete_article(app: AppHandle, store: State<'_, Store>, id: String) -> Result<(), String> {
+    drill::delete_article(&store, &id)?;
+    drill_changed(&app);
+    Ok(())
+}
+
+#[derive(Serialize)]
+pub struct HintPlace {
+    pub deck: String,
+    pub topic: String,
+}
+
+#[tauri::command]
+pub fn drill_hint(rt: State<'_, DrillRuntime>) -> Option<HintPlace> {
+    let mut g = rt.0.lock().unwrap_or_else(|e| e.into_inner());
+    let s = g.as_mut()?;
+    if s.ended.is_some() {
+        return None;
+    }
+    drill::hint(s).map(|(deck, topic)| HintPlace { deck, topic })
 }

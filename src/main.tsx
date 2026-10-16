@@ -1,9 +1,12 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createRoot } from "react-dom/client";
 import "@fontsource/tiny5";
 import "@fontsource/press-start-2p";
 import "./styles.css";
 import "./board/board.css";
+import "./drill/drill.css";
 import App from "./App";
+import { DrillLock } from "./drill/DrillLock";
 
 function syncPixel() {
   const dpr = window.devicePixelRatio || 1;
@@ -19,4 +22,5 @@ window.addEventListener("contextmenu", (e) => {
   if (!t.closest("input, textarea")) e.preventDefault();
 });
 
-createRoot(document.getElementById("root")!).render(<App />);
+const label = getCurrentWindow().label;
+createRoot(document.getElementById("root")!).render(label.startsWith("drill-") ? <DrillLock primary={label === "drill-main"} /> : <App />);

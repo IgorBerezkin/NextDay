@@ -211,6 +211,233 @@ export type ItemInput = {
 export type PlanInput = { name: string; description: string; checklist: ItemInput[] | null };
 export type AssetInfo = { file: string; path: string };
 
+export type CheckMode = "text" | "python" | "shape" | "number" | "choice" | "self";
+export type CheckSpec = { mode: CheckMode; caseSensitive: boolean; ignoreSpaces: boolean; tolerance: number; strictTypes: boolean };
+export type Gate = { enabled: boolean; percent: number; window: number };
+export type DrillSource = { deck: string; topics: string[] };
+export type DrillOrder = "smart" | "random" | "sequence";
+export type DrillGoal = "correct" | "cards" | "minutes";
+export type DrillScreenKind = "lock" | "window";
+export type DrillEscape = "hold" | "none";
+export type DrillPreset = {
+  id: string;
+  name: string;
+  sources: DrillSource[];
+  order: DrillOrder;
+  goal: DrillGoal;
+  amount: number;
+  retry: boolean;
+  explain: boolean;
+  screen: DrillScreenKind;
+  escape: DrillEscape;
+  limitMinutes: number;
+  selfCheck: boolean;
+  theoryLabel: string;
+  peekKeepsBox: boolean;
+};
+export type DrillTopic = {
+  id: string;
+  title: string;
+  cards: number;
+  open: boolean;
+  answered: number;
+  recent: number;
+  recentRight: number;
+  seen: number;
+  due: number;
+  boxes: number[];
+};
+export type DrillDeckKind = "deck" | "bank" | "generator";
+export type DrillDeckInfo = {
+  id: string;
+  title: string;
+  description: string;
+  builtin: boolean;
+  kind: DrillDeckKind;
+  enabled: boolean;
+  author: Author;
+  cards: number;
+  variants: number;
+  check: CheckSpec | null;
+  gate: Gate;
+  topics: DrillTopic[];
+  updatedAt: string;
+};
+export type DrillOutcome = "done" | "escape" | "timeout" | "stopped";
+export type DrillRecord = {
+  id: string;
+  preset: string;
+  name: string;
+  startedAt: string;
+  endedAt: string;
+  outcome: DrillOutcome;
+  screen: DrillScreenKind;
+  goal: DrillGoal;
+  amount: number;
+  answered: number;
+  correct: number;
+  firstTry: number;
+  wrong: number;
+  seconds: number;
+  misses: { deck: string; card: string; topic: string }[];
+  hinted: number;
+};
+export type WeakCard = {
+  deck: string;
+  card: string;
+  topic: string;
+  prompt: string;
+  code: string;
+  answer: string;
+  rule: string;
+  right: number;
+  wrong: number;
+  level: number;
+  lastWrong: string[];
+};
+export type WalkItem = { name: string; repr: string; shape: string };
+export type WalkVar = [string, string, string];
+export type WalkStep = [number, number | null, WalkVar[]];
+export type Walk = {
+  steps: WalkStep[];
+  focus: { step: number; line: number; inputs: string[]; target: string | null } | null;
+  error: { line: number | null; type: string; message: string } | null;
+};
+export type DrillReveal = { expected: string; explain: string; walk: Walk | null };
+export type DrillCardMode = "python" | "shape" | "trace" | "pick" | "output" | "text" | "number" | "choice" | "self";
+export type DrillCard = {
+  deck: string;
+  topic: string;
+  deckId: string;
+  topicId: string;
+  hinted: boolean;
+  kind: string;
+  mode: DrillCardMode;
+  prompt: string;
+  code: string;
+  choices: string[];
+  retry: boolean;
+  selfCheck: boolean;
+  revealed: DrillReveal | null;
+};
+export type DrillSessionView = {
+  id: string;
+  name: string;
+  screen: DrillScreenKind;
+  escape: DrillEscape;
+  startedAt: string;
+  elapsed: number;
+  limit: number | null;
+  goal: DrillGoal;
+  amount: number;
+  answered: number;
+  correct: number;
+  firstTry: number;
+  wrong: number;
+  hinted: number;
+  theoryLabel: string;
+  card: DrillCard | null;
+  ended: DrillRecord | null;
+};
+export type DrillAnswer = {
+  correct: boolean;
+  expected: string;
+  given: string;
+  note: string | null;
+  explain: string;
+  walk: Walk | null;
+  hinted: boolean;
+  opened: string | null;
+  session: DrillSessionView;
+};
+export type Article = {
+  id: string;
+  deck: string;
+  topic: string;
+  title: string;
+  body: string;
+  author: Author;
+  builtin: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type ArticleInput = { id?: string; deck: string; topic: string; title: string; body: string };
+export type BuiltinPrefs = { gate: Gate; strictTypes: boolean };
+export type DrillOverview = {
+  presets: DrillPreset[];
+  defaultPreset: string;
+  python: BuiltinPrefs;
+  decks: DrillDeckInfo[];
+  streak: number;
+  bestStreak: number;
+  today: { sessions: number; answers: number; correct: number };
+  due: number;
+  weak: WeakCard[];
+  sessions: DrillRecord[];
+  active: DrillSessionView | null;
+};
+export type DrillCardData = {
+  id?: string;
+  topic: string;
+  prompt: string;
+  code: string;
+  answer: string;
+  alternatives: string[];
+  choices: string[];
+  check: CheckSpec | null;
+  explain: string;
+};
+export type DrillDeck = {
+  id: string;
+  title: string;
+  description: string;
+  author: Author;
+  check: CheckSpec;
+  gate: Gate;
+  cards: DrillCardData[];
+  createdAt: string;
+  updatedAt: string;
+};
+export type DrillDeckInput = { id?: string; title: string; description: string; check: CheckSpec; gate: Gate; cards: DrillCardData[] };
+export type BankTopic = { id: string; title: string; theory: string };
+export type BankCard = { id: string; topic: string; kind: string; rule: string; check?: CheckSpec | null };
+export type GenVariant = { question: string; code: string; answer: string; choices: string[]; alternatives: string[]; explain: string };
+export type Generated = Record<string, Record<string, GenVariant[]>>;
+export type DrillGenerator = {
+  id: string;
+  title: string;
+  description: string;
+  author: Author;
+  code: string;
+  enabled: boolean;
+  topics: BankTopic[];
+  templates: BankCard[];
+  gate: Gate;
+  createdAt: string;
+  updatedAt: string;
+};
+export type GeneratorInput = {
+  id?: string;
+  title: string;
+  description: string;
+  code: string;
+  enabled: boolean;
+  topics: BankTopic[];
+  templates: BankCard[];
+};
+export type GenSource = { id: string; title: string; code: string; templates: string[] };
+export type GenCheck = { templates: number; ready: number; variants: number; problems: string[] };
+export type ImportReport = {
+  id: string;
+  title: string;
+  topics: number;
+  cards: number;
+  variants: number;
+  dropped: number;
+  problems: string[];
+  replaced: boolean;
+};
+
 export const api = {
   overview: () => invoke<Overview>("get_overview"),
   day: (date: string) => invoke<Day | null>("get_day", { date }),
@@ -244,6 +471,35 @@ export const api = {
   setMcpEnabled: (enabled: boolean) => invoke<McpInfo>("set_mcp_enabled", { enabled }),
   debugShift: (minutes: number) => invoke<string>("debug_shift_time", { minutes }),
   debugTick: () => invoke<void>("debug_tick"),
+  drillOverview: () => invoke<DrillOverview>("drill_overview"),
+  drillDeck: (id: string) => invoke<DrillDeck>("drill_deck", { id }),
+  drillSaveDeck: (deck: DrillDeckInput) => invoke<DrillDeck>("drill_save_deck", { deck }),
+  drillDeleteDeck: (id: string) => invoke<void>("drill_delete_deck", { id }),
+  drillResetProgress: (deck: string) => invoke<void>("drill_reset_progress", { deck }),
+  drillSavePreset: (preset: DrillPreset, makeDefault: boolean) => invoke<DrillPreset>("drill_save_preset", { preset, makeDefault }),
+  drillDeletePreset: (id: string) => invoke<void>("drill_delete_preset", { id }),
+  drillSetDefault: (id: string) => invoke<void>("drill_set_default", { id }),
+  drillSetPrefs: (prefs: BuiltinPrefs) => invoke<void>("drill_set_prefs", { prefs }),
+  drillSetTopic: (deck: string, topic: string, open: boolean) => invoke<void>("drill_set_topic", { deck, topic, open }),
+  drillStart: (presetId: string, generated: Generated = {}) => invoke<DrillSessionView>("drill_start", { presetId, generated }),
+  drillGenSources: (presetId: string) => invoke<GenSource[]>("drill_gen_sources", { presetId }),
+  drillGenerator: (id: string) => invoke<DrillGenerator>("drill_generator", { id }),
+  drillCheckGenerator: (topics: BankTopic[], templates: BankCard[], made: Record<string, GenVariant[]>) =>
+    invoke<GenCheck>("drill_check_generator", { topics, templates, made }),
+  drillSaveGenerator: (generator: GeneratorInput) => invoke<DrillGenerator>("drill_save_generator", { generator }),
+  drillDisableGenerator: (id: string) => invoke<void>("drill_disable_generator", { id }),
+  drillImportBank: (text: string, replace: string | null) => invoke<ImportReport>("drill_import_bank", { text, replace }),
+  drillSetGate: (deck: string, gate: Gate) => invoke<void>("drill_set_gate", { deck, gate }),
+  drillSession: () => invoke<DrillSessionView | null>("drill_session"),
+  drillReveal: () => invoke<DrillSessionView>("drill_reveal"),
+  drillAnswer: (input: { text?: string; knew?: boolean }) => invoke<DrillAnswer>("drill_answer", { input }),
+  drillEscape: () => invoke<DrillRecord>("drill_escape"),
+  drillClose: () => invoke<void>("drill_close"),
+  drillDismiss: () => invoke<void>("drill_dismiss"),
+  drillArticles: () => invoke<Article[]>("drill_articles"),
+  drillSaveArticle: (article: ArticleInput) => invoke<Article>("drill_save_article", { article }),
+  drillDeleteArticle: (id: string) => invoke<void>("drill_delete_article", { id }),
+  drillHint: () => invoke<{ deck: string; topic: string } | null>("drill_hint"),
 };
 
 export function assetUrl(dataDir: string, date: string, file: string) {

@@ -4,7 +4,7 @@ import { plural } from "../util";
 import type { IconName } from "./icons";
 import { Px } from "./Px";
 
-export type TabKey = "today" | "tomorrow" | "clock" | "map" | "goals" | "history" | "settings";
+export type TabKey = "today" | "tomorrow" | "clock" | "map" | "goals" | "drill" | "history" | "settings";
 
 export function TitleBar({
   tab,
@@ -41,6 +41,7 @@ export function TitleBar({
         {item("clock", "Часы", "clock")}
         {item("map", "Карта", "map")}
         {item("goals", "Цели", "flag")}
+        {item("drill", "Зубрилка", "cards")}
         {item("history", "История", "calendar")}
         {item("settings", "Настройки", "gear")}
       </nav>

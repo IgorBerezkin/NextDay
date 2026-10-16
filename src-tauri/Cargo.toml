@@ -1,6 +1,6 @@
 [package]
 name = "next-day"
-version = "0.5.0"
+version = "0.7.2"
 description = "Next Day: вечером называешь завтрашний день, потом подводишь итоги"
 authors = ["IgorBerezkin"]
 edition = "2021"
@@ -18,7 +18,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["raw_value"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 base64 = "0.22"
 minisign-verify = "0.3"

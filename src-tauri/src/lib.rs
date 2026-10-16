@@ -2,12 +2,15 @@ mod ai_guide;
 mod autostart;
 mod clock;
 mod commands;
+mod drill;
 mod goals;
 mod insights;
+mod lock;
 mod logic;
 pub mod mcp;
 mod model;
 mod notify;
+mod pylit;
 mod scheduler;
 mod store;
 mod tray;
@@ -282,6 +285,7 @@ pub fn run() {
         .manage(PendingRoute::default())
         .manage(McpState::default())
         .manage(WinBounds::default())
+        .manage(lock::DrillRuntime::default())
         .setup(|app| {
             if std::env::args().any(|a| a == "--quit") {
                 std::process::exit(0);
@@ -322,6 +326,12 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
+                if window.label().starts_with("drill-") {
+                    if lock::locked(window.app_handle()) {
+                        api.prevent_close();
+                    }
+                    return;
+                }
                 api.prevent_close();
                 hide_to_tray(window.app_handle());
             }
@@ -358,6 +368,34 @@ pub fn run() {
             commands::set_mcp_enabled,
             commands::debug_shift_time,
             commands::debug_tick,
+            commands::drill_overview,
+            commands::drill_deck,
+            commands::drill_save_deck,
+            commands::drill_delete_deck,
+            commands::drill_reset_progress,
+            commands::drill_save_preset,
+            commands::drill_delete_preset,
+            commands::drill_set_default,
+            commands::drill_set_prefs,
+            commands::drill_set_topic,
+            commands::drill_start,
+            commands::drill_session,
+            commands::drill_reveal,
+            commands::drill_answer,
+            commands::drill_escape,
+            commands::drill_close,
+            commands::drill_dismiss,
+            commands::drill_articles,
+            commands::drill_save_article,
+            commands::drill_delete_article,
+            commands::drill_hint,
+            commands::drill_gen_sources,
+            commands::drill_generator,
+            commands::drill_check_generator,
+            commands::drill_save_generator,
+            commands::drill_disable_generator,
+            commands::drill_import_bank,
+            commands::drill_set_gate,
         ])
         .build(tauri::generate_context!())
         .expect("не удалось запустить Next Day")

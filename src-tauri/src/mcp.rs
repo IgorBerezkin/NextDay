@@ -1,7 +1,7 @@
 use crate::ai_guide::{GUIDE, INSTRUCTIONS};
 use crate::model::*;
 use crate::store::Store;
-use crate::{clock, goals, insights};
+use crate::{clock, drill, goals, insights};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::hash::{BuildHasher, Hasher};
@@ -90,6 +90,81 @@ fn goal_fields() -> serde_json::Map<String, Value> {
     v.as_object().cloned().unwrap_or_default()
 }
 
+fn check_schema(what: &str) -> Value {
+    json!({
+        "type": "object",
+        "description": what,
+        "properties": {
+            "mode": { "type": "string", "enum": ["text", "python", "shape", "number", "choice", "self"], "description": "text: normalized text; python: a Python literal compared with types, or an exception name; shape: notation like list[tuple[str, int]]; number: numeric with tolerance; choice: pick one of the choices; self: the user reveals the answer and grades themselves." },
+            "caseSensitive": { "type": "boolean", "description": "text and choice. Default false." },
+            "ignoreSpaces": { "type": "boolean", "description": "text: remove all spaces before comparing. Default false." },
+            "tolerance": { "type": "number", "minimum": 0, "description": "number: allowed absolute difference. Default 0." },
+            "strictTypes": { "type": "boolean", "description": "python: 3 and 3.0, a tuple and a list differ. Default true." }
+        }
+    })
+}
+
+fn drill_card_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "id": { "type": "string", "description": "edit_drill_deck: an existing card id replaces that card. Omit for a new card." },
+            "topic": { "type": "string", "description": "Optional section name. Max 80 chars." },
+            "prompt": { "type": "string", "description": "The question. Max 2000 chars." },
+            "code": { "type": "string", "description": "Optional code shown with line numbers. Max 4000 chars." },
+            "answer": { "type": "string", "description": "Canonical answer, shown after a miss. Max 500 chars." },
+            "alternatives": { "type": "array", "items": { "type": "string" }, "maxItems": 10, "description": "Other accepted answers." },
+            "choices": { "type": "array", "items": { "type": "string" }, "maxItems": 8, "description": "Choice mode: the options; the answer is added if missing." },
+            "check": check_schema("Overrides the deck's check for this card."),
+            "explain": { "type": "string", "description": "The rule or explanation shown after a miss. Max 2000 chars." }
+        },
+        "required": ["prompt", "answer"]
+    })
+}
+
+fn gate_schema() -> Value {
+    json!({
+        "type": "object",
+        "description": "Open topics one by one: the next topic opens when every open topic has at least `window` answers and `percent` of the last `window` are right.",
+        "properties": {
+            "enabled": { "type": "boolean" },
+            "percent": { "type": "integer", "minimum": 50, "maximum": 100 },
+            "window": { "type": "integer", "minimum": 5, "maximum": 50 }
+        }
+    })
+}
+
+fn deck_fields() -> serde_json::Map<String, Value> {
+    let v = json!({
+        "title": { "type": "string", "description": "Max 80 chars." },
+        "description": { "type": "string", "description": "Max 1000 chars." },
+        "check": check_schema("How answers to the deck's cards are compared. Default mode text."),
+        "gate": gate_schema()
+    });
+    v.as_object().cloned().unwrap_or_default()
+}
+
+fn preset_fields() -> Value {
+    json!({
+        "id": { "type": "string", "description": "An existing preset id changes that preset; omitted fields keep their values. Omit to create a preset." },
+        "name": { "type": "string", "description": "Max 60 chars." },
+        "sources": { "type": "array", "description": "What to drill.", "items": { "type": "object", "properties": {
+            "deck": { "type": "string", "description": "Deck id; the built-in Python deck is `python`." },
+            "topics": { "type": "array", "items": { "type": "string" }, "description": "Topic ids or titles. Empty means the deck's open topics." }
+        }, "required": ["deck"] } },
+        "order": { "type": "string", "enum": ["smart", "random", "sequence"], "description": "smart: Leitner spaced repetition with due and missed cards first; random; sequence: deck order, continuing where the last session stopped." },
+        "goal": { "type": "string", "enum": ["correct", "cards", "minutes"], "description": "The session ends after `amount` right answers, `amount` answers or `amount` minutes." },
+        "amount": { "type": "integer", "minimum": 1, "maximum": 200 },
+        "retry": { "type": "boolean", "description": "A missed card comes back later in the same session." },
+        "explain": { "type": "boolean", "description": "Also show the rule after right answers (after a miss it is always shown)." },
+        "screen": { "type": "string", "enum": ["lock", "window"], "description": "lock: full screen on every monitor until the goal is met; window: inside the app." },
+        "escape": { "type": "string", "enum": ["hold", "none"], "description": "lock only: hold Esc 5 seconds to leave (recorded as an escape) or no exit except the ceiling." },
+        "limitMinutes": { "type": "integer", "minimum": 5, "maximum": 180, "description": "lock only: the lock opens by itself after this many minutes." },
+        "selfCheck": { "type": "boolean", "description": "The user reveals each answer and grades themselves instead of typing." },
+        "makeDefault": { "type": "boolean", "description": "Make it the preset the app suggests first." }
+    })
+}
+
 fn ro() -> Value {
     json!({ "readOnlyHint": true, "openWorldHint": false })
 }
@@ -103,6 +178,12 @@ pub fn tools() -> Value {
     create.insert("topics".into(), json!({ "type": "array", "items": topic_schema(true), "maxItems": 60, "description": "The map: topics with prerequisites and ranked tasks." }));
     let mut update = goal_fields();
     update.insert("goalId".into(), json!({ "type": "string" }));
+    let mut deck_create = deck_fields();
+    deck_create.insert("cards".into(), json!({ "type": "array", "items": drill_card_schema(), "maxItems": 2000 }));
+    let mut deck_edit = deck_fields();
+    deck_edit.insert("deckId".into(), json!({ "type": "string" }));
+    deck_edit.insert("upsert".into(), json!({ "type": "array", "items": drill_card_schema() }));
+    deck_edit.insert("remove".into(), json!({ "type": "array", "items": { "type": "string" } }));
     json!([
         {
             "name": "get_overview",
@@ -182,6 +263,84 @@ pub fn tools() -> Value {
                 "note": { "type": "string", "description": "Max 2000 chars." }
             }), &["goalId", "taskId"]),
             "annotations": rw(false)
+        },
+        {
+            "name": "get_drill",
+            "title": "Drill overview",
+            "description": "The drill trainer (Зубрилка): presets (what to drill, how, session conditions), decks with topics and per-topic progress (open or locked, accuracy over the gate window, Leitner boxes, due cards), the streak of days with finished sessions, today's counts, the most missed cards with the user's last wrong answers, and recent sessions (done, escape, timeout or stopped). Call it before coaching or building decks.",
+            "inputSchema": schema(json!({}), &[]),
+            "annotations": ro()
+        },
+        {
+            "name": "get_drill_deck",
+            "title": "Get drill deck",
+            "description": "One deck with every card. For the built-in deck `python` it returns the card templates (topic, kind, rule, number of variants, one sample), because its variants are generated by executing code.",
+            "inputSchema": schema(json!({ "deckId": { "type": "string" } }), &["deckId"]),
+            "annotations": ro()
+        },
+        {
+            "name": "create_drill_deck",
+            "title": "Create drill deck",
+            "description": "Creates a deck of cards authored by AI: questions with a canonical answer, optional code, accepted alternatives, choices and an explanation shown after a miss. The deck's check says how answers are compared; a card may override it. The whole input is validated first. The deck is drilled only after it is added to a preset. Returns the deck with card ids.",
+            "inputSchema": schema(Value::Object(deck_create), &["title", "cards"]),
+            "annotations": rw(false)
+        },
+        {
+            "name": "edit_drill_deck",
+            "title": "Edit drill deck",
+            "description": "Changes a user deck: title, description, check, gate; upsert cards (an existing id replaces the card, no id adds one) and remove card ids. The built-in deck `python` can not be edited. Progress of kept cards stays.",
+            "inputSchema": schema(Value::Object(deck_edit), &["deckId"]),
+            "annotations": rw(true)
+        },
+        {
+            "name": "get_drill_theory",
+            "title": "Get drill theory",
+            "description": "Theory articles of the drill reference (Справочник): the built-in articles of the `python` deck and articles written by the user or AI, each attached to a deck and optionally a topic. The user opens them from the lightbulb button during a session. Optional filters: deckId, and topic (id) together with deckId, which also returns the articles about the whole deck.",
+            "inputSchema": schema(json!({ "deckId": { "type": "string" }, "topic": { "type": "string" } }), &[]),
+            "annotations": ro()
+        },
+        {
+            "name": "save_drill_theory",
+            "title": "Save drill theory",
+            "description": "Creates a theory article or replaces one (pass id). An article gives the model of a topic: how to picture the data, before and after pairs of the main operations, traps, a shape table. Body is Markdown in the app's dialect (headings, lists, tables, code, and the blocks data, chart, plot, graph described in nextday://guide). Built-in articles can not be changed; add your own next to them.",
+            "inputSchema": schema(json!({
+                "id": { "type": "string", "description": "An existing article id to replace it. Omit to create." },
+                "deckId": { "type": "string", "description": "Deck id; the built-in deck is `python`." },
+                "topic": { "type": "string", "description": "Topic id or title; empty for an article about the whole deck." },
+                "title": { "type": "string", "description": "Max 120 chars." },
+                "body": { "type": "string", "description": "Markdown, max 100000 chars." }
+            }), &["deckId", "title", "body"]),
+            "annotations": rw(false)
+        },
+        {
+            "name": "install_drill_generator",
+            "title": "Install drill generator",
+            "description": "Saves a card generator plugin: a JavaScript script that declares `const plugin = { title, description, topics, templates }`, where every template has `make(r)` that returns one variant { prompt, code, answer, choices, alternatives, explain } built with the random helpers in r. The app runs the script in a sandboxed worker (no network, no access to the app) when a session starts, so cards get fresh data every session and a missed card comes back with new data. A new or changed generator is saved switched off: the user checks the code and sample cards and enables it in the app (Зубрилка, tab Наборы). Pass id to replace the code of an existing generator. Read the Generators section of nextday://guide first and run the script with node before installing.",
+            "inputSchema": schema(json!({
+                "id": { "type": "string", "description": "An existing generator id to replace its code. Omit to create one." },
+                "title": { "type": "string", "description": "Max 80 chars." },
+                "description": { "type": "string", "description": "Max 1000 chars." },
+                "code": { "type": "string", "description": "The plugin script, max 300000 chars." }
+            }), &["title", "code"]),
+            "annotations": rw(false)
+        },
+        {
+            "name": "import_drill_bank",
+            "title": "Import drill bank (DataEater)",
+            "description": "Imports a prepared bank of cards in the format of the built-in deck `python`: { title, description, gate, topics: [{id, title, theory}], cards: [{id, topic, kind, rule, check, variants: [{question, code, answer, choices, alternatives, explain}]}] }. A card is a template whose variants differ only in data; after a miss the user gets the same card with another variant. Give the bank inline or as an absolute path to a .json file (max 16 MB), for example the output of a script that executes code to compute the answers. Invalid variants and cards are dropped and listed in the report. Pass replaceId to replace a bank imported before; progress of cards with the same ids stays.",
+            "inputSchema": schema(json!({
+                "bank": { "type": "object", "description": "The bank object." },
+                "path": { "type": "string", "description": "Absolute path to a .json file with the bank." },
+                "replaceId": { "type": "string", "description": "An imported bank to replace." }
+            }), &[]),
+            "annotations": rw(false)
+        },
+        {
+            "name": "save_drill_preset",
+            "title": "Save drill preset",
+            "description": "Creates a preset or changes one (pass id; omitted fields keep their values). A preset says what to drill (decks and topics), how (order, session goal and size, retry, explanations, self-check) and the conditions (full-screen lock or a window, escape, time ceiling). Only the user starts sessions, in the app. Never turn on the lock or set escape none unless the user asked for it.",
+            "inputSchema": schema(preset_fields(), &[]),
+            "annotations": rw(false)
         }
     ])
 }
@@ -190,7 +349,8 @@ fn resources() -> Value {
     json!([
         { "uri": "nextday://guide", "name": "guide", "title": "Next Day guide for AI", "description": "The data model, rules, tools and recommended workflows. Read before planning.", "mimeType": "text/markdown" },
         { "uri": "nextday://goals", "name": "goals", "title": "Goals", "description": "All goals with progress.", "mimeType": "application/json" },
-        { "uri": "nextday://profile", "name": "profile", "title": "Work rhythm", "description": "Statistics over the last 42 days.", "mimeType": "application/json" }
+        { "uri": "nextday://profile", "name": "profile", "title": "Work rhythm", "description": "Statistics over the last 42 days.", "mimeType": "application/json" },
+        { "uri": "nextday://drill", "name": "drill", "title": "Drill", "description": "Drill presets, decks, progress and weak cards.", "mimeType": "application/json" }
     ])
 }
 
@@ -223,6 +383,12 @@ fn prompts() -> Value {
             "title": "Readiness check",
             "description": "Run a practical test that mirrors the goal's outcome and record the score.",
             "arguments": [{ "name": "goalId", "description": "The goal to check.", "required": true }]
+        },
+        {
+            "name": "drill_coach",
+            "title": "Drill coach",
+            "description": "Look at the drill progress and the most missed cards, explain the rules behind the mistakes and offer a deck that targets them.",
+            "arguments": []
         }
     ])
 }
@@ -253,6 +419,10 @@ fn prompt_text(name: &str, args: &Value) -> Option<(String, String)> {
                 ),
             ))
         }
+        "drill_coach" => Some((
+            "Drill coach".into(),
+            "Let's work on my drill (Зубрилка) in Next Day. Read nextday://guide if you have not yet and call get_drill. Tell me in a few sentences where I stand: open topics, accuracy, streak and how my recent sessions ended. Group my most missed cards by the rule behind them and use my last wrong answers to find what I misunderstand. Explain each rule with a tiny example and check me with one short question at a time. Then offer a deck that targets exactly these mistakes (create_drill_deck, 15-30 cards, python check mode for code questions, a short explain on every card) and, if I agree, add it to a preset with save_drill_preset.".into(),
+        )),
         _ => None,
     }
 }
@@ -368,6 +538,75 @@ fn call(store: &Store, name: &str, args: Value) -> Result<(Value, bool), String>
             goals::record(store, at, &id, &task, input, Author::Ai)?;
             Ok((compact_goal(&found(&id)?), true))
         }
+        "get_drill" => Ok((serde_json::to_value(drill::overview(store, at)).unwrap_or(Value::Null), false)),
+        "get_drill_deck" => Ok((drill::get_deck(store, &str_arg(&args, "deckId")?)?, false)),
+        "create_drill_deck" => {
+            let mut input: drill::DeckInput = parse(args, "deck")?;
+            input.id = None;
+            let d = drill::save_deck(store, at, input, Author::Ai)?;
+            let note = "Created. The user sees it in the app under Зубрилка, tab Наборы; it is drilled after it is added to a preset.";
+            Ok((json!({ "deck": d, "note": note }), true))
+        }
+        "edit_drill_deck" => {
+            let id = str_arg(&args, "deckId")?;
+            let patch: drill::DeckPatch = parse(args, "patch")?;
+            Ok((serde_json::to_value(drill::edit_deck(store, at, &id, patch)?).unwrap_or(Value::Null), true))
+        }
+        "get_drill_theory" => {
+            let deck = args.get("deckId").and_then(Value::as_str).filter(|s| !s.is_empty()).map(str::to_string);
+            let topic = args.get("topic").and_then(Value::as_str).filter(|s| !s.is_empty()).map(str::to_string);
+            let list: Vec<drill::Article> = match (&deck, &topic) {
+                (Some(d), Some(t)) => drill::topic_articles(store, d, t),
+                _ => drill::articles(store).into_iter().filter(|a| deck.as_ref().is_none_or(|d| a.deck == *d)).collect(),
+            };
+            Ok((json!({ "articles": list }), false))
+        }
+        "save_drill_theory" => {
+            let input = drill::ArticleInput {
+                id: args.get("id").and_then(Value::as_str).map(str::to_string),
+                deck: str_arg(&args, "deckId")?,
+                topic: args.get("topic").and_then(Value::as_str).unwrap_or("").to_string(),
+                title: str_arg(&args, "title")?,
+                body: str_arg(&args, "body")?,
+            };
+            Ok((serde_json::to_value(drill::save_article(store, at, input, Author::Ai)?).unwrap_or(Value::Null), true))
+        }
+        "install_drill_generator" => {
+            let s = |k: &str| args.get(k).and_then(Value::as_str).map(str::to_string);
+            let g = drill::install_generator(store, at, s("id").filter(|x| !x.is_empty()), str_arg(&args, "title")?, s("description"), str_arg(&args, "code")?)?;
+            let note = "Saved switched off. Ask the user to open Зубрилка, tab Наборы, press Проверить on the generator (it runs the script and shows sample cards), enable it and add it to a preset.";
+            Ok((json!({ "generator": { "id": g.id, "title": g.title, "enabled": g.enabled }, "note": note }), true))
+        }
+        "import_drill_bank" => {
+            let replace = args.get("replaceId").and_then(Value::as_str).map(str::to_string);
+            let input: drill::BankInput = match (args.get("bank").filter(|b| b.is_object()), args.get("path").and_then(Value::as_str)) {
+                (Some(b), _) => parse(b.clone(), "bank")?,
+                (None, Some(p)) => drill::read_bank_file(p)?,
+                (None, None) => return Err("give bank or path".into()),
+            };
+            let report = drill::import_bank(store, at, input, replace.as_deref(), Author::Ai)?;
+            let note = "Imported. The user sees it in the app under Зубрилка, tab Наборы; it is drilled after it is added to a preset.";
+            Ok((json!({ "report": report, "note": note }), true))
+        }
+        "save_drill_preset" => {
+            let make_default = args.get("makeDefault").and_then(Value::as_bool).unwrap_or(false);
+            let id = args.get("id").and_then(Value::as_str).unwrap_or("").to_string();
+            let base = if id.is_empty() {
+                drill::Preset::default()
+            } else {
+                drill::load_state(store).presets.into_iter().find(|p| p.id == id).ok_or("preset not found")?
+            };
+            let mut v = serde_json::to_value(base).map_err(|e| e.to_string())?;
+            if let (Some(obj), Some(given)) = (v.as_object_mut(), args.as_object()) {
+                for (k, x) in given {
+                    if k != "makeDefault" && k != "id" {
+                        obj.insert(k.clone(), x.clone());
+                    }
+                }
+            }
+            let p: drill::Preset = parse(v, "preset")?;
+            Ok((serde_json::to_value(drill::save_preset(store, p, make_default)?).unwrap_or(Value::Null), true))
+        }
         _ => Err(format!("unknown tool {name}")),
     }
 }
@@ -403,6 +642,8 @@ fn data_resource(store: &Store, uri: &str) -> Result<(&'static str, String), (i6
     Ok(if uri == "nextday://goals" {
         let list: Vec<Value> = goals::views(store, at).iter().map(compact_goal).collect();
         ("application/json", serde_json::to_string_pretty(&json!({ "goals": list })).unwrap_or_default())
+    } else if uri == "nextday://drill" {
+        ("application/json", serde_json::to_string_pretty(&drill::overview(store, at)).unwrap_or_default())
     } else if uri == "nextday://profile" {
         ("application/json", serde_json::to_string_pretty(&insights::profile(store, at, 42)).unwrap_or_default())
     } else if let Some(id) = uri.strip_prefix("nextday://goal/") {
@@ -676,7 +917,7 @@ mod tests {
         let (_, r) = handle(&s, &|| {}, &modern("nope", json!({}))).unwrap();
         assert_eq!(r["error"]["code"], -32601);
         let (_, r) = handle(&s, &|| {}, &modern("tools/list", json!({}))).unwrap();
-        assert_eq!(r["result"]["tools"].as_array().unwrap().len(), 9);
+        assert_eq!(r["result"]["tools"].as_array().unwrap().len(), 18);
         let (_, r) = handle(&s, &|| {}, &modern("resources/read", json!({ "uri": "nextday://guide" }))).unwrap();
         assert!(r["result"]["contents"][0]["text"].as_str().unwrap().contains("# Next Day for AI agents"));
         let (_, r) = handle(&s, &|| {}, &modern("prompts/get", json!({ "name": "plan_goal", "arguments": { "goal": "выучить Rust" } }))).unwrap();
@@ -689,10 +930,83 @@ mod tests {
     fn bridge_answers_without_the_app() {
         let ask = |method: &str, params: Value| answer(None, &|| {}, &req(method, params)).unwrap().1;
         assert_eq!(ask("initialize", json!({ "protocolVersion": "2025-11-25" }))["result"]["serverInfo"]["name"], "next-day");
-        assert_eq!(ask("tools/list", json!({}))["result"]["tools"].as_array().unwrap().len(), 9);
+        assert_eq!(ask("tools/list", json!({}))["result"]["tools"].as_array().unwrap().len(), 18);
         assert!(ask("resources/read", json!({ "uri": "nextday://guide" }))["result"]["contents"][0]["text"].as_str().unwrap().starts_with("# Next Day"));
         assert_eq!(ask("tools/call", json!({ "name": "get_overview" }))["result"]["isError"], true);
         assert_eq!(ask("resources/read", json!({ "uri": "nextday://goals" }))["error"]["code"], -32603);
+    }
+
+    #[test]
+    fn tools_manage_drill() {
+        let s = store();
+        let r = tool(&s, "get_drill", json!({}));
+        assert_eq!(r["isError"], false);
+        assert_eq!(r["structuredContent"]["decks"][0]["id"], "python");
+        let r = tool(&s, "create_drill_deck", json!({ "title": "ML", "check": { "mode": "python" }, "cards": [
+            { "prompt": "len([1, [2, 3]])?", "answer": "2", "explain": "Вложенный список считается одним элементом." },
+            { "topic": "numpy", "prompt": "np.zeros((2, 3)).shape?", "answer": "(2, 3)" }
+        ] }));
+        assert_eq!(r["isError"], false, "{r}");
+        let id = r["structuredContent"]["deck"]["id"].as_str().unwrap().to_string();
+        let r = tool(&s, "create_drill_deck", json!({ "title": "bad", "check": { "mode": "python" }, "cards": [{ "prompt": "?", "answer": "[1," }] }));
+        assert_eq!(r["isError"], true);
+        let r = tool(&s, "edit_drill_deck", json!({ "deckId": id, "upsert": [{ "prompt": "1 / 2?", "answer": "0.5" }] }));
+        assert_eq!(r["structuredContent"]["cards"].as_array().unwrap().len(), 3);
+        assert_eq!(tool(&s, "edit_drill_deck", json!({ "deckId": "python", "title": "x" }))["isError"], true);
+        let r = tool(&s, "save_drill_preset", json!({ "name": "ML в окне", "screen": "window", "sources": [{ "deck": id, "topics": ["numpy"] }], "goal": "cards", "amount": 5, "makeDefault": true }));
+        assert_eq!(r["isError"], false, "{r}");
+        let pid = r["structuredContent"]["id"].as_str().unwrap().to_string();
+        let r = tool(&s, "save_drill_preset", json!({ "id": pid, "amount": 7 }));
+        assert_eq!(r["structuredContent"]["amount"], 7);
+        assert_eq!(r["structuredContent"]["screen"], "window");
+        assert_eq!(tool(&s, "get_drill", json!({}))["structuredContent"]["defaultPreset"], pid);
+        let r = tool(&s, "get_drill_deck", json!({ "deckId": "python" }));
+        assert!(r["structuredContent"]["cards"].as_array().unwrap().len() > 10);
+        let (_, r) = handle(&s, &|| {}, &modern("resources/read", json!({ "uri": "nextday://drill" }))).unwrap();
+        assert!(r["result"]["contents"][0]["text"].as_str().unwrap().contains("presets"));
+        let r = tool(&s, "save_drill_theory", json!({ "deckId": id, "topic": "numpy", "title": "Формы массивов", "body": "## Модель\n```data\n[[1, 2], [3, 4]]\n```" }));
+        assert_eq!(r["isError"], false, "{r}");
+        assert_eq!(r["structuredContent"]["author"], "ai");
+        let r = tool(&s, "get_drill_theory", json!({ "deckId": id }));
+        assert_eq!(r["structuredContent"]["articles"].as_array().unwrap().len(), 1);
+        assert_eq!(tool(&s, "save_drill_theory", json!({ "deckId": "nope", "title": "x", "body": "y" }))["isError"], true);
+        let r = tool(&s, "install_drill_generator", json!({ "title": "Глаголы", "code": "const plugin = { topics: [], templates: [] };" }));
+        assert_eq!(r["isError"], false, "{r}");
+        assert_eq!(r["structuredContent"]["generator"]["enabled"], false);
+        let gid = r["structuredContent"]["generator"]["id"].as_str().unwrap().to_string();
+        let r = tool(&s, "get_drill_deck", json!({ "deckId": gid }));
+        assert_eq!(r["structuredContent"]["kind"], "generator");
+        assert_eq!(r["structuredContent"]["author"], "ai");
+        assert_eq!(tool(&s, "install_drill_generator", json!({ "id": "shapes", "title": "x", "code": "y" }))["isError"], true);
+        let bank = json!({ "title": "Глаголы", "topics": [{ "id": "irr", "title": "Неправильные", "theory": "## be\nwas, were" }], "cards": [
+            { "id": "past", "topic": "irr", "kind": "text", "rule": "Past Simple", "variants": [
+                { "question": "go?", "answer": "went" }, { "question": "see?", "answer": "saw" }, { "question": "", "answer": "x" }
+            ] },
+            { "id": "bad", "topic": "irr", "kind": "nope", "variants": [{ "question": "?", "answer": "1" }] },
+            { "id": "pick", "topic": "irr", "kind": "pick", "variants": [{ "question": "?", "code": "x = [1]", "answer": "[1]", "choices": ["(1,)", "1"], "walk": { "steps": [[1, null, [["x", "[1]", "list[int]"]]]], "focus": null, "error": null } }] }
+        ] });
+        let r = tool(&s, "import_drill_bank", json!({ "bank": bank }));
+        assert_eq!(r["isError"], false, "{r}");
+        let rep = &r["structuredContent"]["report"];
+        assert_eq!(rep["cards"], 2);
+        assert_eq!(rep["variants"], 3);
+        assert_eq!(rep["dropped"], 2);
+        let bid = rep["id"].as_str().unwrap().to_string();
+        let r = tool(&s, "get_drill_deck", json!({ "deckId": bid }));
+        assert_eq!(r["structuredContent"]["kind"], "bank");
+        assert_eq!(r["structuredContent"]["cards"][0]["variants"], 2);
+        let r = tool(&s, "get_drill_theory", json!({ "deckId": bid }));
+        assert_eq!(r["structuredContent"]["articles"][0]["builtin"], true);
+        let path = s.dir.join("bank.json");
+        std::fs::write(&path, serde_json::to_string(&bank).unwrap()).unwrap();
+        let r = tool(&s, "import_drill_bank", json!({ "path": path.to_string_lossy(), "replaceId": bid }));
+        assert_eq!(r["structuredContent"]["report"]["replaced"], true, "{r}");
+        assert_eq!(r["structuredContent"]["report"]["id"], bid);
+        assert_eq!(tool(&s, "import_drill_bank", json!({}))["isError"], true);
+        let mut kinds: Vec<String> = tool(&s, "get_drill", json!({}))["structuredContent"]["decks"].as_array().unwrap().iter().map(|d| d["kind"].as_str().unwrap().to_string()).collect();
+        assert_eq!(kinds[..2], ["bank", "generator"]);
+        kinds.sort();
+        assert_eq!(kinds, vec!["bank", "bank", "deck", "generator", "generator"]);
     }
 
     #[test]

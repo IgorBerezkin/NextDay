@@ -2,6 +2,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errText, type Day, type Overview } from "./api";
 import { BoardScreen } from "./board/BoardScreen";
+import { DrillScreen } from "./drill/DrillScreen";
 import { ClockScreen } from "./screens/ClockScreen";
 import { MapScreen } from "./screens/MapScreen";
 import { DayScreen } from "./screens/DayScreen";
@@ -21,6 +22,7 @@ export type Route =
   | { name: "clock" }
   | { name: "map"; focus?: string }
   | { name: "goals"; focus?: string }
+  | { name: "drill" }
   | { name: "history" }
   | { name: "day"; date: string }
   | { name: "board"; date: string }
@@ -40,6 +42,7 @@ function tabOf(r: Route, ov: Overview | null): TabKey | null {
     case "clock":
     case "map":
     case "goals":
+    case "drill":
     case "history":
     case "settings":
       return r.name;
@@ -87,6 +90,7 @@ export default function App() {
       else if (where === "tomorrow") setRoute({ name: "tomorrow" });
       else if (where === "clock") setRoute({ name: "clock" });
       else if (where === "goals") setRoute({ name: "goals" });
+      else if (where === "drill") setRoute({ name: "drill" });
       else if (where === "history") setRoute({ name: "history" });
       else if (where === "settings") setRoute({ name: "settings" });
       else setRoute({ name: "today" });
@@ -147,6 +151,9 @@ export default function App() {
         break;
       case "goals":
         screen = <GoalsScreen nav={nav} focus={route.focus} key={route.focus ?? "goals"} />;
+        break;
+      case "drill":
+        screen = <DrillScreen />;
         break;
       case "history":
         screen = <HistoryScreen nav={nav} />;

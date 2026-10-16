@@ -144,7 +144,7 @@ export function SettingsScreen({ nav }: { nav: Nav }) {
 
         {ov.debug && <DebugCard nav={nav} />}
       </div>
-      <p className="about">Next Day {ov.version} · шрифты Press Start 2P и Tiny5 (SIL OFL)</p>
+      <p className="about">Next Day {ov.version} · шрифты Press Start 2P, Tiny5 и Galmuri (SIL OFL)</p>
     </div>
   );
 }

@@ -15,7 +15,7 @@ pub struct Store {
 
 impl Store {
     pub fn open(dir: PathBuf) -> Result<Self, String> {
-        for sub in ["days", "boards", "assets", "goals"] {
+        for sub in ["days", "boards", "assets", "goals", "drill", "theory", "banks", "gens"] {
             fs::create_dir_all(dir.join(sub))
                 .map_err(|e| format!("Не удалось создать папку {}: {e}", dir.join(sub).display()))?;
         }
@@ -110,6 +110,69 @@ impl Store {
             }
         }
         out.sort_by(|a, b| a.created_at.cmp(&b.created_at).then_with(|| a.id.cmp(&b.id)));
+        out
+    }
+
+    fn item_path(&self, sub: &str, id: &str) -> Option<PathBuf> {
+        let ok = !id.is_empty() && id.len() <= 40 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        ok.then(|| self.dir.join(sub).join(format!("{id}.json")))
+    }
+
+    pub fn load_item<T: DeserializeOwned>(&self, sub: &str, id: &str) -> Option<T> {
+        read_json(&self.item_path(sub, id)?)
+    }
+
+    pub fn save_item<T: Serialize>(&self, sub: &str, id: &str, v: &T) -> Result<(), String> {
+        let p = self.item_path(sub, id).ok_or("Неправильный идентификатор.")?;
+        write_json(&p, v)
+    }
+
+    pub fn save_item_compact<T: Serialize>(&self, sub: &str, id: &str, v: &T) -> Result<(), String> {
+        let p = self.item_path(sub, id).ok_or("Неправильный идентификатор.")?;
+        let text = serde_json::to_string(v).map_err(|e| e.to_string())?;
+        write_text(&p, &text)
+    }
+
+    pub fn has_item(&self, sub: &str, id: &str) -> bool {
+        self.item_path(sub, id).is_some_and(|p| p.exists())
+    }
+
+    pub fn item_ids(&self, sub: &str) -> Vec<String> {
+        let mut out: Vec<String> = fs::read_dir(self.dir.join(sub))
+            .map(|rd| {
+                rd.flatten()
+                    .filter_map(|e| e.file_name().to_string_lossy().strip_suffix(".json").map(str::to_string))
+                    .filter(|id| self.item_path(sub, id).is_some())
+                    .collect()
+            })
+            .unwrap_or_default();
+        out.sort();
+        out
+    }
+
+    pub fn item_stamp(&self, sub: &str, id: &str) -> Option<(SystemTime, u64)> {
+        let m = fs::metadata(self.item_path(sub, id)?).ok()?;
+        Some((m.modified().ok()?, m.len()))
+    }
+
+    pub fn delete_item(&self, sub: &str, id: &str) -> Result<(), String> {
+        let p = self.item_path(sub, id).ok_or("Неправильный идентификатор.")?;
+        fs::remove_file(&p).map_err(|e| format!("Не удалось удалить: {e}"))
+    }
+
+    pub fn list_items<T: DeserializeOwned>(&self, sub: &str) -> Vec<T> {
+        let mut out = Vec::new();
+        if let Ok(rd) = fs::read_dir(self.dir.join(sub)) {
+            let mut names: Vec<String> = rd.flatten().map(|e| e.file_name().to_string_lossy().to_string()).collect();
+            names.sort();
+            for name in names {
+                if let Some(id) = name.strip_suffix(".json") {
+                    if let Some(v) = self.load_item(sub, id) {
+                        out.push(v);
+                    }
+                }
+            }
+        }
         out
     }
 

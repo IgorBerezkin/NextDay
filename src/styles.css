@@ -1,3 +1,9 @@
+@font-face {
+  font-family: "Galmuri9";
+  src: url("../node_modules/galmuri/dist/Galmuri9.woff2") format("woff2");
+  font-display: swap;
+}
+
 :root {
   --p: 3px;
   --ink: #1a1c2c;
@@ -22,6 +28,7 @@
   --white: #f4f4f4;
   --font: "Tiny5", "Segoe UI", sans-serif;
   --head: "Press Start 2P", "Tiny5", monospace;
+  --read: "Galmuri9", "Tiny5", sans-serif;
 }
 
 * {
@@ -155,6 +162,19 @@ button {
 .tb-space {
   flex: 1;
   align-self: stretch;
+}
+@media (max-width: 1439px) {
+  .brand > span {
+    display: none;
+  }
+}
+@media (max-width: 1299px) {
+  .tab:not(.active) > span {
+    display: none;
+  }
+  .tab:not(.active) {
+    padding: 0 10px;
+  }
 }
 .streak {
   align-self: center;
