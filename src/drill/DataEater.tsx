@@ -61,7 +61,7 @@ export function DataEater({ banks, onClose, onDone }: { banks: DrillDeckInfo[]; 
   return (
     <Modal
       wide
-      title={t("DataEater: импорт банка", "DataEater: import a bank")}
+      title={t("DataEater: импорт набора", "DataEater: import a deck")}
       onClose={onClose}
       footer={
         <>
@@ -80,8 +80,8 @@ export function DataEater({ banks, onClose, onDone }: { banks: DrillDeckInfo[]; 
       <div className="drill-form">
         <p className="muted">
           {t(
-            "DataEater ест готовые банки карточек в формате JSON. В банке темы с теорией и карточки, у каждой карточки много вариантов с разными данными. После промаха карточка вернётся с другим вариантом. Такой файл обычно собирает скрипт, который сам считает ответы, или ИИ через MCP (import_drill_bank).",
-            "DataEater eats ready card banks in JSON. A bank has topics with theory and cards, and each card has many variants with different data. After a miss the card comes back with another variant. Such a file is usually built by a script that computes the answers itself, or by AI over MCP (import_drill_bank).",
+            "DataEater ест готовые наборы из файлов JSON. В таком наборе темы с теорией и карточки, у каждой карточки много вариантов с разными данными. После промаха карточка вернётся с другим вариантом. Файл обычно собирает скрипт, который сам считает ответы, или ИИ через MCP (import_drill_bank).",
+            "DataEater eats ready decks from JSON files. A deck like this has topics with theory and cards, and each card has many variants with different data. After a miss the card comes back with another variant. The file is usually built by a script that computes the answers itself, or by AI over MCP (import_drill_bank).",
           )}
         </p>
         <pre className="eater-format">
@@ -109,7 +109,7 @@ export function DataEater({ banks, onClose, onDone }: { banks: DrillDeckInfo[]; 
                   {t(`Заменить «${same.title}», прогресс сохранится`, `Replace "${same.title}", progress is kept`)}
                 </button>
                 <button className={replace === null ? "on" : ""} onClick={() => setReplace(null)}>
-                  {t("Добавить новым банком", "Add as a new bank")}
+                  {t("Добавить новым набором", "Add as a new deck")}
                 </button>
               </div>
             )}
@@ -120,8 +120,8 @@ export function DataEater({ banks, onClose, onDone }: { banks: DrillDeckInfo[]; 
           <div className="eater-file">
             <p className="good">
               {t(
-                `${report.replaced ? "Заменён" : "Добавлен"} банк «${report.title}»`,
-                `${report.replaced ? "Replaced" : "Added"} the bank "${report.title}"`,
+                `${report.replaced ? "Заменён" : "Добавлен"} набор «${report.title}»`,
+                `${report.replaced ? "Replaced" : "Added"} the deck "${report.title}"`,
               )}
               : {plural(report.topics, "тема", "темы", "тем", "topic", "topics")},{" "}
               {plural(report.cards, "карточка", "карточки", "карточек", "card", "cards")},{" "}
@@ -136,7 +136,7 @@ export function DataEater({ banks, onClose, onDone }: { banks: DrillDeckInfo[]; 
               </ul>
             )}
             <p className="muted">
-              {t("Чтобы зубрить банк, добавь его в режим на вкладке Старт.", "To drill the bank, add it to a mode on the Start tab.")}
+              {t("Чтобы зубрить набор, добавь его в режим на вкладке Старт.", "To drill the deck, add it to a mode on the Start tab.")}
             </p>
           </div>
         )}

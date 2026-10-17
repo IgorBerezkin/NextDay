@@ -46,7 +46,7 @@ const KIND_NOTE = (d: DrillDeckInfo) =>
       ? t(", генератор", ", generator")
       : t(", генератор выключен", ", generator off")
     : d.kind === "bank"
-      ? t(", банк", ", bank")
+      ? t(", из файла", ", from file")
       : "";
 
 const GOALS: { value: DrillGoal; label: string }[] = [

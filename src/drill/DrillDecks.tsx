@@ -66,7 +66,7 @@ export function DrillDecks({ ov, reload }: { ov: DrillOverview; reload: () => Pr
         <section key={d.id} className={`card drill-deck${d.kind === "generator" && !d.enabled ? " off" : ""}`}>
           <h2 className="card-title">
             <Px name={d.kind === "generator" ? "sBolt" : "cards"} scale={2} /> {d.title}
-            {d.kind === "bank" && <span className="drill-chip">{t("банк", "bank")}</span>}
+            {d.kind === "bank" && <span className="drill-chip">{t("из файла", "from file")}</span>}
             {d.kind === "generator" && <span className="drill-chip gen">{t("генератор", "generator")}</span>}
             {d.kind === "generator" && !d.enabled && <span className="drill-chip again">{t("выключен", "off")}</span>}
             {d.author === "ai" && <span className="drill-chip ai">{t("от ИИ", "by AI")}</span>}
@@ -136,8 +136,8 @@ export function DrillDecks({ ov, reload }: { ov: DrillOverview; reload: () => Pr
               onClick={() =>
                 setSure({
                   text: t(
-                    `Удалить ${d.kind === "generator" ? "генератор" : d.kind === "bank" ? "банк" : "набор"} «${d.title}» вместе с прогрессом?`,
-                    `Delete the ${d.kind === "generator" ? "generator" : d.kind === "bank" ? "bank" : "deck"} "${d.title}" with its progress?`,
+                    `Удалить ${d.kind === "generator" ? "генератор" : "набор"} «${d.title}» вместе с прогрессом?`,
+                    `Delete the ${d.kind === "generator" ? "generator" : "deck"} "${d.title}" with its progress?`,
                   ),
                   run: () => run(() => api.drillDeleteDeck(d.id)),
                 })
@@ -160,13 +160,13 @@ export function DrillDecks({ ov, reload }: { ov: DrillOverview; reload: () => Pr
           {t("Новый генератор", "New generator")}
         </Button>
         <Button kind="paper" icon="folder" onClick={() => setEater(true)}>
-          {t("DataEater: импорт банка", "DataEater: import a bank")}
+          {t("DataEater: импорт набора", "DataEater: import a deck")}
         </Button>
       </div>
       <p className="muted drill-help">
         {t(
-          "Набор: свои вопросы и ответы. Генератор: скрипт, который в каждом сеансе придумывает карточки с новыми данными. Банк: готовый JSON, где у каждой карточки много вариантов. Всё это можно собирать и через ИИ по MCP.",
-          "Deck: your own questions and answers. Generator: a script that makes up cards with new data in every session. Bank: a ready JSON file where each card has many variants. You can also build all of these with AI over MCP.",
+          "Набор: свои вопросы и ответы. Генератор: скрипт, который в каждом сеансе придумывает карточки с новыми данными. DataEater загружает готовый набор из файла JSON, где у каждой карточки много вариантов. Всё это можно собирать и через ИИ по MCP.",
+          "Deck: your own questions and answers. Generator: a script that makes up cards with new data in every session. DataEater loads a ready deck from a JSON file where each card has many variants. You can also build all of these with AI over MCP.",
         )}
       </p>
       <CheckTemplates list={ov.checks} reload={reload} />
@@ -197,7 +197,7 @@ export function DrillDecks({ ov, reload }: { ov: DrillOverview; reload: () => Pr
           banks={ov.decks.filter((d) => d.kind === "bank")}
           onClose={() => setEater(false)}
           onDone={() => {
-            toast(t("Банк импортирован.", "Bank imported."), "good");
+            toast(t("Набор импортирован.", "Deck imported."), "good");
             void reload();
           }}
         />

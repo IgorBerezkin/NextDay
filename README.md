@@ -77,7 +77,7 @@ Download the installer from [Releases](https://github.com/IgorBerezkin/NextDay/r
 
 Свои наборы собираются прямо в программе: вопрос, ответ, другие верные ответы, варианты для выбора и пояснение после промаха. Много карточек можно вставить сразу, по одной в строке. Как сравнивать ответ, говорит шаблон проверки: текстом, числом, выбором из вариантов или самопроверкой. Шаблон может подсказывать под полем ответа, в каком виде нужен ответ. Шаблоны лежат в группах, свои шаблоны и группы можно создавать под любую тему.
 
-Если задачу нужно решать снова и снова с новыми данными, вместо набора подойдёт генератор: скрипт на JavaScript, который в каждом сеансе придумывает новые карточки. Генератор работает в песочнице без доступа к сети и к вашим данным и включается только после того, как вы посмотрите примеры его карточек. Готовые банки карточек в JSON загружаются кнопкой «DataEater».
+Если задачу нужно решать снова и снова с новыми данными, вместо набора подойдёт генератор: скрипт на JavaScript, который в каждом сеансе придумывает новые карточки. Генератор работает в песочнице без доступа к сети и к вашим данным и включается только после того, как вы посмотрите примеры его карточек. Готовые наборы из файлов JSON загружаются кнопкой «DataEater».
 
 #### Справочник
 
@@ -243,7 +243,7 @@ Next Day это локальный однопользовательский пл
 Наборы бывают трёх видов, и все зубрятся одинаково, через режимы:
 
 - deck: карточки, которые написал пользователь или ИИ через `create_drill_deck`. Поля ниже.
-- bank: готовый банк, импортированный из JSON через `import_drill_bank` (DataEater). Каждая карточка это шаблон со множеством вариантов, которые отличаются только данными, например карточки с кодом, ответы к которым получены выполнением кода.
+- bank: набор, импортированный из файла JSON через `import_drill_bank` (DataEater). В программе у него пометка «из файла», слово «банк» она не использует, поэтому в разговоре с пользователем называйте его набором. Каждая карточка это шаблон со множеством вариантов, которые отличаются только данными, например карточки с кодом, ответы к которым получены выполнением кода.
 - generator: плагин на JavaScript, который придумывает свежие варианты в начале каждого сеанса; ставится через `install_drill_generator`.
 
 После промаха карточка банка или генератора возвращается другим вариантом: та же задача с новыми данными.
@@ -733,7 +733,7 @@ You type the answer as text or a number, pick it from options with the mouse or 
 
 You build your own decks right in the app: a question, an answer, other accepted answers, options to choose from and an explanation for a miss. Many cards can be pasted at once, one per line. A check template says how to compare the answer: as text, as a number, as a choice of options or by self-check. A template can also show a hint under the answer field about the form of the answer. Templates live in groups, and you can create your own templates and groups for any subject.
 
-When a task has to be solved again and again with new data, a generator works better than a deck: a JavaScript script that makes new cards for every session. A generator runs in a sandbox without access to the network and to your data, and it is turned on only after you look at its sample cards. Ready banks of cards in JSON are loaded with the DataEater button.
+When a task has to be solved again and again with new data, a generator works better than a deck: a JavaScript script that makes new cards for every session. A generator runs in a sandbox without access to the network and to your data, and it is turned on only after you look at its sample cards. Ready decks from JSON files are loaded with the DataEater button.
 
 #### Reference
 
@@ -899,7 +899,7 @@ A checklist holds at most 40 items and is always sorted by start hour counted fr
 Decks come in three kinds, all drilled the same way through presets:
 
 - deck: cards written by hand or by AI with `create_drill_deck`. The fields are below.
-- bank: a prepared bank imported from JSON with `import_drill_bank` (DataEater). Every card is a template with many variants that differ only in data, for example code cards whose answers come from executing the code.
+- bank: a deck imported from a JSON file with `import_drill_bank` (DataEater). The app labels it from file and never says bank, so call it a deck when you talk to the user. Every card is a template with many variants that differ only in data, for example code cards whose answers come from executing the code.
 - generator: a JavaScript plugin that makes fresh variants at the start of every session, installed with `install_drill_generator`.
 
 After a miss, a card of a bank or a generator comes back with another variant: the same task with new data.

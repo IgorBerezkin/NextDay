@@ -2264,9 +2264,9 @@ pub struct ImportReport {
 
 pub fn parse_bank(text: &str) -> Result<BankInput, String> {
     if text.len() as u64 > MAX_BANK_BYTES {
-        return Err(tr!("Банк больше 16 МБ.", "The bank is larger than 16 MB."));
+        return Err(tr!("Файл набора больше 16 МБ.", "The deck file is larger than 16 MB."));
     }
-    serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| tr!("Банк не читается как JSON: {e}.", "The bank is not valid JSON: {e}."))
+    serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| tr!("Файл набора не читается как JSON: {e}.", "The deck file is not valid JSON: {e}."))
 }
 
 pub fn read_bank_file(path: &str) -> Result<BankInput, String> {
@@ -2276,7 +2276,7 @@ pub fn read_bank_file(path: &str) -> Result<BankInput, String> {
     }
     let len = std::fs::metadata(p).map_err(|e| tr!("Файл не найден: {e}.", "File not found: {e}."))?.len();
     if len > MAX_BANK_BYTES {
-        return Err(tr!("Банк больше 16 МБ.", "The bank is larger than 16 MB."));
+        return Err(tr!("Файл набора больше 16 МБ.", "The deck file is larger than 16 MB."));
     }
     parse_bank(&std::fs::read_to_string(p).map_err(|e| tr!("Файл не читается: {e}.", "The file can't be read: {e}."))?)
 }
@@ -2284,18 +2284,18 @@ pub fn read_bank_file(path: &str) -> Result<BankInput, String> {
 pub fn import_bank(store: &Store, at: NaiveDateTime, input: BankInput, replace: Option<&str>, author: Author) -> Result<ImportReport, String> {
     let _g = store.lock();
     let existing: Option<Bank> = match replace.filter(|r| !r.is_empty()) {
-        Some(r) => Some(store.load_item(BANKS, r).ok_or_else(|| tr!("Банк для замены не найден.", "The bank to replace was not found."))?),
+        Some(r) => Some(store.load_item(BANKS, r).ok_or_else(|| tr!("Набор для замены не найден.", "The deck to replace was not found."))?),
         None => None,
     };
     if existing.is_none() && deck_count(store) >= MAX_DECKS {
         return Err(tr!("Наборов не больше {MAX_DECKS}.", "At most {MAX_DECKS} decks."));
     }
-    let title = text(&input.title, 80, &tr!("Название банка", "Bank title"))?;
+    let title = text(&input.title, 80, &tr!("Название набора", "Deck title"))?;
     if title.is_empty() {
-        return Err(tr!("У банка нет названия: заполни title.", "The bank has no title: fill in title."));
+        return Err(tr!("У набора нет названия: заполни title.", "The deck has no title: fill in title."));
     }
     if input.cards.len() > MAX_CARDS {
-        return Err(tr!("В банке не больше {MAX_CARDS} карточек.", "A bank holds at most {MAX_CARDS} cards."));
+        return Err(tr!("В наборе не больше {MAX_CARDS} карточек.", "A deck holds at most {MAX_CARDS} cards."));
     }
     let mut topics = clean_topics(input.topics)?;
     let mut seen = HashSet::new();
@@ -2335,10 +2335,10 @@ pub fn import_bank(store: &Store, at: NaiveDateTime, input: BankInput, replace: 
         cards.push(card);
     }
     if overflow {
-        note(&mut problems, tr!("Часть вариантов не вошла: не больше {MAX_VARIANTS} на карточку и {MAX_BANK_VARIANTS} на банк.", "Some variants were left out: at most {MAX_VARIANTS} per card and {MAX_BANK_VARIANTS} per bank."));
+        note(&mut problems, tr!("Часть вариантов не вошла: не больше {MAX_VARIANTS} на карточку и {MAX_BANK_VARIANTS} на набор.", "Some variants were left out: at most {MAX_VARIANTS} per card and {MAX_BANK_VARIANTS} per deck."));
     }
     if cards.is_empty() {
-        return Err(tr!("В банке нет ни одной рабочей карточки. {}", "The bank has no working cards. {}", problems.join(" ")));
+        return Err(tr!("В наборе нет ни одной рабочей карточки. {}", "The deck has no working cards. {}", problems.join(" ")));
     }
     topics.retain(|t| cards.iter().any(|c| c.topic == t.id));
     let now = fmt_dt(at);
@@ -2448,7 +2448,7 @@ pub fn save_article(store: &Store, at: NaiveDateTime, input: ArticleInput, autho
     }
     let _g = store.lock();
     let existing: Option<Article> = match input.id.as_deref().filter(|i| !i.is_empty()) {
-        Some(i) if bank_articles(&cat).iter().any(|a| a.id == i) => return Err(tr!("Статью банка или генератора менять нельзя, добавь свою.", "Articles of banks and generators can't be changed, add your own.")),
+        Some(i) if bank_articles(&cat).iter().any(|a| a.id == i) => return Err(tr!("Статью из набора менять нельзя, добавь свою.", "An article from the deck can't be changed, add your own.")),
         Some(i) => Some(store.load_item(THEORY, i).ok_or_else(|| tr!("Статья не найдена.", "Article not found."))?),
         None => None,
     };
@@ -2470,7 +2470,7 @@ pub fn save_article(store: &Store, at: NaiveDateTime, input: ArticleInput, autho
 
 pub fn delete_article(store: &Store, id: &str) -> Result<(), String> {
     if bank_articles(&Catalog::load(store)).iter().any(|a| a.id == id) {
-        return Err(tr!("Статью банка или генератора удалить нельзя.", "Articles of banks and generators can't be deleted."));
+        return Err(tr!("Статью из набора удалить нельзя.", "An article from the deck can't be deleted."));
     }
     let _g = store.lock();
     store.delete_item(THEORY, id)

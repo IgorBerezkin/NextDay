@@ -1,10 +1,11 @@
 pub const INSTRUCTIONS: &str = "Next Day is the user's local day planner (Windows tray app). The user plans only TOMORROW, ticks checklist items during the day and seals the day with a rating. A goal is a map: topics linked by prerequisites, each with tasks ranked from simple to hard. While a goal is active the app itself puts its next tasks into tomorrow's plan, as many as fit the goal's daily minutes, and ticks move the goal forward. Start with get_overview and take dates from it. Before building a goal, read get_profile (real working rhythm) and recent get_history. create_goal makes a DRAFT that only the user can activate in the app; never pretend a draft is active. The drill trainer (tab Зубрилка) keeps decks of cards and presets of how to drill them: read get_drill before coaching, build decks with create_drill_deck and a fitting check template, tasks that need fresh data every time with install_drill_generator (a sandboxed JavaScript plugin) or import_drill_bank (a prepared JSON bank), and never turn on the screen lock or remove its escape unless the user asked. Read the resource nextday://guide for the data model, planning rules, tool reference and workflows.";
 
-const ENGLISH_UI: [(&str, &str); 26] = [
+const ENGLISH_UI: [(&str, &str); 27] = [
     ("ИИ через MCP", "AI over MCP"),
     ("Зубрилка", "Drill"),
     ("Справочник", "Reference"),
     ("Наборы", "Decks"),
+    ("из файла", "from file"),
     ("Проверить", "Test"),
     ("Основные", "Basic"),
     ("Для программистов", "For programmers"),
@@ -161,7 +162,7 @@ A checklist holds at most 40 items and is always sorted by start hour counted fr
 Decks come in three kinds, all drilled the same way through presets:
 
 - deck: cards written by hand or by AI with `create_drill_deck`. The fields are below.
-- bank: a prepared bank imported from JSON with `import_drill_bank` (DataEater). Every card is a template with many variants that differ only in data, for example code cards whose answers come from executing the code.
+- bank: a deck imported from a JSON file with `import_drill_bank` (DataEater). The app labels it из файла and never says bank, so call it a deck when you talk to the user. Every card is a template with many variants that differ only in data, for example code cards whose answers come from executing the code.
 - generator: a JavaScript plugin that makes fresh variants at the start of every session, installed with `install_drill_generator`.
 
 After a miss, a card of a bank or a generator comes back with another variant: the same task with new data.

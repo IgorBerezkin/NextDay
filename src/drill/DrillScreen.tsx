@@ -135,8 +135,8 @@ export function DrillScreen() {
               </h2>
               <p>
                 {t(
-                  "Зубрилка учит всему, что можно разложить на вопросы и ответы. Собери свой набор карточек, загрузи готовый банк из файла или попроси ИИ собрать набор через MCP.",
-                  "The drill trainer teaches anything you can split into questions and answers. Build your own deck of cards, load a ready bank from a file or ask an AI to build a deck over MCP.",
+                  "Зубрилка учит всему, что можно разложить на вопросы и ответы. Собери свои карточки, загрузи готовый набор из файла или попроси ИИ собрать набор через MCP.",
+                  "The drill trainer teaches anything you can split into questions and answers. Build your own cards, load a ready deck from a file or ask an AI to build a deck over MCP.",
                 )}
               </p>
               <div className="row">
