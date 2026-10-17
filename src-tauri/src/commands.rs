@@ -414,6 +414,27 @@ pub async fn drill_import_bank(app: AppHandle, text: String, replace: Option<Str
 }
 
 #[tauri::command]
+pub fn drill_save_check(app: AppHandle, store: State<'_, Store>, check: drill::CheckTemplate) -> Result<drill::CheckTemplate, String> {
+    let t = drill::save_check(&store, check)?;
+    drill_changed(&app);
+    Ok(t)
+}
+
+#[tauri::command]
+pub fn drill_delete_check(app: AppHandle, store: State<'_, Store>, id: Option<String>, group: Option<String>) -> Result<usize, String> {
+    let n = drill::delete_check(&store, id.as_deref(), group.as_deref())?;
+    drill_changed(&app);
+    Ok(n)
+}
+
+#[tauri::command]
+pub fn drill_reset_checks(app: AppHandle, store: State<'_, Store>) -> Result<usize, String> {
+    let n = drill::reset_checks(&store)?;
+    drill_changed(&app);
+    Ok(n)
+}
+
+#[tauri::command]
 pub fn drill_set_gate(app: AppHandle, store: State<'_, Store>, deck: String, gate: drill::Gate) -> Result<(), String> {
     drill::set_gate(&store, &deck, gate)?;
     drill_changed(&app);

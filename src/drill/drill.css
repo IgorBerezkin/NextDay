@@ -18,6 +18,7 @@
 .drill-badges {
   display: flex;
   gap: 14px;
+  margin-left: auto;
   color: var(--ink2);
 }
 .drill-badges span {
@@ -1224,4 +1225,34 @@
 }
 .eater-file p {
   margin: 0;
+}
+
+.chk-group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.chk-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 2px solid var(--paper2);
+}
+.chk-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 4px 0 4px 14px;
+  border-bottom: 1px dashed var(--paper2);
+}
+.chk-name {
+  min-width: 200px;
+}
+.chk-hint {
+  color: var(--teal);
+}
+.chk-hintfield {
+  flex: 1 1 100%;
 }

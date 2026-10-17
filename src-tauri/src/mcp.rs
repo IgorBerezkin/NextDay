@@ -99,7 +99,8 @@ fn check_schema(what: &str) -> Value {
             "caseSensitive": { "type": "boolean", "description": "text and choice. Default false." },
             "ignoreSpaces": { "type": "boolean", "description": "text: remove all spaces before comparing. Default false." },
             "tolerance": { "type": "number", "minimum": 0, "description": "number: allowed absolute difference. Default 0." },
-            "strictTypes": { "type": "boolean", "description": "python: 3 and 3.0, a tuple and a list differ. Default true." }
+            "strictTypes": { "type": "boolean", "description": "python: 3 and 3.0, a tuple and a list differ. Default true." },
+            "hint": { "type": "string", "description": "Shown under the answer field during a session instead of the default hint of the mode, up to 200 chars. Example: the word in its base form." }
         }
     })
 }
@@ -116,6 +117,7 @@ fn drill_card_schema() -> Value {
             "alternatives": { "type": "array", "items": { "type": "string" }, "maxItems": 10, "description": "Other accepted answers." },
             "choices": { "type": "array", "items": { "type": "string" }, "maxItems": 8, "description": "Choice mode: the options; the answer is added if missing." },
             "check": check_schema("Overrides the deck's check for this card."),
+            "template": { "type": "string", "description": "Id or name of a check template (get_drill, checks). Copies the template's check into the card instead of `check`." },
             "explain": { "type": "string", "description": "The rule or explanation shown after a miss. Max 2000 chars." }
         },
         "required": ["prompt", "answer"]
@@ -139,6 +141,7 @@ fn deck_fields() -> serde_json::Map<String, Value> {
         "title": { "type": "string", "description": "Max 80 chars." },
         "description": { "type": "string", "description": "Max 1000 chars." },
         "check": check_schema("How answers to the deck's cards are compared. Default mode text."),
+        "template": { "type": "string", "description": "Id or name of a check template (get_drill, checks). Copies the template's check into the deck instead of `check`." },
         "gate": gate_schema()
     });
     v.as_object().cloned().unwrap_or_default()
@@ -334,6 +337,28 @@ pub fn tools() -> Value {
                 "replaceId": { "type": "string", "description": "An imported bank to replace." }
             }), &[]),
             "annotations": rw(false)
+        },
+        {
+            "name": "save_drill_check",
+            "title": "Save check template",
+            "description": "Creates or replaces a check template: a named way to compare answers (mode, options and a hint shown under the answer field) kept in a group. The user picks templates when building a deck, and create_drill_deck and edit_drill_deck take `template` (id or name) instead of `check`. A deck copies the template, so later changes of the template do not touch existing decks. A new group appears when you use a new group name. Pass id to replace a template. Returns the template.",
+            "inputSchema": schema(json!({
+                "id": { "type": "string", "description": "An existing template id to replace it. Omit to create one." },
+                "group": { "type": "string", "description": "Group title, up to 40 chars, for example Языки. Default Свои." },
+                "name": { "type": "string", "description": "Up to 60 chars, for example Английское слово." },
+                "check": check_schema("How answers are compared and the hint under the answer field.")
+            }), &["name", "check"]),
+            "annotations": rw(false)
+        },
+        {
+            "name": "delete_drill_check",
+            "title": "Delete check template",
+            "description": "Deletes one check template by id, or every template of a group when `group` is given. Decks keep their own copy of the check and are not affected. Returns the number of deleted templates.",
+            "inputSchema": schema(json!({
+                "id": { "type": "string" },
+                "group": { "type": "string", "description": "Delete the whole group." }
+            }), &[]),
+            "annotations": rw(true)
         },
         {
             "name": "save_drill_preset",
@@ -587,6 +612,15 @@ fn call(store: &Store, name: &str, args: Value) -> Result<(Value, bool), String>
             let report = drill::import_bank(store, at, input, replace.as_deref(), Author::Ai)?;
             let note = "Imported. The user sees it in the app under Зубрилка, tab Наборы; it is drilled after it is added to a preset.";
             Ok((json!({ "report": report, "note": note }), true))
+        }
+        "save_drill_check" => {
+            let t: drill::CheckTemplate = parse(args, "check template")?;
+            Ok((serde_json::to_value(drill::save_check(store, t)?).unwrap_or(Value::Null), true))
+        }
+        "delete_drill_check" => {
+            let s = |k: &str| args.get(k).and_then(Value::as_str).map(str::to_string);
+            let n = drill::delete_check(store, s("id").as_deref(), s("group").as_deref())?;
+            Ok((json!({ "deleted": n }), true))
         }
         "save_drill_preset" => {
             let make_default = args.get("makeDefault").and_then(Value::as_bool).unwrap_or(false);
@@ -917,7 +951,7 @@ mod tests {
         let (_, r) = handle(&s, &|| {}, &modern("nope", json!({}))).unwrap();
         assert_eq!(r["error"]["code"], -32601);
         let (_, r) = handle(&s, &|| {}, &modern("tools/list", json!({}))).unwrap();
-        assert_eq!(r["result"]["tools"].as_array().unwrap().len(), 18);
+        assert_eq!(r["result"]["tools"].as_array().unwrap().len(), 20);
         let (_, r) = handle(&s, &|| {}, &modern("resources/read", json!({ "uri": "nextday://guide" }))).unwrap();
         assert!(r["result"]["contents"][0]["text"].as_str().unwrap().contains("# Next Day for AI agents"));
         let (_, r) = handle(&s, &|| {}, &modern("prompts/get", json!({ "name": "plan_goal", "arguments": { "goal": "выучить Rust" } }))).unwrap();
@@ -930,7 +964,7 @@ mod tests {
     fn bridge_answers_without_the_app() {
         let ask = |method: &str, params: Value| answer(None, &|| {}, &req(method, params)).unwrap().1;
         assert_eq!(ask("initialize", json!({ "protocolVersion": "2025-11-25" }))["result"]["serverInfo"]["name"], "next-day");
-        assert_eq!(ask("tools/list", json!({}))["result"]["tools"].as_array().unwrap().len(), 18);
+        assert_eq!(ask("tools/list", json!({}))["result"]["tools"].as_array().unwrap().len(), 20);
         assert!(ask("resources/read", json!({ "uri": "nextday://guide" }))["result"]["contents"][0]["text"].as_str().unwrap().starts_with("# Next Day"));
         assert_eq!(ask("tools/call", json!({ "name": "get_overview" }))["result"]["isError"], true);
         assert_eq!(ask("resources/read", json!({ "uri": "nextday://goals" }))["error"]["code"], -32603);
@@ -1007,6 +1041,14 @@ mod tests {
         assert_eq!(kinds[..2], ["bank", "generator"]);
         kinds.sort();
         assert_eq!(kinds, vec!["bank", "bank", "deck", "generator", "generator"]);
+        let r = tool(&s, "save_drill_check", json!({ "group": "Языки", "name": "Слово", "check": { "mode": "text", "hint": "одно слово" } }));
+        assert_eq!(r["isError"], false, "{r}");
+        let cid = r["structuredContent"]["id"].as_str().unwrap().to_string();
+        let r = tool(&s, "create_drill_deck", json!({ "title": "Words", "template": "Слово", "cards": [{ "prompt": "a?", "answer": "b" }] }));
+        assert_eq!(r["structuredContent"]["deck"]["check"]["hint"], "одно слово", "{r}");
+        assert_eq!(tool(&s, "get_drill", json!({}))["structuredContent"]["checks"].as_array().unwrap().len(), 7);
+        assert_eq!(tool(&s, "delete_drill_check", json!({ "id": cid }))["structuredContent"]["deleted"], 1);
+        assert_eq!(tool(&s, "delete_drill_check", json!({}))["isError"], true);
     }
 
     #[test]

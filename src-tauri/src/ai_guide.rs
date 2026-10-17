@@ -1,4 +1,4 @@
-pub const INSTRUCTIONS: &str = "Next Day is the user's local day planner (Windows tray app). The user plans only TOMORROW, ticks checklist items during the day and seals the day with a rating. A goal is a map: topics linked by prerequisites, each with tasks ranked from simple to hard. While a goal is active the app itself puts its next tasks into tomorrow's plan, as many as fit the goal's daily minutes, and ticks move the goal forward. Start with get_overview and take dates from it. Before building a goal, read get_profile (real working rhythm) and recent get_history. create_goal makes a DRAFT that only the user can activate in the app; never pretend a draft is active. The drill trainer (Зубрилка) keeps decks of cards and presets of how to drill them: read get_drill before coaching, build decks with create_drill_deck, tasks that need fresh data every time with install_drill_generator (a sandboxed JavaScript plugin) or import_drill_bank (a prepared JSON bank), and never turn on the screen lock or remove its escape unless the user asked. Read the resource nextday://guide for the data model, planning rules, tool reference and workflows.";
+pub const INSTRUCTIONS: &str = "Next Day is the user's local day planner (Windows tray app). The user plans only TOMORROW, ticks checklist items during the day and seals the day with a rating. A goal is a map: topics linked by prerequisites, each with tasks ranked from simple to hard. While a goal is active the app itself puts its next tasks into tomorrow's plan, as many as fit the goal's daily minutes, and ticks move the goal forward. Start with get_overview and take dates from it. Before building a goal, read get_profile (real working rhythm) and recent get_history. create_goal makes a DRAFT that only the user can activate in the app; never pretend a draft is active. The drill trainer (Зубрилка) keeps decks of cards and presets of how to drill them: read get_drill before coaching, build decks with create_drill_deck and a fitting check template, tasks that need fresh data every time with install_drill_generator (a sandboxed JavaScript plugin) or import_drill_bank (a prepared JSON bank), and never turn on the screen lock or remove its escape unless the user asked. Read the resource nextday://guide for the data model, planning rules, tool reference and workflows.";
 
 pub const GUIDE: &str = r##"# Next Day for AI agents
 
@@ -14,7 +14,7 @@ The rhythm of the app:
 - Day: the plan is frozen; the user only ticks checklist items and sub-items.
 - Night or next morning: the user collects results on a board (notes, images, finished tasks) and seals the day with a rating 1-5 and an optional short summary. Sealed days are read-only history.
 - Goals: a goal is a map of topics. Arrows (prerequisites) say what must be mastered before what; every topic holds tasks ranked from simple to hard. While a goal is active, the app plans tomorrow by itself from the map and the goal's daily minutes. The user sees the map on the Map tab and the goal on the Goals tab.
-- Drill (Зубрилка): short cards answered in a row until a session goal is met. The user chooses what to drill (decks and topics), how (order, session size, self-check) and under which conditions (a full-screen lock or a normal window, an escape, a time ceiling). The built-in deck `python` teaches reading Python code without running it: what a variable holds, its shape, how it changes in a loop, which error the code raises. Its answers and value tables come from executing the code. The built-in generator `shapes` makes new tasks every session about how NumPy and PyTorch shapes change after one to three operations. Decks can also be generators (JavaScript plugins) or imported banks.
+- Drill (Зубрилка): short cards answered in a row until a session goal is met. The user chooses what to drill (decks and topics), how (order, session size, self-check) and under which conditions (a full-screen lock or a normal window, an escape, a time ceiling). The built-in deck `python` teaches reading Python code without running it: what a variable holds, its shape, how it changes in a loop, which error the code raises. Its answers and value tables come from executing the code. The built-in generator `shapes` makes new tasks every session about how NumPy and PyTorch shapes change after one to three operations. Decks can also be generators (JavaScript plugins) or imported banks. How answers are compared (text, a number, a choice of options, self-check, Python values and shapes) comes from check templates that the user keeps in groups and can extend.
 
 ## 2. Connecting
 
@@ -131,7 +131,7 @@ After a miss, a card of a bank or a generator comes back with another variant: t
 | title | string | Up to 80 chars |
 | description | string | Up to 1000 chars |
 | author | user or ai | |
-| check | Check | How answers to the deck's cards are compared |
+| check | Check | How answers to the deck's cards are compared, usually copied from a check template |
 | gate | Gate | When enabled, topics open one by one |
 | cards | Card[] | Up to 2000 |
 
@@ -151,7 +151,7 @@ After a miss, a card of a bank or a generator comes back with another variant: t
 
 ### Check
 
-`{mode, caseSensitive, ignoreSpaces, tolerance, strictTypes}`
+`{mode, caseSensitive, ignoreSpaces, tolerance, strictTypes, hint}`
 
 | mode | The answer is right when |
 |---|---|
@@ -162,12 +162,20 @@ After a miss, a card of a bank or a generator comes back with another variant: t
 | choice | The picked option is the answer |
 | self | The user reveals the answer and says whether they knew it |
 
+`hint` (up to 200 chars) is shown under the answer field during a session instead of the default hint of the mode. Use it for the expected form of the answer: the base form of a word, a unit, a date format. Write it in the user's language.
+
+### Check template
+
+`{id, group, name, check}`: a named Check that the user picks when building a deck or a card. Templates are listed in groups, and a new group name makes a new group. A new install starts with two groups: Основные with `text` (Текст), `choice` (Выбор из вариантов), `number` (Число) and `self` (Самопроверка), and Для программистов with `python` (Значение Python) and `shape` (Форма данных Python). The user can change and delete any template and bring the default ones back.
+
+A deck or a card copies the check of its template. Changing or deleting the template later does not touch existing decks.
+
 ### Bank
 
 `{title, description, gate, topics, cards}`: the format of `python` and of `import_drill_bank`.
 
 - `topics`: up to 100 `{id, title, theory}`. `theory` is Markdown in the app's dialect (see Theory article) and becomes a read-only article of the topic. Topics without cards are dropped.
-- `cards`: up to 2000 `{id, topic, kind, rule, check, variants}`. `id` is up to 60 chars and unique; `topic` is a topic id or title; `rule` (up to 2000 chars) is shown after a miss; `check` may tune the comparison (caseSensitive, ignoreSpaces, tolerance, strictTypes) while its mode always comes from `kind`.
+- `cards`: up to 2000 `{id, topic, kind, rule, check, variants}`. `id` is up to 60 chars and unique; `topic` is a topic id or title; `rule` (up to 2000 chars) is shown after a miss; `check` may tune the comparison (caseSensitive, ignoreSpaces, tolerance, strictTypes, hint) while its mode always comes from `kind`.
 - `variants`: up to 200 per card and 100000 per bank, `{question, code, answer, choices, alternatives, explain}`; `prompt` works as another name for `question`. `explain` (Markdown, up to 2000 chars) is shown after a miss under the rule: put the explanation of this very data there, for example a table of every line with its result.
 
 | kind | The user | answer |
@@ -362,10 +370,11 @@ Required: `title`, `outcome`, `topics`. Optional: `note`, `deadline`, `minutesPe
 
 ### get_drill (read)
 
-No arguments. Returns `{presets, defaultPreset, python, decks, streak, bestStreak, today, due, weak, sessions}`.
+No arguments. Returns `{presets, checks, defaultPreset, python, decks, streak, bestStreak, today, due, weak, sessions}`.
 
+- `checks`: the check templates in the order the user sees them, `{id, group, name, check}`.
 - `python`: settings of the built-in deck, `{gate, strictTypes}`.
-- `decks`: `[{id, title, description, builtin, kind, enabled, author, cards, variants, check, gate, topics, updatedAt}]`; `kind` is deck, bank or generator, `cards` of a generator counts its templates, `variants` counts the prepared variants of a bank, `enabled` is false for a generator waiting for the user's check with topics `{id, title, cards, open, answered, recent, recentRight, seen, due, boxes}`. `recentRight` of `recent` is the accuracy over the gate window; `boxes` counts seen cards per Leitner box.
+- `decks`: `[{id, title, description, builtin, kind, enabled, author, cards, variants, check, gate, topics, updatedAt}]`; `kind` is deck, bank or generator, `cards` of a generator counts its templates, `variants` counts the prepared variants of a bank, `enabled` is false for a generator waiting for the user's check. `topics` are `{id, title, cards, open, answered, recent, recentRight, seen, due, boxes}`. `recentRight` of `recent` is the accuracy over the gate window; `boxes` counts seen cards per Leitner box.
 - `today`: `{sessions, answers, correct}`. `due`: cards due in the default preset.
 - `weak`: the most missed cards `{deck, card, topic, prompt, code, answer, rule, right, wrong, level, lastWrong}`. `lastWrong` holds the user's last wrong answers, the best evidence of a misconception.
 - `sessions`: the last 40, newest first, `{name, startedAt, endedAt, outcome, screen, goal, amount, answered, correct, firstTry, wrong, seconds, misses}`.
@@ -376,18 +385,19 @@ No arguments. Returns `{presets, defaultPreset, python, decks, streak, bestStrea
 
 ### create_drill_deck (write)
 
-Required: `title`, `cards`. Optional: `description`, `check`, `gate`. Every card needs `prompt` and `answer`.
+Required: `title`, `cards`. Optional: `description`, `check` or `template`, `gate`. Every card needs `prompt` and `answer` and may have its own `check` or `template`.
 
+- `template` is the id or name of a check template from `get_drill`; its check is copied into the deck or the card. Prefer a template that fits over a hand-made `check`.
 - The whole input is validated first: in python mode every answer and alternative must be a literal or an exception name, in number mode a number; choice cards need at least two options.
 - Creates the deck with `author: ai` and returns `{deck, note}`. The deck is drilled only after it is added to a preset.
 
 ### edit_drill_deck (write)
 
-`deckId` plus any of `title`, `description`, `check`, `gate`, `upsert` (cards; a card with an existing `id` is replaced, one without `id` is added) and `remove` (card ids). The built-in deck can not be edited. Progress of kept cards stays. Returns the deck.
+`deckId` plus any of `title`, `description`, `check` or `template`, `gate`, `upsert` (cards; a card with an existing `id` is replaced, one without `id` is added) and `remove` (card ids). The built-in deck can not be edited. Progress of kept cards stays. Returns the deck.
 
 ### get_drill_theory (read)
 
-Optional `deckId`; with it, `topic` (a topic id) narrows the list to that topic plus the articles about the whole deck. Returns `{articles}`: `[{id, deck, topic, title, body, author, builtin, createdAt, updatedAt}]`. Built-in articles belong to the `python` deck and have `builtin: true`.
+Optional `deckId`; with it, `topic` (a topic id) narrows the list to that topic plus the articles about the whole deck. Returns `{articles}`: `[{id, deck, topic, title, body, author, builtin, createdAt, updatedAt}]`. Articles that come with the topics of banks and generators, `python` and `shapes` included, have `builtin: true`.
 
 ### save_drill_theory (write)
 
@@ -400,6 +410,14 @@ Optional `deckId`; with it, `topic` (a topic id) narrows the list to that topic 
 ### import_drill_bank (write)
 
 `bank` (the object) or `path` (an absolute path to a .json file up to 16 MB), optional `replaceId` (an imported bank to replace; progress of cards with the same ids stays). Returns `{report: {id, title, topics, cards, variants, dropped, problems, replaced}, note}`. Read `problems`: they name the dropped cards and variants and why.
+
+### save_drill_check (write)
+
+`name` (up to 60 chars), `check`, optional `group` (up to 40 chars, default Свои) and `id` (replaces that template). A new group name creates the group; a new template goes to the end of its group. Returns the template.
+
+### delete_drill_check (write)
+
+`id` deletes one template, `group` deletes the whole group. Decks keep their copies of the check. Returns `{deleted}`.
 
 ### save_drill_preset (write)
 
@@ -465,7 +483,7 @@ Prompts: `plan_goal(goal, deadline?)`, `evening_review()`, `readiness_check(goal
 1. Call `get_drill`. Name the open topics, accuracy, streak and the outcomes of recent sessions; escapes and timeouts mean the sessions are too long or too hard.
 2. Study `weak`: group the misses by the rule behind them and read `lastWrong` to find the misconception.
 3. Explain each rule with a tiny example and check the user with one question at a time in the chat.
-4. Offer a deck that targets these mistakes: create it with `create_drill_deck` (python mode for code questions, a short `explain` on every card) and, if the user agrees, add it to a preset with `save_drill_preset`.
+4. Offer a deck that targets these mistakes: create it with `create_drill_deck` (a fitting check template from `checks`, python for code questions, a short `explain` on every card) and, if the user agrees, add it to a preset with `save_drill_preset`. When the user will drill the same kind of answer again (words of a language, dates, formulas), offer a check template for it with `save_drill_check` and a `hint` that names the expected form.
 5. When a rule keeps failing, write the model down for later with `save_drill_theory` on that deck and topic: a short article with `data` blocks that show the structure before and after.
 6. When the user needs the same kind of task again and again with new data (shapes after transformations, verb forms, unit conversions), write a generator instead of a deck. See below.
 

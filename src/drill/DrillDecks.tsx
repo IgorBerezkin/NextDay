@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   api,
-  type CheckMode,
-  type CheckSpec,
+  type CheckTemplate,
   type DrillCardData,
   type DrillDeckInfo,
   type DrillDeckInput,
@@ -13,11 +12,12 @@ import {
 import { Button, Check, Modal, toast, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
 import { plural } from "../util";
+import { CheckFields, checkHelp, CheckTemplates } from "./CheckTemplates";
 import { DataEater } from "./DataEater";
-import { DEFAULT_CHECK, DEFAULT_GATE, MODES } from "./drillKit";
+import { checkName, DEFAULT_CHECK, DEFAULT_GATE } from "./drillKit";
 import { GeneratorEditor } from "./GeneratorEditor";
 
-function sizeText(d: DrillDeckInfo): string {
+function sizeText(d: DrillDeckInfo, checks: CheckTemplate[]): string {
   if (d.kind === "generator") {
     if (!d.cards) return "Код ещё не проверен, шаблонов пока нет.";
     return `${plural(d.cards, "шаблон", "шаблона", "шаблонов")}, данные новые в каждом сеансе, промах вернётся с другими данными`;
@@ -25,7 +25,7 @@ function sizeText(d: DrillDeckInfo): string {
   if (d.kind === "bank") {
     return `${plural(d.cards, "карточка", "карточки", "карточек")}, ${plural(d.variants, "вариант", "варианта", "вариантов")} с разными данными`;
   }
-  const mode = MODES.find((m) => m.value === d.check?.mode)?.label.toLowerCase();
+  const mode = d.check ? checkName(d.check, checks) : "";
   return `${plural(d.cards, "карточка", "карточки", "карточек")}${mode ? `, проверка: ${mode}` : ""}`;
 }
 
@@ -66,7 +66,7 @@ export function DrillDecks({ ov, reload }: { ov: DrillOverview; reload: () => Pr
             {d.author === "ai" && <span className="drill-chip ai">от ИИ</span>}
           </h2>
           {d.description && <p className="muted">{d.description}</p>}
-          <p>{sizeText(d)}</p>
+          <p>{sizeText(d, ov.checks)}</p>
           {d.kind === "generator" && !d.enabled && (
             <p className="drill-gen-off">Генератор выключен: открой его, нажми «Проверить», посмотри примеры карточек и включи.</p>
           )}
@@ -159,10 +159,12 @@ export function DrillDecks({ ov, reload }: { ov: DrillOverview; reload: () => Pr
         Набор: свои вопросы и ответы. Генератор: скрипт, который в каждом сеансе придумывает карточки с новыми данными. Банк: готовый JSON,
         где у каждой карточки много вариантов. Всё это можно собирать и через ИИ по MCP.
       </p>
+      <CheckTemplates list={ov.checks} reload={reload} />
 
       {editing && (
         <DeckEditor
           deck={editing}
+          templates={ov.checks}
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
@@ -302,56 +304,6 @@ function BuiltinPrefs({ gate, strict, onChange }: { gate: Gate; strict: boolean;
   );
 }
 
-function CheckFields({
-  spec,
-  onChange,
-  allowInherit,
-}: {
-  spec: CheckSpec | null;
-  onChange: (s: CheckSpec | null) => void;
-  allowInherit?: boolean;
-}) {
-  const s = spec ?? DEFAULT_CHECK;
-  return (
-    <div className="drill-checkfields">
-      <select
-        className="field select"
-        value={spec ? spec.mode : "inherit"}
-        onChange={(e) => onChange(e.target.value === "inherit" ? null : { ...s, mode: e.target.value as CheckMode })}
-      >
-        {allowInherit && <option value="inherit">как у набора</option>}
-        {MODES.map((m) => (
-          <option key={m.value} value={m.value}>
-            {m.label}
-          </option>
-        ))}
-      </select>
-      {spec && (spec.mode === "text" || spec.mode === "choice") && (
-        <Check small checked={spec.caseSensitive} onChange={(v) => onChange({ ...spec, caseSensitive: v })} label="регистр важен" />
-      )}
-      {spec && spec.mode === "text" && (
-        <Check small checked={spec.ignoreSpaces} onChange={(v) => onChange({ ...spec, ignoreSpaces: v })} label="пробелы не важны" />
-      )}
-      {spec && spec.mode === "number" && (
-        <label className="row">
-          <span>допуск</span>
-          <input
-            className="field drill-num"
-            type="number"
-            min={0}
-            step="any"
-            value={spec.tolerance}
-            onChange={(e) => onChange({ ...spec, tolerance: Math.max(0, Number(e.target.value) || 0) })}
-          />
-        </label>
-      )}
-      {spec && spec.mode === "python" && (
-        <Check small checked={spec.strictTypes} onChange={(v) => onChange({ ...spec, strictTypes: v })} label="строгие типы" />
-      )}
-    </div>
-  );
-}
-
 const lines = (s: string) =>
   s
     .split("\n")
@@ -362,7 +314,17 @@ function blankCard(topic: string): DrillCardData {
   return { topic, prompt: "", code: "", answer: "", alternatives: [], choices: [], check: null, explain: "" };
 }
 
-function DeckEditor({ deck, onClose, onSaved }: { deck: DrillDeckInput; onClose: () => void; onSaved: () => void }) {
+function DeckEditor({
+  deck,
+  templates,
+  onClose,
+  onSaved,
+}: {
+  deck: DrillDeckInput;
+  templates: CheckTemplate[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [d, setD] = useState<DrillDeckInput>(() => structuredClone(deck));
   const [open, setOpen] = useState<number | null>(deck.cards.length ? null : 0);
   const [bulk, setBulk] = useState("");
@@ -441,8 +403,8 @@ function DeckEditor({ deck, onClose, onSaved }: { deck: DrillDeckInput; onClose:
         </label>
         <div className="drill-field">
           <span>Как проверять ответы</span>
-          <CheckFields spec={d.check} onChange={(s) => s && set({ check: s })} />
-          <p className="muted">{MODES.find((m) => m.value === d.check.mode)?.hint}</p>
+          <CheckFields spec={d.check} templates={templates} onChange={(s) => s && set({ check: s })} />
+          <p className="muted">{checkHelp(d.check)}</p>
         </div>
         <div className="drill-field">
           <Check checked={d.gate.enabled} onChange={(v) => set({ gate: { ...d.gate, enabled: v } })} label="Открывать темы по очереди" />
@@ -487,7 +449,7 @@ function DeckEditor({ deck, onClose, onSaved }: { deck: DrillDeckInput; onClose:
                     maxLength={80}
                     onChange={(e) => setCard(i, { topic: e.target.value })}
                   />
-                  <CheckFields spec={c.check} allowInherit onChange={(s) => setCard(i, { check: s })} />
+                  <CheckFields spec={c.check} templates={templates} base={d.check} onChange={(s) => setCard(i, { check: s })} />
                   <span className="grow" />
                   <Button kind="ghost" small onClick={() => setOpen(null)}>
                     Свернуть

@@ -392,11 +392,12 @@ pub struct CheckSpec {
     pub ignore_spaces: bool,
     pub tolerance: f64,
     pub strict_types: bool,
+    pub hint: String,
 }
 
 impl Default for CheckSpec {
     fn default() -> Self {
-        Self { mode: Mode::Text, case_sensitive: false, ignore_spaces: false, tolerance: 0.0, strict_types: true }
+        Self { mode: Mode::Text, case_sensitive: false, ignore_spaces: false, tolerance: 0.0, strict_types: true, hint: String::new() }
     }
 }
 

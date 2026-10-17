@@ -27,6 +27,7 @@ const RECENT: usize = 50;
 const MAX_CARDS: usize = 2000;
 const MAX_DECKS: usize = 200;
 const MAX_PRESETS: usize = 30;
+const MAX_CHECKS: usize = 100;
 const MAX_TOPICS: usize = 100;
 const MAX_TEMPLATES: usize = 500;
 const MAX_VARIANTS: usize = 200;
@@ -243,6 +244,27 @@ impl Default for Preset {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CheckTemplate {
+    pub id: String,
+    pub group: String,
+    pub name: String,
+    pub check: CheckSpec,
+}
+
+fn default_checks() -> Vec<CheckTemplate> {
+    let t = |id: &str, group: &str, name: &str, mode: Mode| CheckTemplate { id: id.into(), group: group.into(), name: name.into(), check: CheckSpec { mode, ..CheckSpec::default() } };
+    vec![
+        t("text", "Основные", "Текст", Mode::Text),
+        t("choice", "Основные", "Выбор из вариантов", Mode::Choice),
+        t("number", "Основные", "Число", Mode::Number),
+        t("self", "Основные", "Самопроверка", Mode::SelfCheck),
+        t("python", "Для программистов", "Значение Python", Mode::Python),
+        t("shape", "Для программистов", "Форма данных Python", Mode::Shape),
+    ]
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Gate {
@@ -344,6 +366,8 @@ pub struct DrillState {
     pub sessions: Vec<SessionRecord>,
     pub cursors: BTreeMap<String, usize>,
     pub gates: BTreeMap<String, Gate>,
+    pub checks: Vec<CheckTemplate>,
+    pub checks_seeded: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -396,6 +420,7 @@ pub struct CardInput {
     pub alternatives: Vec<String>,
     pub choices: Vec<String>,
     pub check: Option<CheckSpec>,
+    pub template: Option<String>,
     pub explain: String,
 }
 
@@ -406,6 +431,7 @@ pub struct DeckInput {
     pub title: String,
     pub description: String,
     pub check: CheckSpec,
+    pub template: Option<String>,
     pub gate: Gate,
     pub cards: Vec<CardInput>,
 }
@@ -416,6 +442,7 @@ pub struct DeckPatch {
     pub title: Option<String>,
     pub description: Option<String>,
     pub check: Option<CheckSpec>,
+    pub template: Option<String>,
     pub gate: Option<Gate>,
     pub upsert: Vec<CardInput>,
     pub remove: Vec<String>,
@@ -499,6 +526,10 @@ pub fn load_state(store: &Store) -> DrillState {
     }
     if !s.presets.iter().any(|p| p.id == s.default_preset) {
         s.default_preset = s.presets[0].id.clone();
+    }
+    if !s.checks_seeded {
+        s.checks = default_checks();
+        s.checks_seeded = true;
     }
     s
 }
@@ -1128,6 +1159,7 @@ pub struct CardView {
     pub retry: bool,
     pub self_check: bool,
     pub hinted: bool,
+    pub hint: String,
     pub revealed: Option<Reveal>,
 }
 
@@ -1171,6 +1203,7 @@ pub fn view(s: &Session, at: NaiveDateTime) -> SessionView {
             retry: slot.retry,
             self_check,
             hinted: slot.hinted,
+            hint: r.spec.hint.clone(),
             revealed: slot.revealed.then(|| Reveal { expected: r.shown, explain: r.explain, walk: r.walk }),
         })
     });
@@ -1399,6 +1432,7 @@ pub struct DayCount {
 #[serde(rename_all = "camelCase")]
 pub struct Overview {
     pub presets: Vec<Preset>,
+    pub checks: Vec<CheckTemplate>,
     pub default_preset: String,
     pub python: BuiltinPrefs,
     pub decks: Vec<DeckInfo>,
@@ -1551,6 +1585,7 @@ pub fn overview(store: &Store, at: NaiveDateTime) -> Overview {
         .count();
     Overview {
         presets: state.presets.clone(),
+        checks: state.checks.clone(),
         default_preset: state.default_preset.clone(),
         python: state.python.clone(),
         decks,
@@ -1602,6 +1637,7 @@ fn clean_spec(mut s: CheckSpec) -> Result<CheckSpec, String> {
     if matches!(s.mode, Mode::Error | Mode::Output) {
         s.mode = Mode::Text;
     }
+    s.hint = text(&s.hint, 200, "Подсказка к ответу")?;
     if !s.tolerance.is_finite() || s.tolerance < 0.0 {
         return Err("Допуск должен быть неотрицательным числом.".into());
     }
@@ -1630,11 +1666,18 @@ pub fn save_deck(store: &Store, at: NaiveDateTime, input: DeckInput, author: Aut
     if input.cards.len() > MAX_CARDS {
         return Err(format!("В наборе не больше {MAX_CARDS} карточек."));
     }
-    let check = clean_spec(input.check)?;
+    let state = load_state(store);
+    let check = match input.template.as_deref().filter(|t| !t.trim().is_empty()) {
+        Some(t) => find_check(&state, t)?,
+        None => clean_spec(input.check)?,
+    };
     let mut seen = HashSet::new();
     let mut cards = Vec::new();
     for c in input.cards {
         let mut c = c;
+        if let Some(t) = c.template.as_deref().filter(|t| !t.trim().is_empty()) {
+            c.check = Some(find_check(&state, t)?);
+        }
         c.check = c.check.map(clean_spec).transpose()?;
         cards.push(clean_card(c, &check, &mut seen)?);
     }
@@ -1669,6 +1712,7 @@ pub fn edit_deck(store: &Store, at: NaiveDateTime, id: &str, patch: DeckPatch) -
             alternatives: c.alternatives.clone(),
             choices: c.choices.clone(),
             check: c.check.clone(),
+            template: None,
             explain: c.explain.clone(),
         })
         .collect();
@@ -1686,6 +1730,7 @@ pub fn edit_deck(store: &Store, at: NaiveDateTime, id: &str, patch: DeckPatch) -
             title: patch.title.unwrap_or(d.title),
             description: patch.description.unwrap_or(d.description),
             check: patch.check.unwrap_or(d.check),
+            template: patch.template,
             gate: patch.gate.unwrap_or(d.gate),
             cards,
         },
@@ -1858,6 +1903,81 @@ pub fn set_topic(store: &Store, at: NaiveDateTime, deck: &str, topic: &str, open
     t.open = open;
     t.opened_at = open.then(|| fmt_dt(at));
     save_state(store, &state)
+}
+
+fn find_check(state: &DrillState, key: &str) -> Result<CheckSpec, String> {
+    let key = key.trim();
+    state
+        .checks
+        .iter()
+        .find(|c| c.id == key)
+        .or_else(|| state.checks.iter().find(|c| c.name.to_lowercase() == key.to_lowercase()))
+        .map(|c| c.check.clone())
+        .ok_or_else(|| format!("Шаблон проверки «{key}» не найден."))
+}
+
+pub fn save_check(store: &Store, input: CheckTemplate) -> Result<CheckTemplate, String> {
+    let name = text(&input.name, 60, "Название шаблона")?;
+    if name.is_empty() {
+        return Err("Дай шаблону название.".into());
+    }
+    let group = text(&input.group, 40, "Группа")?;
+    let group = if group.is_empty() { "Свои".to_string() } else { group };
+    let check = clean_spec(input.check)?;
+    let _g = store.lock();
+    let mut state = load_state(store);
+    let id = input.id.trim().to_string();
+    let old = state.checks.iter().position(|c| !id.is_empty() && c.id == id);
+    if old.is_none() && state.checks.len() >= MAX_CHECKS {
+        return Err(format!("Шаблонов не больше {MAX_CHECKS}."));
+    }
+    let id = if old.is_some() || (!id.is_empty() && id.len() <= 40) { id } else { uid() };
+    let t = CheckTemplate { id, group, name, check };
+    match old {
+        Some(i) if state.checks[i].group == t.group => state.checks[i] = t.clone(),
+        _ => {
+            if let Some(i) = old {
+                state.checks.remove(i);
+            }
+            let at = state.checks.iter().rposition(|c| c.group == t.group).map(|i| i + 1).unwrap_or(state.checks.len());
+            state.checks.insert(at, t.clone());
+        }
+    }
+    save_state(store, &state)?;
+    Ok(t)
+}
+
+pub fn delete_check(store: &Store, id: Option<&str>, group: Option<&str>) -> Result<usize, String> {
+    let _g = store.lock();
+    let mut state = load_state(store);
+    let before = state.checks.len();
+    match (id.filter(|x| !x.is_empty()), group.filter(|x| !x.is_empty())) {
+        (Some(id), _) => state.checks.retain(|c| c.id != id),
+        (None, Some(group)) => state.checks.retain(|c| c.group != group),
+        _ => return Err("Укажи шаблон или группу.".into()),
+    }
+    let gone = before - state.checks.len();
+    if gone == 0 {
+        return Err("Такого шаблона нет.".into());
+    }
+    save_state(store, &state)?;
+    Ok(gone)
+}
+
+pub fn reset_checks(store: &Store) -> Result<usize, String> {
+    let _g = store.lock();
+    let mut state = load_state(store);
+    let mut added = 0;
+    for d in default_checks() {
+        if state.checks.iter().any(|c| c.id == d.id) {
+            continue;
+        }
+        let at = state.checks.iter().rposition(|c| c.group == d.group).map(|i| i + 1).unwrap_or(state.checks.len());
+        state.checks.insert(at, d);
+        added += 1;
+    }
+    save_state(store, &state)?;
+    Ok(added)
 }
 
 pub fn set_gate(store: &Store, deck: &str, gate: Gate) -> Result<(), String> {
@@ -2769,5 +2889,39 @@ mod tests {
         let cat = Catalog::load(&tmp_store("shapes"));
         assert_eq!(cat.kind(SHAPES), Some(DeckKind::Generator));
         assert!(builtin_articles(&cat).iter().any(|a| a.deck == SHAPES));
+    }
+
+    #[test]
+    fn check_templates_group_and_feed_decks() {
+        let store = tmp_store("checks");
+        let t0 = at("2026-10-16T10:00:00");
+        let st = load_state(&store);
+        assert_eq!(st.checks.len(), 6);
+        assert_eq!(st.checks[4].group, "Для программистов");
+        let word = CheckTemplate { group: "Языки".into(), name: "Английское слово".into(), check: CheckSpec { hint: "в начальной форме".into(), ..CheckSpec::default() }, ..Default::default() };
+        let word = save_check(&store, word).unwrap();
+        assert_eq!(load_state(&store).checks.last().unwrap().id, word.id);
+        let num = CheckTemplate { group: "Основные".into(), name: "Число с допуском".into(), check: CheckSpec { mode: Mode::Number, tolerance: 0.5, ..CheckSpec::default() }, ..Default::default() };
+        let num = save_check(&store, num).unwrap();
+        assert_eq!(load_state(&store).checks.iter().position(|c| c.id == num.id), Some(4));
+        let cards = vec![
+            CardInput { prompt: "go?".into(), answer: "went".into(), ..Default::default() },
+            CardInput { prompt: "pi?".into(), answer: "3.14".into(), template: Some(num.id.clone()), ..Default::default() },
+        ];
+        let deck = save_deck(&store, t0, DeckInput { title: "Слова".into(), template: Some("английское слово".into()), cards, ..Default::default() }, Author::User).unwrap();
+        assert_eq!(deck.check.hint, "в начальной форме");
+        assert_eq!(deck.cards[1].check.as_ref().unwrap().tolerance, 0.5);
+        let bad = DeckInput { title: "x".into(), template: Some("нет такого".into()), cards: vec![CardInput { prompt: "q".into(), answer: "a".into(), ..Default::default() }], ..Default::default() };
+        assert!(save_deck(&store, t0, bad, Author::User).is_err());
+        let p = save_preset(&store, Preset { name: "s".into(), sources: vec![Source { deck: deck.id.clone(), topics: vec![] }], order: Order::Sequence, goal: GoalKind::Cards, amount: 1, screen: Screen::Window, ..Preset::default() }, false).unwrap();
+        let s = start(&store, t0, &p.id, Generated::new()).unwrap();
+        assert_eq!(view(&s, t0).card.unwrap().hint, "в начальной форме");
+        assert_eq!(delete_check(&store, None, Some("Для программистов")).unwrap(), 2);
+        assert!(delete_check(&store, Some("nope"), None).is_err());
+        assert_eq!(reset_checks(&store).unwrap(), 2);
+        assert_eq!(load_state(&store).checks.len(), 8);
+        delete_check(&store, Some(&word.id), None).unwrap();
+        assert_eq!(load_state(&store).checks.len(), 7);
+        assert_eq!(overview(&store, t0).checks.len(), 7);
     }
 }

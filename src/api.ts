@@ -212,7 +212,15 @@ export type PlanInput = { name: string; description: string; checklist: ItemInpu
 export type AssetInfo = { file: string; path: string };
 
 export type CheckMode = "text" | "python" | "shape" | "number" | "choice" | "self";
-export type CheckSpec = { mode: CheckMode; caseSensitive: boolean; ignoreSpaces: boolean; tolerance: number; strictTypes: boolean };
+export type CheckSpec = {
+  mode: CheckMode;
+  caseSensitive: boolean;
+  ignoreSpaces: boolean;
+  tolerance: number;
+  strictTypes: boolean;
+  hint: string;
+};
+export type CheckTemplate = { id: string; group: string; name: string; check: CheckSpec };
 export type Gate = { enabled: boolean; percent: number; window: number };
 export type DrillSource = { deck: string; topics: string[] };
 export type DrillOrder = "smart" | "random" | "sequence";
@@ -311,6 +319,7 @@ export type DrillCard = {
   deckId: string;
   topicId: string;
   hinted: boolean;
+  hint: string;
   kind: string;
   mode: DrillCardMode;
   prompt: string;
@@ -365,6 +374,7 @@ export type ArticleInput = { id?: string; deck: string; topic: string; title: st
 export type BuiltinPrefs = { gate: Gate; strictTypes: boolean };
 export type DrillOverview = {
   presets: DrillPreset[];
+  checks: CheckTemplate[];
   defaultPreset: string;
   python: BuiltinPrefs;
   decks: DrillDeckInfo[];
@@ -490,6 +500,9 @@ export const api = {
   drillDisableGenerator: (id: string) => invoke<void>("drill_disable_generator", { id }),
   drillImportBank: (text: string, replace: string | null) => invoke<ImportReport>("drill_import_bank", { text, replace }),
   drillSetGate: (deck: string, gate: Gate) => invoke<void>("drill_set_gate", { deck, gate }),
+  drillSaveCheck: (check: CheckTemplate) => invoke<CheckTemplate>("drill_save_check", { check }),
+  drillDeleteCheck: (id: string | null, group: string | null) => invoke<number>("drill_delete_check", { id, group }),
+  drillResetChecks: () => invoke<number>("drill_reset_checks"),
   drillSession: () => invoke<DrillSessionView | null>("drill_session"),
   drillReveal: () => invoke<DrillSessionView>("drill_reveal"),
   drillAnswer: (input: { text?: string; knew?: boolean }) => invoke<DrillAnswer>("drill_answer", { input }),

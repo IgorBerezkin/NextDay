@@ -396,6 +396,9 @@ pub fn run() {
             commands::drill_disable_generator,
             commands::drill_import_bank,
             commands::drill_set_gate,
+            commands::drill_save_check,
+            commands::drill_delete_check,
+            commands::drill_reset_checks,
         ])
         .build(tauri::generate_context!())
         .expect("не удалось запустить Next Day")

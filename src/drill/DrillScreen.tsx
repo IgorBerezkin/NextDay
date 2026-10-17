@@ -106,7 +106,6 @@ export function DrillScreen() {
             <Px name="star" scale={1.5} /> Статистика
           </button>
         </div>
-        <span className="grow" />
         <div className="drill-badges">
           <span title={`Лучшая серия: ${ov.bestStreak}`}>
             <Px name="flame" scale={1.5} /> {plural(ov.streak, "день", "дня", "дней")}

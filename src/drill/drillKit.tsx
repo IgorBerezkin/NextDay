@@ -1,5 +1,16 @@
 import type { ReactNode } from "react";
-import type { CheckMode, CheckSpec, DrillCardMode, DrillGoal, DrillOrder, DrillOutcome, DrillPreset, DrillDeckInfo, Gate } from "../api";
+import type {
+  CheckMode,
+  CheckSpec,
+  CheckTemplate,
+  DrillCardMode,
+  DrillGoal,
+  DrillOrder,
+  DrillOutcome,
+  DrillPreset,
+  DrillDeckInfo,
+  Gate,
+} from "../api";
 import { duration, plural } from "../util";
 
 export const OUTCOME: Record<DrillOutcome, string> = {
@@ -15,17 +26,36 @@ export const ORDER: Record<DrillOrder, string> = {
   sequence: "По порядку",
 };
 
-export const MODES: { value: CheckMode; label: string; hint: string }[] = [
-  { value: "text", label: "Текст", hint: "Сравнение без учёта регистра и лишних пробелов." },
-  { value: "python", label: "Литерал Python", hint: "3 и 3.0 разные, порядок ключей словаря не важен, кавычки любые." },
-  { value: "shape", label: "Форма", hint: "Запись вида list[tuple[str, int]], пробелы не важны." },
-  { value: "number", label: "Число", hint: "С допуском, запятая тоже подходит." },
-  { value: "choice", label: "Выбор варианта", hint: "Ответ выбирают из вариантов." },
-  { value: "self", label: "Самопроверка", hint: "Открыть ответ и честно отметить, знал ли." },
+export const MODES: { value: CheckMode; label: string; hint: string; code?: boolean }[] = [
+  { value: "text", label: "Текст", hint: "Ответ пишут словами. Регистр, буквы ё и е и лишние пробелы не важны." },
+  { value: "choice", label: "Выбор из вариантов", hint: "Ответ выбирают из нескольких вариантов мышью или клавишами a, b, c, d." },
+  { value: "number", label: "Число", hint: "Ответ числом, можно задать допуск. Запятая тоже подходит." },
+  { value: "self", label: "Самопроверка", hint: "Без ввода: открыть ответ и честно отметить, знал ли." },
+  {
+    value: "python",
+    label: "Значение Python",
+    hint: "Для карточек про код: ответ это значение на Python, например [1, 2] или 'abc'. Кавычки и пробелы не важны, а 3 и 3.0 разные.",
+    code: true,
+  },
+  {
+    value: "shape",
+    label: "Форма данных Python",
+    hint: "Для карточек про код: ответ это запись вида list[int] или dict[str, int].",
+    code: true,
+  },
 ];
 
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+export const modeName = (mode: CheckMode) => lowerFirst(MODES.find((m) => m.value === mode)?.label ?? "");
+
+export function checkName(c: CheckSpec, templates: CheckTemplate[]) {
+  const t = templates.find((x) => sameCheck(x.check, c));
+  return t ? lowerFirst(t.name) : modeName(c.mode);
+}
+
 export const HINT: Record<DrillCardMode, string> = {
-  python: "Литерал Python: 3, 3.5, 'a', [1, 2], (1, 'a'), {'a': 1}, True, None. Если код падает, напиши имя ошибки.",
+  python: "Значение Python: 3, 3.5, 'a', [1, 2], (1, 'a'), {'a': 1}, True, None. Если код падает, напиши имя ошибки.",
   trace: "Список значений по порядку, например [1, 3, 6].",
   pick: "Выбери верный вариант мышью или клавишей a, b, c, d (цифры тоже работают).",
   shape: "Форма: int, str, list[int], tuple[str, int], dict[str, list[int]].",
@@ -45,7 +75,44 @@ export function choiceKey(e: KeyboardEvent): number | null {
   return m[1] ? m[1].charCodeAt(0) - 65 : Number(m[2] ?? m[3]) - 1;
 }
 
-export const DEFAULT_CHECK: CheckSpec = { mode: "text", caseSensitive: false, ignoreSpaces: false, tolerance: 0, strictTypes: true };
+export const DEFAULT_CHECK: CheckSpec = {
+  mode: "text",
+  caseSensitive: false,
+  ignoreSpaces: false,
+  tolerance: 0,
+  strictTypes: true,
+  hint: "",
+};
+
+export function sameCheck(a: CheckSpec, b: CheckSpec) {
+  return (
+    a.mode === b.mode &&
+    a.caseSensitive === b.caseSensitive &&
+    a.ignoreSpaces === b.ignoreSpaces &&
+    a.tolerance === b.tolerance &&
+    a.strictTypes === b.strictTypes &&
+    (a.hint ?? "") === (b.hint ?? "")
+  );
+}
+
+export function groupsOf(list: CheckTemplate[]): [string, CheckTemplate[]][] {
+  const out: [string, CheckTemplate[]][] = [];
+  for (const t of list) {
+    const g = out.find(([name]) => name === t.group);
+    if (g) g[1].push(t);
+    else out.push([t.group, [t]]);
+  }
+  return out;
+}
+
+export function checkNote(c: CheckSpec): string {
+  const parts = [modeName(c.mode)];
+  if ((c.mode === "text" || c.mode === "choice") && c.caseSensitive) parts.push("регистр важен");
+  if (c.mode === "text" && c.ignoreSpaces) parts.push("пробелы не важны");
+  if (c.mode === "number" && c.tolerance > 0) parts.push(`допуск ${c.tolerance}`);
+  if (c.mode === "python" && !c.strictTypes) parts.push("типы не строгие");
+  return parts.join(", ");
+}
 export const DEFAULT_GATE: Gate = { enabled: false, percent: 85, window: 20 };
 
 export function goalText(goal: DrillGoal, amount: number): string {

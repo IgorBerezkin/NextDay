@@ -318,7 +318,7 @@ export function DrillSession({ initial, lock, onDone }: { initial: DrillSessionV
               </Button>
             </form>
           )}
-          {phase === "ask" && <p className="drill-hint">{HINT[card.mode]}</p>}
+          {phase === "ask" && <p className="drill-hint">{card.hint || HINT[card.mode]}</p>}
 
           {phase !== "ask" && last && (
             <div className={`drill-verdict ${last.correct ? "ok" : "bad"}`}>
