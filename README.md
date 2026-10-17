@@ -1,6 +1,6 @@
 # Next Day
 
-Next Day is a pixel art day planner for Windows. Every evening you plan only the next day: give it a name, write what you will do and make a checklist. During the day you tick what is done, and in the evening you collect the results on a board and seal the day. Big goals become maps of topics, and the app puts their tasks into your plan by itself. A built-in MCP server lets AI assistants such as Claude read your history and build goals with you. The interface is in Russian.
+Next Day is a pixel art day planner for Windows. Every evening you plan only the next day: give it a name, write what you will do and make a checklist. During the day you tick what is done, and in the evening you collect the results on a board and seal the day. Big goals become maps of topics, and the app puts their tasks into your plan by itself. A drill trainer helps you learn words, formulas and rules by heart. A built-in MCP server lets AI assistants such as Claude read your history and build goals with you. The interface is in Russian.
 
 Download the installer from [Releases](https://github.com/IgorBerezkin/NextDay/releases/latest).
 
@@ -9,7 +9,7 @@ Download the installer from [Releases](https://github.com/IgorBerezkin/NextDay/r
 
 ## Next Day
 
-Планировщик на один день вперёд для Windows. Вечером вы называете завтрашний день и решаете, чем будете заниматься. Днём отмечаете сделанное, вечером собираете итоги и запечатываете день. Большие цели раскладываются на темы, и программа сама ставит их задачи в план. Программа запускается вместе с Windows, живёт в трее и напоминает о себе утром и вечером.
+Планировщик на один день вперёд для Windows. Вечером вы называете завтрашний день и решаете, чем будете заниматься. Днём отмечаете сделанное, вечером собираете итоги и запечатываете день. Большие цели раскладываются на темы, и программа сама ставит их задачи в план. В зубрилке можно выучить наизусть слова, формулы и правила. Программа запускается вместе с Windows, живёт в трее и напоминает о себе утром и вечером.
 
 Планировать можно только завтрашний день, один план на день.
 
@@ -59,9 +59,37 @@ Download the installer from [Releases](https://github.com/IgorBerezkin/NextDay/r
 
 На вкладке «Цели» видно, что стоит на сегодня и что программа поставит в ближайшие дни. Справа прогресс по темам и задачам, готовность по проверкам и прогноз: успеваете ли вы к сроку. В режиме задаются время на день, дни недели, час начала и срок. Кнопки сверху ставят цель на паузу, завершают её или открывают карту.
 
+### Зубрилка
+
+![Зубрилка](screenshots/drill.png)
+
+Зубрилка помогает выучить то, что нужно помнить без подсказок: слова, формулы, определения, правила. Карточки идут подряд, пока не наберётся цель сеанса: нужное число верных ответов, карточек или минут. Что повторять и как, задаёт режим. Сеанс идёт в обычном окне или под замком на весь экран: из замка можно выйти, только если держать Esc пять секунд, или когда выйдет время. Серия считает дни подряд, в которые сеанс пройден до конца.
+
+#### Карточки
+
+![Карточка](screenshots/drill-card.png)
+
+Ответ пишут текстом или числом, выбирают из вариантов мышью или клавишами, а можно вспомнить про себя, открыть ответ и честно отметить, знали ли его. После промаха видно правильный ответ и пояснение, а карточка вернётся позже в том же сеансе. Верный ответ отодвигает карточку: она придёт снова через день, потом через два, четыре и восемь дней. Темы набора можно открывать по очереди: следующая откроется, когда в открытых наберётся нужная доля верных ответов.
+
+#### Наборы
+
+![Наборы](screenshots/drill-decks.png)
+
+Свои наборы собираются прямо в программе: вопрос, ответ, другие верные ответы, варианты для выбора и пояснение после промаха. Много карточек можно вставить сразу, по одной в строке. Как сравнивать ответ, говорит шаблон проверки: текстом, числом, выбором из вариантов или самопроверкой. Шаблон может подсказывать под полем ответа, в каком виде нужен ответ. Шаблоны лежат в группах, свои шаблоны и группы можно создавать под любую тему.
+
+Если задачу нужно решать снова и снова с новыми данными, вместо набора подойдёт генератор: скрипт на JavaScript, который в каждом сеансе придумывает новые карточки. Генератор работает в песочнице без доступа к сети и к вашим данным и включается только после того, как вы посмотрите примеры его карточек. Готовые банки карточек в JSON загружаются кнопкой «DataEater».
+
+В справочнике лежат статьи к темам наборов. Во время сеанса он открывается кнопкой с лампочкой.
+
+#### Для программистов
+
+![Разбор промаха](screenshots/drill-python.png)
+
+Встроенный набор учит читать код на Python без запуска: что лежит в переменной, какой у данных тип и форма, что изменится после прохода цикла и какую ошибку выдаст код. Ответы получены запуском кода. После промаха можно сравнить данные до и после строки, пройти код по шагам и прочитать правило. Генератор «Формы массивов и тензоров» каждый раз придумывает новые задачи про формы в NumPy и PyTorch. Структуры данных в справочнике и в разборе нарисованы картинками: ячейки списка с индексами, сетка матрицы, пары ключ и значение.
+
 ### ИИ через MCP
 
-Карту цели можно собрать самому или поручить ИИ. В программу встроен MCP-сервер. Через него Claude Code, Claude Desktop или другой клиент MCP видит историю дней, составляет черновик цели, правит карту и записывает результаты. Сервер доступен только с этого компьютера и пускает только с ключом.
+Карту цели можно собрать самому или поручить ИИ. В программу встроен MCP-сервер. Через него Claude Code, Claude Desktop или другой клиент MCP видит историю дней, составляет черновик цели, правит карту и записывает результаты. Ещё ИИ может собрать набор для зубрилки, написать статью в справочник, сделать генератор или шаблон проверки и разобрать ваши промахи. Сервер доступен только с этого компьютера и пускает только с ключом.
 
 #### Черновик от ИИ
 
@@ -94,7 +122,7 @@ claude mcp add --scope user --transport http next-day http://127.0.0.1:47328/mcp
 
 Путь зависит от папки, которую вы выбрали при установке, поэтому настройку удобнее скопировать кнопкой: она подставит путь к вашей копии. Если переустановите программу в другую папку, скопируйте настройку заново.
 
-После этого попросите ИИ составить цель в Next Day.
+После этого попросите ИИ составить цель или набор карточек в Next Day.
 
 <details>
 <summary>Справка по MCP</summary>
@@ -111,6 +139,7 @@ Next Day это локальный однопользовательский пл
 - День: план заморожен, пользователь только отмечает пункты и подпункты.
 - Ночь или следующее утро: пользователь собирает итоги на доске (заметки, картинки, сделанные задачи) и запечатывает день оценкой от 1 до 5 и коротким итогом. Запечатанные дни доступны только для чтения.
 - Цели: цель это карта тем. Стрелки (требования) показывают, что нужно освоить раньше чего, в каждой теме задачи от простых к сложным. Пока цель активна, программа сама планирует завтрашний день по карте и минутам цели в день. Пользователь видит карту на вкладке «Карта», а цель на вкладке «Цели».
+- Зубрилка: короткие карточки подряд, пока не выполнена цель сеанса. Пользователь выбирает, что зубрить (наборы и темы), как (порядок, размер сеанса, самопроверка) и в каких условиях (замок на весь экран или обычное окно, выход, потолок по времени). Встроенный набор `python` учит читать код на Python без запуска: что лежит в переменной, какая у неё форма, как она меняется в цикле, какую ошибку выдаст код. Его ответы и таблицы значений получены выполнением кода. Встроенный генератор `shapes` в каждом сеансе придумывает новые задачи о том, как меняется форма массивов NumPy и тензоров PyTorch после одной, двух или трёх операций. Набором может быть и генератор (плагин на JavaScript), и импортированный банк. Как сравнивать ответ (текст, число, выбор из вариантов, самопроверка, значения и формы Python), задают шаблоны проверки, которые пользователь хранит в группах и может дополнять.
 
 #### 2. Подключение
 
@@ -211,6 +240,163 @@ Next Day это локальный однопользовательский пл
 - Result: `{minutes, score, confidence, note, at, by}`; minutes от 1 до 1440, score от 0 до 100, confidence от 1 до 5 (каждое может быть null), note до 2000 символов, `by` это user или ai.
 - Progress: `{topicsTotal, topicsDone, tasksTotal, tasksDone, tasksLeft, minutesTotal, minutesDone, checksTotal, checksDone, readiness}`. Пропущенные задачи не учитываются. Тема пройдена, когда в ней есть задачи и все они сделаны или пропущены. `readiness` это целое среднее баллов, записанных на проверках; null, если их нет.
 
+##### Набор зубрилки
+
+Наборы бывают трёх видов, и все зубрятся одинаково, через режимы:
+
+- deck: карточки, которые написал пользователь или ИИ через `create_drill_deck`. Поля ниже.
+- bank: готовый банк, импортированный из JSON через `import_drill_bank` (DataEater). Каждая карточка это шаблон со множеством вариантов, которые отличаются только данными. Встроенный набор `python` тоже банк.
+- generator: плагин на JavaScript, который придумывает свежие варианты в начале каждого сеанса; ставится через `install_drill_generator`. Встроенный генератор `shapes` спрашивает, как меняется форма массивов NumPy и тензоров PyTorch после одной, двух или трёх операций, и даёт четыре варианта ответа.
+
+После промаха карточка банка или генератора возвращается другим вариантом: та же задача с новыми данными.
+
+| Поле | Тип | Смысл |
+|---|---|---|
+| id | строка | `python` это встроенный набор; у наборов пользователя непрозрачные идентификаторы |
+| title | строка | До 80 символов |
+| description | строка | До 1000 символов |
+| author | user или ai | |
+| check | Check | Как сравнивать ответы на карточки набора, обычно копия шаблона проверки |
+| gate | Gate | Если включено, темы открываются по одной |
+| cards | Card[] | До 2000 |
+
+##### Карточка
+
+| Поле | Тип | Смысл |
+|---|---|---|
+| id | строка | Непрозрачный идентификатор |
+| topic | строка | Необязательное название раздела, до 80 символов; темы идут в порядке своих первых карточек |
+| prompt | строка | Вопрос, до 2000 символов |
+| code | строка | Необязательный код, показывается с номерами строк, до 4000 символов |
+| answer | строка | Эталонный ответ, его видно после промаха, до 500 символов |
+| alternatives | string[] | Другие верные ответы, до 10 |
+| choices | string[] | Для выбора из вариантов: сами варианты; ответ добавляется, если его там нет |
+| check | Check или null | Своя проверка карточки вместо проверки набора |
+| explain | строка | Правило или пояснение после промаха, до 2000 символов |
+
+##### Проверка
+
+`{mode, caseSensitive, ignoreSpaces, tolerance, strictTypes, hint}`
+
+| mode | Ответ верный, когда |
+|---|---|
+| text | Совпадает после обрезки краёв и схлопывания пробелов; регистр и буквы ё и е не важны, если не задан `caseSensitive`; `ignoreSpaces` убирает все пробелы |
+| python | Литерал Python равен ответу вместе с типами (3 и 3.0 различаются, кортеж не список), если `strictTypes` не false; ключи словаря и элементы множества в любом порядке, кавычки любые, пробелы не важны. Имя исключения, например `TypeError`, в кавычках или без, отвечает на код, который падает |
+| shape | Запись формы совпадает без учёта пробелов: `int`, `list[str]`, `tuple[str, int]`, `dict[str, list[int]]`, `set[int]` |
+| number | Отличается от ответа не больше чем на `tolerance`; запятая работает как десятичная точка |
+| choice | Выбран вариант, который и есть ответ |
+| self | Пользователь открывает ответ и сам говорит, знал ли его |
+
+`hint` (до 200 символов) показывается под полем ответа во время сеанса вместо стандартной подсказки. Пишите в нём, в каком виде ждут ответ: начальная форма слова, единица измерения, формат даты. Пишите на языке пользователя.
+
+##### Шаблон проверки
+
+`{id, group, name, check}`: проверка с названием, которую пользователь выбирает, когда собирает набор или карточку. Шаблоны лежат в группах, новое название группы создаёт новую группу. Новая установка начинается с двух групп: Основные с `text` (Текст), `choice` (Выбор из вариантов), `number` (Число) и `self` (Самопроверка) и Для программистов с `python` (Значение Python) и `shape` (Форма данных Python). Пользователь может менять и удалять любые шаблоны и вернуть стандартные.
+
+Набор или карточка копирует проверку своего шаблона. Если потом изменить или удалить шаблон, готовые наборы не меняются.
+
+##### Банк
+
+`{title, description, gate, topics, cards}`: формат набора `python` и `import_drill_bank`.
+
+- `topics`: до 100 `{id, title, theory}`. `theory` это Markdown в диалекте программы (смотрите «Статья справочника»), он становится статьёй темы только для чтения. Темы без карточек отбрасываются.
+- `cards`: до 2000 `{id, topic, kind, rule, check, variants}`. `id` до 60 символов и не повторяется; `topic` это идентификатор или название темы; `rule` (до 2000 символов) показывается после промаха; `check` может настроить сравнение (caseSensitive, ignoreSpaces, tolerance, strictTypes, hint), а режим всегда берётся из `kind`.
+- `variants`: до 200 на карточку и до 100000 на банк, `{question, code, answer, choices, alternatives, explain}`; `prompt` работает как другое имя для `question`. `explain` (Markdown, до 2000 символов) показывается после промаха под правилом: кладите туда разбор именно этих данных, например таблицу всех строк с их результатами.
+
+| kind | Пользователь | answer |
+|---|---|---|
+| value, python, step | вводит литерал Python | литерал или имя исключения, если код падает |
+| pick | выбирает один из 2-8 вариантов, показанных кодом, клавишами a-h | один из `choices`, сравнивается как значения Python |
+| shape | вводит форму вида `list[tuple[str, int]]` | форма |
+| error | вводит имя исключения | например `TypeError` |
+| output | вводит то, что покажет print | напечатанный текст |
+| text | вводит текст | текст |
+| number | вводит число | число |
+| choice | выбирает один из 2-8 текстовых вариантов клавишами a-h | один из `choices` |
+| self | открывает ответ и сам себя оценивает | любой текст |
+
+Неправильные варианты отбрасываются и попадают в отчёт импорта; карточка, у которой не осталось вариантов, тоже отбрасывается.
+
+##### Генератор
+
+Обычный скрипт на JavaScript без import и export, который объявляет `plugin`:
+
+```js
+const VERBS = [["go", "went", "gone"], ["see", "saw", "seen"]];
+const plugin = {
+  title: "Неправильные глаголы",
+  description: "Формы неправильных глаголов",
+  topics: [{ id: "forms", title: "Три формы", theory: "У неправильного глагола три формы: go, went, gone." }],
+  templates: [
+    {
+      id: "past",
+      topic: "forms",
+      kind: "choice",
+      rule: "Past Simple неправильного глагола нужно помнить.",
+      make(r) {
+        const [base, past, done] = r.pick(VERBS);
+        return { prompt: `Past Simple от \`${base}\`?`, answer: past, choices: [past, done, base + "ed", base], explain: `${base}, ${past}, ${done}` };
+      },
+    },
+  ],
+};
+```
+
+- Шаблон карточки это `{id, topic, kind, rule, check, make}`. `id` до 60 символов и не должен меняться: по нему хранится прогресс. `kind` берётся из таблицы банка, по умолчанию choice. `make(r)` возвращает один вариант с полями варианта банка.
+- `r` это источник случайных чисел с зерном: `r.random()`, `r.int(a, b)` с обоими концами, `r.pick(list)`, `r.chance(p)`, `r.shuffle(list)` (возвращает копию), `r.sample(list, k)`. Используйте его вместо Math.random. Числа в ответах и вариантах становятся строками.
+- В начале сеанса программа вызывает `make` до 12 раз на шаблон, убирает повторы и проверяет каждый вариант как вариант банка. Весь прогон должен уложиться в 6 секунд.
+- Скрипт работает в изолированном воркере: без сети, без DOM, без доступа к программе и её данным, только вычисления.
+- Генератор, установленный или изменённый через MCP, сохраняется выключенным. Пользователь нажимает в программе «Проверить», смотрит примеры карточек и включает его.
+- Четыре варианта у карточек choice и pick делайте типичными ошибками именно этой задачи (забыл операцию, взял не ту ось, спутал две похожие функции), а не случайным шумом.
+
+Gate: `{enabled, percent, window}`, по умолчанию 85 и 20. Первая тема открыта всегда; следующая открывается, когда у каждой открытой темы есть хотя бы `window` ответов и не меньше `percent` процентов из последних `window` верные. Пользователь может открывать и закрывать темы и сам.
+
+##### Режим
+
+| Поле | Тип | Смысл |
+|---|---|---|
+| id | строка | |
+| name | строка | До 60 символов |
+| sources | `[{deck, topics}]` | Что зубрить; пустой `topics` значит открытые темы набора |
+| order | smart, random, sequence | smart: интервальное повторение по Лейтнеру (ниже); sequence продолжает с того места, где остановился прошлый сеанс |
+| goal | correct, cards, minutes | Сеанс заканчивается после `amount` верных ответов, `amount` ответов или `amount` минут |
+| amount | целое | 1-200; для минут 1-180 |
+| retry | bool | Карточка с промахом вернётся позже в том же сеансе; карточки банков и генераторов возвращаются с новыми данными |
+| explain | bool | Показывать правило и после верных ответов |
+| screen | lock, window | lock: на весь экран на каждом мониторе, поверх всех окон, Alt+F4 не работает, фокус возвращается; window: внутри программы, уйти можно в любой момент |
+| escape | hold, none | Только для lock: удерживать Esc 5 секунд и подтвердить, это записывается как побег; none: выхода нет, кроме потолка |
+| limitMinutes | 5-180 | Только для lock: замок открывается сам через это время (итог timeout) |
+| selfCheck | bool | Самопроверка вместо ввода ответа у всех карточек |
+| theoryLabel | строка | Подпись кнопки теории, до 24 символов, может быть пустой |
+| peekKeepsBox | bool | Карточка, на которую ответили после открытия теории, не поднимается |
+
+- У каждой карточки есть коробка Лейтнера от 1 до 5. Верный ответ при первом показе карточки в сеансе поднимает её на одну коробку, промах отправляет в коробку 1. Следующий показ: коробка 1 в тот же день, коробки 2-5 через 1, 2, 4 и 8 дней. Умный порядок сначала берёт карточки к повтору (сначала из нижних коробок), подмешивает новые и чередует темы; когда повторять нечего, берёт карточки, срок которых ближе всего.
+- Итоги сеанса: done (готово), escape (выход из замка по Esc), timeout (сработал потолок замка), stopped (сеанс в окне закончили раньше). Серия зубрилки считает дни подряд с готовым сеансом; побег её обнуляет.
+- `theoryLabel` (до 24 символов, может быть пустым) это подпись кнопки с лампочкой, которая открывает теорию во время сеанса. С `peekKeepsBox` (по умолчанию true) карточка, на которую ответили после открытия теории, остаётся в своей коробке и вернётся в тот же день.
+
+##### Статья справочника
+
+| Поле | Тип | Смысл |
+|---|---|---|
+| id | строка | `{deck}-{topic}` у встроенных статей банков и генераторов, например `python-t01` |
+| deck | строка | Идентификатор набора |
+| topic | строка | Идентификатор темы, пусто для всего набора |
+| title | строка | До 120 символов |
+| body | строка | Markdown, до 100000 символов |
+| author | user или ai | |
+| builtin | bool | Встроенные статьи только для чтения |
+
+Текст пишется в диалекте Markdown программы: заголовки от `#` до `###`, абзацы, `**жирный**`, `*курсив*`, `` `код` ``, ссылки, списки (`- ` и `1. `, вложенные через два пробела), цитаты `> `, таблицы со строкой `|---|`, линии `---` и блоки кода между тройными обратными кавычками. Особые блоки:
+
+- `data`: по одному элементу в строке, `name = literal`, `literal` или `literal -> literal` (до и после). Программа рисует значение Python картинкой структуры (ячейки списка с индексами, сетка матрицы, пары ключ и значение, кортежи, множества) вместе с его формой. Только литералы: числа, строки, True, False, None, списки, кортежи, словари, множества, set().
+- `chart`: JSON `{"type": "line" | "bar" | "scatter", "title", "x": [...], "series": [{"name", "y": [...]}], "xlabel", "ylabel"}`.
+- `plot`: строки `y = <выражение от x>` (можно несколько; операторы + - * / ** ^, функции sin cos tan exp log sqrt abs, pi, e), строка диапазона `x = -3..3` и необязательная строка `title: ...`.
+- `graph`: рёбра, по одному в строке или через запятую: `a -> b` направленное, `a - b` ненаправленное, `a -> b: 3` с подписью.
+
+Хорошая статья даёт модель, а не список функций: как представить себе данные, пары до и после для главных операций, ловушки и таблицу выражений с их формами.
+
+Во всех текстах, которые читает пользователь (статьи, `explain` карточек, `rule` и `explain` банков и генераторов, вопросы), заключайте каждый кусок кода, имя переменной и значение в обратные кавычки: пишите `a % b` даёт остаток, а не a % b даёт остаток. Программа показывает их плашками кода, и они не сливаются с русскими словами вокруг.
+
 #### 5. Как программа планирует
 
 Статус цели принадлежит пользователю. `create_goal` всегда создаёт черновик. Планируются только активные цели; черновики, цели на паузе, завершённые и архивные не планируются никогда. Никогда не утверждайте, что черновик активен.
@@ -307,6 +493,64 @@ Next Day это локальный однопользовательский пл
 - Записывайте баллы на задачах-проверках, чтобы они шли в готовность.
 - Перед записью спросите пользователя или проверьте работу. Возвращает краткий вид цели.
 
+##### get_drill (чтение)
+
+Без аргументов. Возвращает `{presets, checks, defaultPreset, python, decks, streak, bestStreak, today, due, weak, sessions}`.
+
+- `checks`: шаблоны проверки в том порядке, в каком их видит пользователь, `{id, group, name, check}`.
+- `python`: настройки встроенного набора, `{gate, strictTypes}`.
+- `decks`: `[{id, title, description, builtin, kind, enabled, author, cards, variants, check, gate, topics, updatedAt}]`; `kind` это deck, bank или generator, `cards` у генератора считает его шаблоны карточек, `variants` считает готовые варианты банка, `enabled` равно false у генератора, который ждёт проверки пользователем. `topics` это `{id, title, cards, open, answered, recent, recentRight, seen, due, boxes}`. `recentRight` из `recent` это точность в окне порога; `boxes` считает показанные карточки по коробкам Лейтнера.
+- `today`: `{sessions, answers, correct}`. `due`: карточки к повтору в основном режиме.
+- `weak`: карточки с наибольшим числом промахов `{deck, card, topic, prompt, code, answer, rule, right, wrong, level, lastWrong}`. В `lastWrong` последние неверные ответы пользователя, лучшая подсказка, где ошибка в понимании.
+- `sessions`: последние 40, сначала новые, `{name, startedAt, endedAt, outcome, screen, goal, amount, answered, correct, firstTry, wrong, seconds, misses}`.
+
+##### get_drill_deck (чтение)
+
+`deckId`. Набор пользователя со всеми карточками. Генератор возвращает `{kind: generator, title, description, builtin, author, enabled, topics, templates, code}`. Банк, в том числе `python`, возвращает `{kind: bank, topics, cards}`, где каждая карточка это шаблон `{id, topic, kind, rule, variants, sample}`; kind бывает value (ввести литерал), pick (выбрать один из четырёх литералов: верный и три типичные ошибки в структуре), shape (ввести форму), step (значение после k-го прохода цикла), error (код падает, ввести имя исключения) или output (что покажет print). После промаха пользователь получает тот же шаблон с новыми данными.
+
+##### create_drill_deck (запись)
+
+Обязательные поля: `title`, `cards`. Необязательные: `description`, `check` или `template`, `gate`. Каждой карточке нужны `prompt` и `answer`, у неё может быть свой `check` или `template`.
+
+- `template` это идентификатор или название шаблона проверки из `get_drill`; его проверка копируется в набор или в карточку. Если подходящий шаблон есть, берите его, а не собирайте `check` вручную.
+- Сначала проверяется весь ввод: в режиме python каждый ответ и альтернатива должны быть литералом или именем исключения, в режиме number числом; у карточек с выбором нужно хотя бы два варианта.
+- Создаёт набор с `author: ai` и возвращает `{deck, note}`. Набор зубрится только после того, как его добавят в режим.
+
+##### edit_drill_deck (запись)
+
+`deckId` и любые из `title`, `description`, `check` или `template`, `gate`, `upsert` (карточки; карточка с существующим `id` заменяется, без `id` добавляется) и `remove` (идентификаторы карточек). Встроенный набор менять нельзя. Прогресс оставшихся карточек сохраняется. Возвращает набор.
+
+##### get_drill_theory (чтение)
+
+Необязательный `deckId`; вместе с ним `topic` (идентификатор темы) сужает список до этой темы и статей обо всём наборе. Возвращает `{articles}`: `[{id, deck, topic, title, body, author, builtin, createdAt, updatedAt}]`. Статьи, которые пришли с темами банков и генераторов, в том числе `python` и `shapes`, имеют `builtin: true`.
+
+##### save_drill_theory (запись)
+
+`deckId`, `title`, `body`, необязательные `topic` (идентификатор или название, пусто для всего набора) и `id` (заменяет эту статью). Создаёт статью с `author: ai`. Встроенные статьи менять нельзя; пишите свои рядом с ними. Возвращает статью.
+
+##### install_drill_generator (запись)
+
+`title`, `code`, необязательные `description` и `id` (заменяет код этого генератора; встроенные менять нельзя). Сохраняет генератор выключенным и возвращает `{generator: {id, title, enabled}, note}`. Программа запускает скрипт только после того, как пользователь проверит и включит его; потом добавьте его в режим.
+
+##### import_drill_bank (запись)
+
+`bank` (сам объект) или `path` (абсолютный путь к файлу .json до 16 МБ), необязательный `replaceId` (импортированный банк, который нужно заменить; прогресс карточек с теми же идентификаторами сохраняется). Возвращает `{report: {id, title, topics, cards, variants, dropped, problems, replaced}, note}`. Прочитайте `problems`: там названы отброшенные карточки и варианты и причины.
+
+##### save_drill_check (запись)
+
+`name` (до 60 символов), `check`, необязательные `group` (до 40 символов, по умолчанию Свои) и `id` (заменяет этот шаблон). Новое название группы создаёт группу; новый шаблон встаёт в конец своей группы. Возвращает шаблон.
+
+##### delete_drill_check (запись)
+
+`id` удаляет один шаблон, `group` удаляет всю группу. Наборы сохраняют свои копии проверки. Возвращает `{deleted}`.
+
+##### save_drill_preset (запись)
+
+Любые поля режима и `makeDefault`. Без `id` режим создаётся из значений по умолчанию (10 верных ответов, умный порядок, повтор промахов, замок с выходом по Esc и потолком 30 минут); с `id` меняются только переданные поля. Возвращает режим.
+
+- Сеансы запускает только пользователь, в программе.
+- Никогда не включайте `screen: lock` и не ставьте `escape: none`, если пользователь сам не попросил об этом своими словами.
+
 #### 7. Ресурсы и промпты
 
 | URI | Содержимое |
@@ -316,8 +560,9 @@ Next Day это локальный однопользовательский пл
 | nextday://profile | `get_profile` за 42 дня |
 | nextday://goal/{goalId} | То же, что `get_goal` |
 | nextday://day/{date} | Один день с планом и заметками с доски |
+| nextday://drill | То же, что `get_drill` |
 
-Промпты: `plan_goal(goal, deadline?)`, `evening_review()`, `readiness_check(goalId)`. Каждый возвращает одно сообщение от имени пользователя, которое запускает соответствующий сценарий ниже.
+Промпты: `plan_goal(goal, deadline?)`, `evening_review()`, `readiness_check(goalId)`, `drill_coach()`. Каждый возвращает одно сообщение от имени пользователя, которое запускает соответствующий сценарий ниже.
 
 #### 8. Сценарии
 
@@ -357,6 +602,23 @@ Next Day это локальный однопользовательский пл
 - Чтобы вставить работу, передайте весь список задач темы в новом порядке с существующими идентификаторами.
 - Чтобы поставить тему между двумя другими, добавьте её и обновите `requires` тем, которые от неё зависят.
 - Не удаляйте темы со сделанной работой: их сделанные задачи пропадут. Лучше добавляйте задачи или темы.
+
+##### Тренер зубрилки
+
+1. Вызовите `get_drill`. Назовите открытые темы, точность, серию и итоги последних сеансов; побеги и истёкшее время значат, что сеансы слишком длинные или слишком трудные.
+2. Изучите `weak`: сгруппируйте промахи по правилу, которое за ними стоит, и прочитайте `lastWrong`, чтобы найти ошибку в понимании.
+3. Объясните каждое правило на крошечном примере и проверьте пользователя в чате, по одному вопросу за раз.
+4. Предложите набор против этих ошибок: создайте его через `create_drill_deck` (подходящий шаблон проверки из `checks`, python для вопросов про код, короткий `explain` у каждой карточки) и, если пользователь согласен, добавьте его в режим через `save_drill_preset`. Если пользователь будет снова зубрить ответы одного вида (слова языка, даты, формулы), предложите для них шаблон проверки через `save_drill_check` с `hint`, который называет ожидаемую форму ответа.
+5. Если правило продолжает подводить, запишите модель на будущее через `save_drill_theory` в этом наборе и теме: короткую статью с блоками `data`, которые показывают структуру до и после.
+6. Если пользователю снова и снова нужна задача одного вида с новыми данными (формы после преобразований, формы глаголов, перевод единиц), напишите генератор вместо набора. Смотрите ниже.
+
+##### Написать генератор
+
+1. Договоритесь с пользователем о задаче: что показывается, о чём спрашивается, какие ошибки стоят за неверными вариантами, и о темах.
+2. Напишите скрипт. Данные держите маленькими и читаемыми: задача должна тренировать узнавание структуры, а не устный счёт. Кладите в каждый вариант пошаговый `explain`.
+3. Проверьте его до установки: загрузите скрипт в node (`new Function(code + "; return plugin")()`), вызовите каждый `make` несколько сотен раз с `r` с зерном, как описано выше, и проверьте, что ответ есть среди вариантов, варианты не повторяются, а тексты укладываются в лимиты. Если ответы получаются из кода (Python, NumPy, PyTorch), выполните этот код и сравните.
+4. Установите его через `install_drill_generator`, затем попросите пользователя открыть Зубрилку, вкладку «Наборы», нажать «Проверить», посмотреть примеры карточек и включить генератор.
+5. Предложите режим с ним через `save_drill_preset`, например сеанс в окне на 10 карточек.
 
 #### 9. Соглашения
 
@@ -404,7 +666,7 @@ MIT
 
 ## Next Day
 
-A planner for one day ahead, for Windows. In the evening you name the next day and decide what you will do. During the day you tick what is done, and in the evening you collect the results and seal the day. Big goals are split into topics, and the app puts their tasks into your plan by itself. The app starts with Windows, lives in the tray and reminds you about the plan in the morning and in the evening.
+A planner for one day ahead, for Windows. In the evening you name the next day and decide what you will do. During the day you tick what is done, and in the evening you collect the results and seal the day. Big goals are split into topics, and the app puts their tasks into your plan by itself. The drill trainer helps you learn words, formulas and rules by heart. The app starts with Windows, lives in the tray and reminds you about the plan in the morning and in the evening.
 
 Only the next day can be planned, one plan per day. The interface is in Russian for now.
 
@@ -454,9 +716,37 @@ The Map tab shows a goal as a graph. An arrow goes from a topic you need to know
 
 The Goals tab shows what is planned for today and what the app will plan for the next days. On the right you see the progress by topics and tasks, the readiness from checks and a forecast that tells you if you will finish before the deadline. The settings set the time per day, the weekdays, the start hour and the deadline. The buttons at the top pause the goal, finish it or open its map.
 
+### Drill trainer
+
+![Drill trainer](screenshots/drill.png)
+
+The drill trainer helps you learn what you need to remember without hints: words, formulas, definitions, rules. Cards come one after another until the session goal is met: a number of right answers, of cards or of minutes. A mode sets what to drill and how. A session runs in the normal window or behind a full screen lock: you leave the lock only by holding Esc for five seconds, or when the time is up. The streak counts the days in a row with a finished session.
+
+#### Cards
+
+![Card](screenshots/drill-card.png)
+
+You type the answer as text or a number, pick it from options with the mouse or the keys, or recall it, reveal the answer and honestly mark whether you knew it. After a miss you see the right answer and an explanation, and the card comes back later in the same session. A right answer moves the card further away: it comes back after a day, then after two, four and eight days. Topics of a deck can open one by one: the next one opens when the open ones reach the share of right answers you set.
+
+#### Decks
+
+![Decks](screenshots/drill-decks.png)
+
+You build your own decks right in the app: a question, an answer, other accepted answers, options to choose from and an explanation for a miss. Many cards can be pasted at once, one per line. A check template says how to compare the answer: as text, as a number, as a choice of options or by self-check. A template can also show a hint under the answer field about the form of the answer. Templates live in groups, and you can create your own templates and groups for any subject.
+
+When a task has to be solved again and again with new data, a generator works better than a deck: a JavaScript script that makes new cards for every session. A generator runs in a sandbox without access to the network and to your data, and it is turned on only after you look at its sample cards. Ready banks of cards in JSON are loaded with the DataEater button.
+
+The reference holds articles for the topics of the decks. During a session it opens with the lightbulb button.
+
+#### For programmers
+
+![Miss review](screenshots/drill-python.png)
+
+The built-in deck teaches reading Python code without running it: what a variable holds, which type and shape the data has, what changes after a pass of a loop and which error the code raises. The answers come from running the code. After a miss you can compare the data before and after a line, step through the code and read the rule. The generator for array and tensor shapes makes new tasks about shapes in NumPy and PyTorch every time. Data structures in the reference and in the miss review are drawn as pictures: list cells with indexes, a matrix grid, key and value pairs.
+
 ### AI over MCP
 
-You can build the goal map yourself or ask an AI to do it. The app has a built-in MCP server. Through it Claude Code, Claude Desktop or any other MCP client can read your day history, create a draft goal, change the map and record results. The server can be reached only from your own computer, and only with a token.
+You can build the goal map yourself or ask an AI to do it. The app has a built-in MCP server. Through it Claude Code, Claude Desktop or any other MCP client can read your day history, create a draft goal, change the map and record results. It can also build a drill deck, write an article for the reference, make a generator or a check template and go through your misses with you. The server can be reached only from your own computer, and only with a token.
 
 #### Draft from AI
 
@@ -489,7 +779,7 @@ The config for Claude Desktop goes into `claude_desktop_config.json`:
 
 The path depends on the folder you chose during installation, so it is easier to copy the config with the button: it fills in the path to your copy. If you reinstall the app into another folder, copy the config again.
 
-After that, ask the AI to make a goal in Next Day.
+After that, ask the AI to make a goal or a drill deck in Next Day.
 
 <details>
 <summary>MCP reference</summary>
@@ -506,6 +796,7 @@ The rhythm of the app:
 - Day: the plan is frozen; the user only ticks checklist items and sub-items.
 - Night or next morning: the user collects results on a board (notes, images, finished tasks) and seals the day with a rating 1-5 and an optional short summary. Sealed days are read-only history.
 - Goals: a goal is a map of topics. Arrows (prerequisites) say what must be mastered before what; every topic holds tasks ranked from simple to hard. While a goal is active, the app plans tomorrow by itself from the map and the goal's daily minutes. The user sees the map on the Map tab and the goal on the Goals tab.
+- Drill (Зубрилка): short cards answered in a row until a session goal is met. The user chooses what to drill (decks and topics), how (order, session size, self-check) and under which conditions (a full-screen lock or a normal window, an escape, a time ceiling). The built-in deck `python` teaches reading Python code without running it: what a variable holds, its shape, how it changes in a loop, which error the code raises. Its answers and value tables come from executing the code. The built-in generator `shapes` makes new tasks every session about how NumPy and PyTorch shapes change after one to three operations. Decks can also be generators (JavaScript plugins) or imported banks. How answers are compared (text, a number, a choice of options, self-check, Python values and shapes) comes from check templates that the user keeps in groups and can extend.
 
 #### 2. Connecting
 
@@ -606,6 +897,163 @@ A checklist holds at most 40 items and is always sorted by start hour counted fr
 - Result: `{minutes, score, confidence, note, at, by}`; minutes 1-1440, score 0-100, confidence 1-5 (each may be null), note up to 2000 chars, `by` is user or ai.
 - Progress: `{topicsTotal, topicsDone, tasksTotal, tasksDone, tasksLeft, minutesTotal, minutesDone, checksTotal, checksDone, readiness}`. Skipped tasks are left out. A topic is done when it has tasks and all of them are done or skipped. `readiness` is the integer average of the scores recorded on check tasks, null when there are none.
 
+##### Drill deck
+
+Decks come in three kinds, all drilled the same way through presets:
+
+- deck: cards written by hand or by AI with `create_drill_deck`. The fields are below.
+- bank: a prepared bank imported from JSON with `import_drill_bank` (DataEater). Every card is a template with many variants that differ only in data. The built-in deck `python` is a bank.
+- generator: a JavaScript plugin that makes fresh variants at the start of every session, installed with `install_drill_generator`. The built-in generator `shapes` asks how the shape of NumPy arrays and PyTorch tensors changes after one to three operations, with four options.
+
+After a miss, a card of a bank or a generator comes back with another variant: the same task with new data.
+
+| Field | Type | Meaning |
+|---|---|---|
+| id | string | `python` is the built-in deck; user decks have opaque ids |
+| title | string | Up to 80 chars |
+| description | string | Up to 1000 chars |
+| author | user or ai | |
+| check | Check | How answers to the deck's cards are compared, usually copied from a check template |
+| gate | Gate | When enabled, topics open one by one |
+| cards | Card[] | Up to 2000 |
+
+##### Card
+
+| Field | Type | Meaning |
+|---|---|---|
+| id | string | Opaque |
+| topic | string | Optional section name, up to 80 chars; topics follow the order of their first card |
+| prompt | string | The question, up to 2000 chars |
+| code | string | Optional code shown with line numbers, up to 4000 chars |
+| answer | string | Canonical answer shown after a miss, up to 500 chars |
+| alternatives | string[] | Other accepted answers, up to 10 |
+| choices | string[] | Choice mode: the options; the answer is added if missing |
+| check | Check or null | Overrides the deck's check for this card |
+| explain | string | Rule or explanation shown after a miss, up to 2000 chars |
+
+##### Check
+
+`{mode, caseSensitive, ignoreSpaces, tolerance, strictTypes, hint}`
+
+| mode | The answer is right when |
+|---|---|
+| text | It is equal after trimming and collapsing spaces; case and the letters ё and е are ignored unless `caseSensitive`; `ignoreSpaces` removes all spaces |
+| python | The Python literal equals the answer together with types (3 and 3.0 differ, a tuple is not a list) unless `strictTypes` is false; dict keys and set items in any order, either quotes, spaces ignored. An exception name such as `TypeError`, quoted or not, answers code that fails |
+| shape | The shape notation matches with spaces ignored: `int`, `list[str]`, `tuple[str, int]`, `dict[str, list[int]]`, `set[int]` |
+| number | It is within `tolerance` of the answer; a comma works as the decimal point |
+| choice | The picked option is the answer |
+| self | The user reveals the answer and says whether they knew it |
+
+`hint` (up to 200 chars) is shown under the answer field during a session instead of the default hint of the mode. Use it for the expected form of the answer: the base form of a word, a unit, a date format. Write it in the user's language.
+
+##### Check template
+
+`{id, group, name, check}`: a named Check that the user picks when building a deck or a card. Templates are listed in groups, and a new group name makes a new group. A new install starts with two groups: Основные with `text` (Текст), `choice` (Выбор из вариантов), `number` (Число) and `self` (Самопроверка), and Для программистов with `python` (Значение Python) and `shape` (Форма данных Python). The user can change and delete any template and bring the default ones back.
+
+A deck or a card copies the check of its template. Changing or deleting the template later does not touch existing decks.
+
+##### Bank
+
+`{title, description, gate, topics, cards}`: the format of `python` and of `import_drill_bank`.
+
+- `topics`: up to 100 `{id, title, theory}`. `theory` is Markdown in the app's dialect (see Theory article) and becomes a read-only article of the topic. Topics without cards are dropped.
+- `cards`: up to 2000 `{id, topic, kind, rule, check, variants}`. `id` is up to 60 chars and unique; `topic` is a topic id or title; `rule` (up to 2000 chars) is shown after a miss; `check` may tune the comparison (caseSensitive, ignoreSpaces, tolerance, strictTypes, hint) while its mode always comes from `kind`.
+- `variants`: up to 200 per card and 100000 per bank, `{question, code, answer, choices, alternatives, explain}`; `prompt` works as another name for `question`. `explain` (Markdown, up to 2000 chars) is shown after a miss under the rule: put the explanation of this very data there, for example a table of every line with its result.
+
+| kind | The user | answer |
+|---|---|---|
+| value, python, step | types a Python literal | a literal, or an exception name when the code fails |
+| pick | picks one of 2-8 options shown as code, keys a-h | one of `choices`, compared as Python values |
+| shape | types a shape such as `list[tuple[str, int]]` | a shape |
+| error | types the exception name | for example `TypeError` |
+| output | types what print shows | the printed text |
+| text | types text | text |
+| number | types a number | a number |
+| choice | picks one of 2-8 text options, keys a-h | one of `choices` |
+| self | reveals the answer and grades themselves | any text |
+
+Invalid variants are dropped and listed in the import report; a card left without variants is dropped too.
+
+##### Generator
+
+A plain JavaScript script, without import or export, that declares `plugin`:
+
+```js
+const VERBS = [["go", "went", "gone"], ["see", "saw", "seen"]];
+const plugin = {
+  title: "Неправильные глаголы",
+  description: "Формы неправильных глаголов",
+  topics: [{ id: "forms", title: "Три формы", theory: "У неправильного глагола три формы: go, went, gone." }],
+  templates: [
+    {
+      id: "past",
+      topic: "forms",
+      kind: "choice",
+      rule: "Past Simple неправильного глагола нужно помнить.",
+      make(r) {
+        const [base, past, done] = r.pick(VERBS);
+        return { prompt: `Past Simple от \`${base}\`?`, answer: past, choices: [past, done, base + "ed", base], explain: `${base}, ${past}, ${done}` };
+      },
+    },
+  ],
+};
+```
+
+- A template is `{id, topic, kind, rule, check, make}`. `id` is up to 60 chars and must stay stable: progress is stored by it. `kind` is one from the Bank table, choice by default. `make(r)` returns one variant with the fields of a bank variant.
+- `r` is a seeded random source: `r.random()`, `r.int(a, b)` with both ends included, `r.pick(list)`, `r.chance(p)`, `r.shuffle(list)` (returns a copy), `r.sample(list, k)`. Use it instead of Math.random. Numbers in answers and choices become strings.
+- At the start of a session the app calls `make` up to 12 times per template, drops repeats and checks every variant like a bank variant. The whole run must finish within 6 seconds.
+- The script runs in a sandboxed worker: no network, no DOM, no access to the app or its data, only computation.
+- A generator installed or changed through MCP is saved switched off. The user presses Проверить in the app, sees sample cards and enables it.
+- Make the four options of a choice or pick card the typical mistakes of this exact task (forgot an operation, took the wrong axis, mixed up two similar functions), not random noise.
+
+Gate: `{enabled, percent, window}`, default 85 and 20. The first topic is always open; the next one opens when every open topic has at least `window` answers and at least `percent` of the last `window` are right. The user can also open or close topics by hand.
+
+##### Preset
+
+| Field | Type | Meaning |
+|---|---|---|
+| id | string | |
+| name | string | Up to 60 chars |
+| sources | `[{deck, topics}]` | What to drill; empty `topics` means the deck's open topics |
+| order | smart, random, sequence | smart: Leitner spaced repetition (below); sequence continues where the last session stopped |
+| goal | correct, cards, minutes | The session ends after `amount` right answers, `amount` answers, or `amount` minutes |
+| amount | integer | 1-200; for minutes 1-180 |
+| retry | bool | A missed card comes back later in the same session; cards of banks and generators come back with new data |
+| explain | bool | Also show the rule after right answers |
+| screen | lock, window | lock: full screen on every monitor, on top, Alt+F4 blocked, focus comes back; window: inside the app, can be left any time |
+| escape | hold, none | lock only: hold Esc for 5 seconds and confirm, recorded as an escape; none: no exit except the ceiling |
+| limitMinutes | 5-180 | lock only: the lock opens by itself after this time (outcome timeout) |
+| selfCheck | bool | Self-grading instead of typed answers for every card |
+| theoryLabel | string | Caption of the theory button, up to 24 chars, may be empty |
+| peekKeepsBox | bool | A card answered after opening the theory is not promoted |
+
+- Every card has a Leitner box 1-5. A right answer the first time a card appears in a session moves it one box up; a miss sends it to box 1. Next show: box 1 the same day, boxes 2-5 after 1, 2, 4 and 8 days. Smart order takes due cards first (lower boxes first), mixes new cards in and interleaves topics; when nothing is due it continues with the cards due soonest.
+- Session outcomes: done, escape (lock exit by Esc), timeout (lock ceiling), stopped (a window session ended early). The drill streak counts consecutive days with a done session; an escape resets it.
+- `theoryLabel` (up to 24 chars, may be empty) is the caption of the lightbulb button that opens the theory during a session. With `peekKeepsBox` (default true) a card answered after opening the theory stays in its box and comes back the same day.
+
+##### Theory article
+
+| Field | Type | Meaning |
+|---|---|---|
+| id | string | `{deck}-{topic}` for the built-in articles of banks and generators, such as `python-t01` |
+| deck | string | Deck id |
+| topic | string | Topic id, empty for the whole deck |
+| title | string | Up to 120 chars |
+| body | string | Markdown, up to 100000 chars |
+| author | user or ai | |
+| builtin | bool | Built-in articles are read-only |
+
+The body uses the app's Markdown dialect: headings `#` to `###`, paragraphs, `**bold**`, `*italic*`, `` `code` ``, links, lists (`- ` and `1. `, nested by two spaces), quotes `> `, tables with a `|---|` row, `---` rules and fenced code blocks. Special fenced blocks:
+
+- `data`: one item per line, `name = literal`, `literal` or `literal -> literal` (before and after). The app draws the Python value as a structure picture (list cells with indexes, a matrix grid, key and value pairs, tuples, sets) with its shape. Literals only: numbers, strings, True, False, None, lists, tuples, dicts, sets, set().
+- `chart`: JSON `{"type": "line" | "bar" | "scatter", "title", "x": [...], "series": [{"name", "y": [...]}], "xlabel", "ylabel"}`.
+- `plot`: lines `y = <expression of x>` (several allowed; operators + - * / ** ^, functions sin cos tan exp log sqrt abs, pi, e), a range line `x = -3..3` and an optional `title: ...`.
+- `graph`: edges, one per line or comma separated: `a -> b` directed, `a - b` undirected, `a -> b: 3` with a label.
+
+A good article gives the model, not a list of functions: how to picture the data, before and after pairs for the main operations, traps, and a table of expressions with their shapes.
+
+In every text the user reads (articles, card `explain`, bank and generator `rule` and `explain`, prompts) wrap each piece of code, variable name and value in backticks: write `a % b` даёт остаток, not a % b даёт остаток. The app shows them as code chips, so they never merge with the Russian words around them.
+
 #### 5. How the app plans
 
 Goal status belongs to the user. `create_goal` always makes a draft. Only active goals are planned; drafts, paused, done and archived goals never are. Never claim that a draft is active.
@@ -702,6 +1150,64 @@ Required: `title`, `outcome`, `topics`. Optional: `note`, `deadline`, `minutesPe
 - Record scores on check tasks so they count toward readiness.
 - Ask the user or verify the work before recording. Returns the compact goal.
 
+##### get_drill (read)
+
+No arguments. Returns `{presets, checks, defaultPreset, python, decks, streak, bestStreak, today, due, weak, sessions}`.
+
+- `checks`: the check templates in the order the user sees them, `{id, group, name, check}`.
+- `python`: settings of the built-in deck, `{gate, strictTypes}`.
+- `decks`: `[{id, title, description, builtin, kind, enabled, author, cards, variants, check, gate, topics, updatedAt}]`; `kind` is deck, bank or generator, `cards` of a generator counts its templates, `variants` counts the prepared variants of a bank, `enabled` is false for a generator waiting for the user's check. `topics` are `{id, title, cards, open, answered, recent, recentRight, seen, due, boxes}`. `recentRight` of `recent` is the accuracy over the gate window; `boxes` counts seen cards per Leitner box.
+- `today`: `{sessions, answers, correct}`. `due`: cards due in the default preset.
+- `weak`: the most missed cards `{deck, card, topic, prompt, code, answer, rule, right, wrong, level, lastWrong}`. `lastWrong` holds the user's last wrong answers, the best evidence of a misconception.
+- `sessions`: the last 40, newest first, `{name, startedAt, endedAt, outcome, screen, goal, amount, answered, correct, firstTry, wrong, seconds, misses}`.
+
+##### get_drill_deck (read)
+
+`deckId`. A user deck with all its cards. A generator returns `{kind: generator, title, description, builtin, author, enabled, topics, templates, code}`. A bank, `python` included, returns `{kind: bank, topics, cards}` where each card is a template `{id, topic, kind, rule, variants, sample}`; kind is value (type a literal), pick (choose one of four literals: the right one and three typical structural mistakes), shape (type the shape), step (the value after pass k of a loop), error (the code fails, type the exception name) or output (what print shows). After a miss the user gets the same template with new data.
+
+##### create_drill_deck (write)
+
+Required: `title`, `cards`. Optional: `description`, `check` or `template`, `gate`. Every card needs `prompt` and `answer` and may have its own `check` or `template`.
+
+- `template` is the id or name of a check template from `get_drill`; its check is copied into the deck or the card. Prefer a template that fits over a hand-made `check`.
+- The whole input is validated first: in python mode every answer and alternative must be a literal or an exception name, in number mode a number; choice cards need at least two options.
+- Creates the deck with `author: ai` and returns `{deck, note}`. The deck is drilled only after it is added to a preset.
+
+##### edit_drill_deck (write)
+
+`deckId` plus any of `title`, `description`, `check` or `template`, `gate`, `upsert` (cards; a card with an existing `id` is replaced, one without `id` is added) and `remove` (card ids). The built-in deck can not be edited. Progress of kept cards stays. Returns the deck.
+
+##### get_drill_theory (read)
+
+Optional `deckId`; with it, `topic` (a topic id) narrows the list to that topic plus the articles about the whole deck. Returns `{articles}`: `[{id, deck, topic, title, body, author, builtin, createdAt, updatedAt}]`. Articles that come with the topics of banks and generators, `python` and `shapes` included, have `builtin: true`.
+
+##### save_drill_theory (write)
+
+`deckId`, `title`, `body`, optional `topic` (id or title, empty for the whole deck) and `id` (replaces that article). Creates the article with `author: ai`. Built-in articles can not be changed; write your own next to them. Returns the article.
+
+##### install_drill_generator (write)
+
+`title`, `code`, optional `description` and `id` (replaces the code of that generator; built-in ones can not be changed). Saves the generator switched off and returns `{generator: {id, title, enabled}, note}`. The app runs the script only after the user checks and enables it; then add it to a preset.
+
+##### import_drill_bank (write)
+
+`bank` (the object) or `path` (an absolute path to a .json file up to 16 MB), optional `replaceId` (an imported bank to replace; progress of cards with the same ids stays). Returns `{report: {id, title, topics, cards, variants, dropped, problems, replaced}, note}`. Read `problems`: they name the dropped cards and variants and why.
+
+##### save_drill_check (write)
+
+`name` (up to 60 chars), `check`, optional `group` (up to 40 chars, default Свои) and `id` (replaces that template). A new group name creates the group; a new template goes to the end of its group. Returns the template.
+
+##### delete_drill_check (write)
+
+`id` deletes one template, `group` deletes the whole group. Decks keep their copies of the check. Returns `{deleted}`.
+
+##### save_drill_preset (write)
+
+Any preset fields plus `makeDefault`. Without `id` a preset is created from the defaults (10 right answers, smart order, retry, lock with the Esc escape and a 30-minute ceiling); with `id` only the given fields change. Returns the preset.
+
+- Sessions are started only by the user, in the app.
+- Never turn on `screen: lock` or set `escape: none` unless the user asked for it in their own words.
+
 #### 7. Resources and prompts
 
 | URI | Content |
@@ -711,8 +1217,9 @@ Required: `title`, `outcome`, `topics`. Optional: `note`, `deadline`, `minutesPe
 | nextday://profile | `get_profile` for 42 days |
 | nextday://goal/{goalId} | The same as `get_goal` |
 | nextday://day/{date} | One planned day with board notes |
+| nextday://drill | The same as `get_drill` |
 
-Prompts: `plan_goal(goal, deadline?)`, `evening_review()`, `readiness_check(goalId)`. Each returns one user message that starts the matching workflow below.
+Prompts: `plan_goal(goal, deadline?)`, `evening_review()`, `readiness_check(goalId)`, `drill_coach()`. Each returns one user message that starts the matching workflow below.
 
 #### 8. Workflows
 
@@ -752,6 +1259,23 @@ Prompts: `plan_goal(goal, deadline?)`, `evening_review()`, `readiness_check(goal
 - To insert work, send the topic's full task list in the new order with the existing ids.
 - To put a topic between two others, add it and update the `requires` of the topics that depend on it.
 - Avoid removing topics with finished work: their done tasks would be lost. Add tasks or topics instead.
+
+##### Coach the drill
+
+1. Call `get_drill`. Name the open topics, accuracy, streak and the outcomes of recent sessions; escapes and timeouts mean the sessions are too long or too hard.
+2. Study `weak`: group the misses by the rule behind them and read `lastWrong` to find the misconception.
+3. Explain each rule with a tiny example and check the user with one question at a time in the chat.
+4. Offer a deck that targets these mistakes: create it with `create_drill_deck` (a fitting check template from `checks`, python for code questions, a short `explain` on every card) and, if the user agrees, add it to a preset with `save_drill_preset`. When the user will drill the same kind of answer again (words of a language, dates, formulas), offer a check template for it with `save_drill_check` and a `hint` that names the expected form.
+5. When a rule keeps failing, write the model down for later with `save_drill_theory` on that deck and topic: a short article with `data` blocks that show the structure before and after.
+6. When the user needs the same kind of task again and again with new data (shapes after transformations, verb forms, unit conversions), write a generator instead of a deck. See below.
+
+##### Write a generator
+
+1. Agree on the task with the user: what is shown, what is asked, which mistakes the wrong options stand for, and the topics.
+2. Write the script. Keep data small and readable: the task should train recognizing structure, not mental arithmetic. Put a step by step `explain` into every variant.
+3. Test it before installing: load the script with node (`new Function(code + "; return plugin")()`), call every `make` a few hundred times with a seeded `r` like the one above, and check that the answer is among the choices, the options are unique and the texts fit the limits. When answers come from code (Python, NumPy, PyTorch), execute that code and compare.
+4. Install it with `install_drill_generator`, then ask the user to open Зубрилка, tab Наборы, press Проверить, look at the sample cards and enable it.
+5. Offer a preset with `save_drill_preset` that uses it, for example a window session of 10 cards.
 
 #### 9. Conventions
 
