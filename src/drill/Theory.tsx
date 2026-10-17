@@ -71,7 +71,8 @@ export function TheoryBrowser({ ov }: { ov: DrillOverview }) {
           kind="paper"
           small
           icon="plus"
-          onClick={() => setEdit({ deck: current?.deck ?? "python", topic: current?.topic ?? "", title: "", body: "" })}
+          disabled={!ov.decks.length}
+          onClick={() => setEdit({ deck: current?.deck ?? ov.decks[0].id, topic: current?.topic ?? "", title: "", body: "" })}
         >
           {t("Новая статья", "New article")}
         </Button>
@@ -92,7 +93,7 @@ export function TheoryBrowser({ ov }: { ov: DrillOverview }) {
                     {arts.map((a) => (
                       <button key={a.id} className={`th-item${current?.id === a.id ? " on" : ""}`} onClick={() => setSel(a.id)}>
                         <Px name={a.builtin ? "cards" : a.author === "ai" ? "sBolt" : "note"} scale={1.5} />
-                        <span>{a.builtin ? t("Встроенная статья", "Built-in article") : a.title}</span>
+                        <span>{a.builtin ? t("Статья из набора", "Article from the deck") : a.title}</span>
                       </button>
                     ))}
                     {!arts.length && (
@@ -116,7 +117,7 @@ export function TheoryBrowser({ ov }: { ov: DrillOverview }) {
               <span className="muted">
                 {topicTitle(ov.decks, current.deck, current.topic)}
                 {current.builtin
-                  ? t(", встроенная", ", built-in")
+                  ? t(", из набора", ", from the deck")
                   : current.author === "ai"
                     ? t(`, от ИИ, ${stamp(current.updatedAt)}`, `, by AI, ${stamp(current.updatedAt)}`)
                     : `, ${stamp(current.updatedAt)}`}
@@ -151,7 +152,12 @@ export function TheoryBrowser({ ov }: { ov: DrillOverview }) {
           </>
         ) : (
           <p className="muted">
-            {t("Статей пока нет. Напиши первую или попроси ИИ через MCP.", "No articles yet. Write the first one or ask AI over MCP.")}
+            {ov.decks.length
+              ? t("Статей пока нет. Напиши первую или попроси ИИ через MCP.", "No articles yet. Write the first one or ask AI over MCP.")
+              : t(
+                  "Статьи пишутся к наборам и их темам. Сначала создай набор.",
+                  "Articles belong to decks and their topics. Create a deck first.",
+                )}
           </p>
         )}
       </section>
@@ -345,7 +351,7 @@ export function TheoryPanel({
           <select className="field select" value={current?.id ?? ""} onChange={(e) => setSel(e.target.value)}>
             {ordered.map((a) => (
               <option key={a.id} value={a.id}>
-                {topicTitle(decks, a.deck, a.topic)}: {a.builtin ? t("встроенная", "built-in") : a.title}
+                {topicTitle(decks, a.deck, a.topic)}: {a.builtin ? t("из набора", "from the deck") : a.title}
               </option>
             ))}
           </select>

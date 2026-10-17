@@ -6,7 +6,7 @@ import { Button, Check, Modal, toastError } from "../ui/kit";
 const BLANK: DrillPreset = {
   id: "",
   name: "",
-  sources: [{ deck: "python", topics: [] }],
+  sources: [],
   order: "smart",
   goal: "correct",
   amount: 10,
@@ -45,7 +45,7 @@ const KIND_NOTE = (d: DrillDeckInfo) =>
     ? d.enabled
       ? t(", генератор", ", generator")
       : t(", генератор выключен", ", generator off")
-    : d.kind === "bank" && !d.builtin
+    : d.kind === "bank"
       ? t(", банк", ", bank")
       : "";
 
@@ -66,7 +66,10 @@ export function PresetEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [p, setP] = useState<DrillPreset>(() => structuredClone(preset ?? { ...BLANK, name: t("Новый режим", "New mode") }));
+  const [p, setP] = useState<DrillPreset>(() => {
+    const base = structuredClone(preset ?? { ...BLANK, name: t("Новый режим", "New mode") });
+    return { ...base, sources: base.sources.filter((s) => ov.decks.some((d) => d.id === s.deck)) };
+  });
   const [main, setMain] = useState(preset ? preset.id === ov.defaultPreset : false);
   const [busy, setBusy] = useState(false);
   const set = (patch: Partial<DrillPreset>) => setP((x) => ({ ...x, ...patch }));
@@ -107,7 +110,7 @@ export function PresetEditor({
           <Button kind="paper" onClick={onClose}>
             {t("Отмена", "Cancel")}
           </Button>
-          <Button icon="check" disabled={busy || !p.sources.length} onClick={() => void save()}>
+          <Button icon="check" disabled={busy} onClick={() => void save()}>
             {t("Сохранить", "Save")}
           </Button>
         </>
@@ -120,6 +123,9 @@ export function PresetEditor({
         </label>
 
         <h3 className="drill-h">{t("Что зубрить", "What to drill")}</h3>
+        {!p.sources.length && (
+          <p className="muted">{t("Ничего не выбрано: в сеанс пойдут все наборы.", "Nothing is picked: the session takes all decks.")}</p>
+        )}
         <div className="drill-sources">
           {ov.decks.map((d) => {
             const src = source(d.id);

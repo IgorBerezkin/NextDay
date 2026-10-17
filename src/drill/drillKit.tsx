@@ -181,6 +181,7 @@ export function mmss(sec: number): string {
 }
 
 export function sourcesText(p: DrillPreset, decks: DrillDeckInfo[]): string {
+  if (!p.sources.length) return t("все наборы", "all decks");
   return p.sources
     .map((s) => {
       const d = decks.find((x) => x.id === s.deck);

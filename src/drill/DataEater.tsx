@@ -80,8 +80,8 @@ export function DataEater({ banks, onClose, onDone }: { banks: DrillDeckInfo[]; 
       <div className="drill-form">
         <p className="muted">
           {t(
-            "DataEater ест готовые банки карточек: JSON в том же формате, что встроенный набор Python. В банке темы с теорией и карточки, у каждой карточки много вариантов с разными данными. После промаха карточка вернётся с другим вариантом. Такой файл обычно собирает скрипт, который сам выполняет код и считает ответы, или ИИ через MCP (import_drill_bank).",
-            "DataEater eats ready card banks: JSON in the same format as the built-in Python deck. A bank has topics with theory and cards, and each card has many variants with different data. After a miss the card comes back with another variant. Such a file is usually built by a script that runs the code and computes the answers itself, or by AI over MCP (import_drill_bank).",
+            "DataEater ест готовые банки карточек в формате JSON. В банке темы с теорией и карточки, у каждой карточки много вариантов с разными данными. После промаха карточка вернётся с другим вариантом. Такой файл обычно собирает скрипт, который сам считает ответы, или ИИ через MCP (import_drill_bank).",
+            "DataEater eats ready card banks in JSON. A bank has topics with theory and cards, and each card has many variants with different data. After a miss the card comes back with another variant. Such a file is usually built by a script that computes the answers itself, or by AI over MCP (import_drill_bank).",
           )}
         </p>
         <pre className="eater-format">

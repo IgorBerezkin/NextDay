@@ -262,7 +262,6 @@ export type DrillDeckInfo = {
   id: string;
   title: string;
   description: string;
-  builtin: boolean;
   kind: DrillDeckKind;
   enabled: boolean;
   author: Author;
@@ -373,12 +372,10 @@ export type Article = {
   updatedAt: string;
 };
 export type ArticleInput = { id?: string; deck: string; topic: string; title: string; body: string };
-export type BuiltinPrefs = { gate: Gate; strictTypes: boolean };
 export type DrillOverview = {
   presets: DrillPreset[];
   checks: CheckTemplate[];
   defaultPreset: string;
-  python: BuiltinPrefs;
   decks: DrillDeckInfo[];
   streak: number;
   bestStreak: number;
@@ -491,7 +488,6 @@ export const api = {
   drillSavePreset: (preset: DrillPreset, makeDefault: boolean) => invoke<DrillPreset>("drill_save_preset", { preset, makeDefault }),
   drillDeletePreset: (id: string) => invoke<void>("drill_delete_preset", { id }),
   drillSetDefault: (id: string) => invoke<void>("drill_set_default", { id }),
-  drillSetPrefs: (prefs: BuiltinPrefs) => invoke<void>("drill_set_prefs", { prefs }),
   drillSetTopic: (deck: string, topic: string, open: boolean) => invoke<void>("drill_set_topic", { deck, topic, open }),
   drillStart: (presetId: string, generated: Generated = {}) => invoke<DrillSessionView>("drill_start", { presetId, generated }),
   drillGenSources: (presetId: string) => invoke<GenSource[]>("drill_gen_sources", { presetId }),

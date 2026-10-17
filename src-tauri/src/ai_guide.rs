@@ -55,7 +55,7 @@ The rhythm of the app:
 - Day: the plan is frozen; the user only ticks checklist items and sub-items.
 - Night or next morning: the user collects results on a board (notes, images, finished tasks) and seals the day with a rating 1-5 and an optional short summary. Sealed days are read-only history.
 - Goals: a goal is a map of topics. Arrows (prerequisites) say what must be mastered before what; every topic holds tasks ranked from simple to hard. While a goal is active, the app plans tomorrow by itself from the map and the goal's daily minutes. The user sees the map on the Map tab and the goal on the Goals tab.
-- Drill trainer (tab Зубрилка): short cards answered in a row until a session goal is met. The user chooses what to drill (decks and topics), how (order, session size, self-check) and under which conditions (a full-screen lock or a normal window, an escape, a time ceiling). The built-in deck `python` teaches reading Python code without running it: what a variable holds, its shape, how it changes in a loop, which error the code raises. Its answers and value tables come from executing the code. The built-in generator `shapes` makes new tasks every session about how NumPy and PyTorch shapes change after one to three operations. Decks can also be generators (JavaScript plugins) or imported banks. How answers are compared (text, a number, a choice of options, self-check, Python values and shapes) comes from check templates that the user keeps in groups and can extend.
+- Drill trainer (tab Зубрилка): short cards answered in a row until a session goal is met. The user chooses what to drill (decks and topics), how (order, session size, self-check) and under which conditions (a full-screen lock or a normal window, an escape, a time ceiling). The app has no decks of its own: the user builds them, imports banks or installs generators (JavaScript plugins), by hand or with your help. How answers are compared (text, a number, a choice of options, self-check, Python values and shapes) comes from check templates that the user keeps in groups and can extend.
 
 ## 2. Connecting
 
@@ -161,14 +161,14 @@ A checklist holds at most 40 items and is always sorted by start hour counted fr
 Decks come in three kinds, all drilled the same way through presets:
 
 - deck: cards written by hand or by AI with `create_drill_deck`. The fields are below.
-- bank: a prepared bank imported from JSON with `import_drill_bank` (DataEater). Every card is a template with many variants that differ only in data. The built-in deck `python` is a bank.
-- generator: a JavaScript plugin that makes fresh variants at the start of every session, installed with `install_drill_generator`. The built-in generator `shapes` asks how the shape of NumPy arrays and PyTorch tensors changes after one to three operations, with four options.
+- bank: a prepared bank imported from JSON with `import_drill_bank` (DataEater). Every card is a template with many variants that differ only in data, for example code cards whose answers come from executing the code.
+- generator: a JavaScript plugin that makes fresh variants at the start of every session, installed with `install_drill_generator`.
 
 After a miss, a card of a bank or a generator comes back with another variant: the same task with new data.
 
 | Field | Type | Meaning |
 |---|---|---|
-| id | string | `python` is the built-in deck; user decks have opaque ids |
+| id | string | Opaque |
 | title | string | Up to 80 chars |
 | description | string | Up to 1000 chars |
 | author | user or ai | |
@@ -213,7 +213,7 @@ A deck or a card copies the check of its template. Changing or deleting the temp
 
 ### Bank
 
-`{title, description, gate, topics, cards}`: the format of `python` and of `import_drill_bank`.
+`{id, title, description, gate, topics, cards}`: the format of `import_drill_bank`. `id` is optional: when it is free (letters, digits, `-` and `_`, up to 40 chars) the bank keeps it, so progress survives a fresh import after the bank was deleted.
 
 - `topics`: up to 100 `{id, title, theory}`. `theory` is Markdown in the app's dialect (see Theory article) and becomes a read-only article of the topic. Topics without cards are dropped.
 - `cards`: up to 2000 `{id, topic, kind, rule, check, variants}`. `id` is up to 60 chars and unique; `topic` is a topic id or title; `rule` (up to 2000 chars) is shown after a miss; `check` may tune the comparison (caseSensitive, ignoreSpaces, tolerance, strictTypes, hint) while its mode always comes from `kind`.
@@ -258,6 +258,7 @@ const plugin = {
 };
 ```
 
+- `plugin.id` is optional: when it is free, the installed generator keeps it, so progress survives a reinstall.
 - A template is `{id, topic, kind, rule, check, make}`. `id` is up to 60 chars and must stay stable: progress is stored by it. `kind` is one from the Bank table, choice by default. `make(r)` returns one variant with the fields of a bank variant.
 - `r` is a seeded random source: `r.random()`, `r.int(a, b)` with both ends included, `r.pick(list)`, `r.chance(p)`, `r.shuffle(list)` (returns a copy), `r.sample(list, k)`. Use it instead of Math.random. Numbers in answers and choices become strings.
 - At the start of a session the app calls `make` up to 12 times per template, drops repeats and checks every variant like a bank variant. The whole run must finish within 6 seconds.
@@ -273,7 +274,7 @@ Gate: `{enabled, percent, window}`, default 85 and 20. The first topic is always
 |---|---|---|
 | id | string | |
 | name | string | Up to 60 chars |
-| sources | `[{deck, topics}]` | What to drill; empty `topics` means the deck's open topics |
+| sources | `[{deck, topics}]` | What to drill; an empty list means all decks, empty `topics` means the deck's open topics |
 | order | smart, random, sequence | smart: Leitner spaced repetition (below); sequence continues where the last session stopped |
 | goal | correct, cards, minutes | The session ends after `amount` right answers, `amount` answers, or `amount` minutes |
 | amount | integer | 1-200; for minutes 1-180 |
@@ -294,13 +295,13 @@ Gate: `{enabled, percent, window}`, default 85 and 20. The first topic is always
 
 | Field | Type | Meaning |
 |---|---|---|
-| id | string | `{deck}-{topic}` for the built-in articles of banks and generators, such as `python-t01` |
+| id | string | `{deck}-{topic}` for the articles that come with banks and generators |
 | deck | string | Deck id |
 | topic | string | Topic id, empty for the whole deck |
 | title | string | Up to 120 chars |
 | body | string | Markdown, up to 100000 chars |
 | author | user or ai | |
-| builtin | bool | Built-in articles are read-only |
+| builtin | bool | The article comes with a bank or a generator and is read-only |
 
 The body uses the app's Markdown dialect: headings `#` to `###`, paragraphs, `**bold**`, `*italic*`, `` `code` ``, links, lists (`- ` and `1. `, nested by two spaces), quotes `> `, tables with a `|---|` row, `---` rules and fenced code blocks. Special fenced blocks:
 
@@ -411,18 +412,17 @@ Required: `title`, `outcome`, `topics`. Optional: `note`, `deadline`, `minutesPe
 
 ### get_drill (read)
 
-No arguments. Returns `{presets, checks, defaultPreset, python, decks, streak, bestStreak, today, due, weak, sessions}`.
+No arguments. Returns `{presets, checks, defaultPreset, decks, streak, bestStreak, today, due, weak, sessions}`.
 
 - `checks`: the check templates in the order the user sees them, `{id, group, name, check}`.
-- `python`: settings of the built-in deck, `{gate, strictTypes}`.
-- `decks`: `[{id, title, description, builtin, kind, enabled, author, cards, variants, check, gate, topics, updatedAt}]`; `kind` is deck, bank or generator, `cards` of a generator counts its templates, `variants` counts the prepared variants of a bank, `enabled` is false for a generator waiting for the user's check. `topics` are `{id, title, cards, open, answered, recent, recentRight, seen, due, boxes}`. `recentRight` of `recent` is the accuracy over the gate window; `boxes` counts seen cards per Leitner box.
+- `decks`: `[{id, title, description, kind, enabled, author, cards, variants, check, gate, topics, updatedAt}]`; `kind` is deck, bank or generator, `cards` of a generator counts its templates, `variants` counts the prepared variants of a bank, `enabled` is false for a generator waiting for the user's check. `topics` are `{id, title, cards, open, answered, recent, recentRight, seen, due, boxes}`. `recentRight` of `recent` is the accuracy over the gate window; `boxes` counts seen cards per Leitner box.
 - `today`: `{sessions, answers, correct}`. `due`: cards due in the default preset.
 - `weak`: the most missed cards `{deck, card, topic, prompt, code, answer, rule, right, wrong, level, lastWrong}`. `lastWrong` holds the user's last wrong answers, the best evidence of a misconception.
 - `sessions`: the last 40, newest first, `{name, startedAt, endedAt, outcome, screen, goal, amount, answered, correct, firstTry, wrong, seconds, misses}`.
 
 ### get_drill_deck (read)
 
-`deckId`. A user deck with all its cards. A generator returns `{kind: generator, title, description, builtin, author, enabled, topics, templates, code}`. A bank, `python` included, returns `{kind: bank, topics, cards}` where each card is a template `{id, topic, kind, rule, variants, sample}`; kind is value (type a literal), pick (choose one of four literals: the right one and three typical structural mistakes), shape (type the shape), step (the value after pass k of a loop), error (the code fails, type the exception name) or output (what print shows). After a miss the user gets the same template with new data.
+`deckId`. A user deck with all its cards. A generator returns `{kind: generator, title, description, author, enabled, topics, templates, code}`. A bank returns `{kind: bank, topics, cards}` where each card is a template `{id, topic, kind, rule, variants, sample}`; kind is value (type a literal), pick (choose one of four literals: the right one and three typical structural mistakes), shape (type the shape), step (the value after pass k of a loop), error (the code fails, type the exception name) or output (what print shows). After a miss the user gets the same template with new data.
 
 ### create_drill_deck (write)
 
@@ -434,19 +434,19 @@ Required: `title`, `cards`. Optional: `description`, `check` or `template`, `gat
 
 ### edit_drill_deck (write)
 
-`deckId` plus any of `title`, `description`, `check` or `template`, `gate`, `upsert` (cards; a card with an existing `id` is replaced, one without `id` is added) and `remove` (card ids). The built-in deck can not be edited. Progress of kept cards stays. Returns the deck.
+`deckId` plus any of `title`, `description`, `check` or `template`, `gate`, `upsert` (cards; a card with an existing `id` is replaced, one without `id` is added) and `remove` (card ids). Banks and generators are changed by `import_drill_bank` and `install_drill_generator`. Progress of kept cards stays. Returns the deck.
 
 ### get_drill_theory (read)
 
-Optional `deckId`; with it, `topic` (a topic id) narrows the list to that topic plus the articles about the whole deck. Returns `{articles}`: `[{id, deck, topic, title, body, author, builtin, createdAt, updatedAt}]`. Articles that come with the topics of banks and generators, `python` and `shapes` included, have `builtin: true`.
+Optional `deckId`; with it, `topic` (a topic id) narrows the list to that topic plus the articles about the whole deck. Returns `{articles}`: `[{id, deck, topic, title, body, author, builtin, createdAt, updatedAt}]`. Articles that come with the topics of banks and generators have `builtin: true`.
 
 ### save_drill_theory (write)
 
-`deckId`, `title`, `body`, optional `topic` (id or title, empty for the whole deck) and `id` (replaces that article). Creates the article with `author: ai`. Built-in articles can not be changed; write your own next to them. Returns the article.
+`deckId`, `title`, `body`, optional `topic` (id or title, empty for the whole deck) and `id` (replaces that article). Creates the article with `author: ai`. Articles of banks and generators can not be changed; write your own next to them. Returns the article.
 
 ### install_drill_generator (write)
 
-`title`, `code`, optional `description` and `id` (replaces the code of that generator; built-in ones can not be changed). Saves the generator switched off and returns `{generator: {id, title, enabled}, note}`. The app runs the script only after the user checks and enables it; then add it to a preset.
+`title`, `code`, optional `description` and `id` (replaces the code of that generator, or becomes the id of a new one when it is free). Saves the generator switched off and returns `{generator: {id, title, enabled}, note}`. The app runs the script only after the user checks and enables it; then add it to a preset.
 
 ### import_drill_bank (write)
 
@@ -462,7 +462,7 @@ Optional `deckId`; with it, `topic` (a topic id) narrows the list to that topic 
 
 ### save_drill_preset (write)
 
-Any preset fields plus `makeDefault`. Without `id` a preset is created from the defaults (10 right answers, smart order, retry, lock with the Esc escape and a 30-minute ceiling); with `id` only the given fields change. Returns the preset.
+Any preset fields plus `makeDefault`. Without `id` a preset is created from the defaults (all decks, 10 right answers, smart order, retry, lock with the Esc escape and a 30-minute ceiling); with `id` only the given fields change. Returns the preset.
 
 - Sessions are started only by the user, in the app.
 - Never turn on `screen: lock` or set `escape: none` unless the user asked for it in their own words.

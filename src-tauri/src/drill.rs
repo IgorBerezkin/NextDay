@@ -14,16 +14,9 @@ use std::time::SystemTime;
 
 pub const STATE_FILE: &str = "drill.json";
 pub const DECKS: &str = "drill";
-pub const BUILTIN: &str = "python";
 pub const THEORY: &str = "theory";
 pub const BANKS: &str = "banks";
 pub const GENS: &str = "gens";
-pub const SHAPES: &str = "shapes";
-const BANK: &str = include_str!("../drill/python.json");
-const SHAPES_JS: &str = include_str!("../drill/shapes.js");
-const SHAPES_META: &str = include_str!("../drill/shapes.json");
-const BANK_EN: &str = include_str!("../drill/python.en.json");
-const SHAPES_META_EN: &str = include_str!("../drill/shapes.en.json");
 const INTERVALS: [i64; 5] = [0, 1, 2, 4, 8];
 const HISTORY: usize = 300;
 const RECENT: usize = 50;
@@ -108,82 +101,6 @@ pub struct Generator {
 }
 
 pub type Generated = HashMap<String, HashMap<String, Vec<Variant>>>;
-
-#[derive(Deserialize, Default)]
-#[serde(default)]
-struct BankText {
-    title: String,
-    description: String,
-    topics: Vec<BankTopic>,
-    cards: Vec<CardText>,
-}
-
-#[derive(Deserialize, Default)]
-#[serde(default)]
-struct CardText {
-    id: String,
-    rule: String,
-    questions: Vec<String>,
-}
-
-fn english_bank(b: &mut Bank) {
-    let t: BankText = serde_json::from_str(BANK_EN).unwrap_or_else(|e| {
-        eprintln!("английский текст банка не читается: {e}");
-        BankText::default()
-    });
-    if !t.title.is_empty() {
-        b.title = t.title;
-        b.description = t.description;
-    }
-    for topic in &mut b.topics {
-        if let Some(x) = t.topics.iter().find(|x| x.id == topic.id) {
-            topic.title = x.title.clone();
-            topic.theory = x.theory.clone();
-        }
-    }
-    for card in &mut b.cards {
-        let Some(x) = t.cards.iter().find(|x| x.id == card.id) else { continue };
-        card.rule = x.rule.clone();
-        for (v, q) in card.variants.iter_mut().zip(&x.questions) {
-            v.question = q.clone();
-        }
-    }
-}
-
-pub fn bank() -> &'static Arc<Bank> {
-    static B: [OnceLock<Arc<Bank>>; 2] = [OnceLock::new(), OnceLock::new()];
-    let en = crate::i18n::en();
-    B[usize::from(en)].get_or_init(|| {
-        let mut b: Bank = serde_json::from_str(BANK).unwrap_or_else(|e| {
-            eprintln!("банк карточек не читается: {e}");
-            Bank::default()
-        });
-        b.id = BUILTIN.into();
-        if en {
-            english_bank(&mut b);
-        }
-        Arc::new(b)
-    })
-}
-
-pub fn shapes() -> &'static Generator {
-    static G: [OnceLock<Generator>; 2] = [OnceLock::new(), OnceLock::new()];
-    let en = crate::i18n::en();
-    G[usize::from(en)].get_or_init(|| {
-        let mut g: Generator = serde_json::from_str(if en { SHAPES_META_EN } else { SHAPES_META }).unwrap_or_else(|e| {
-            eprintln!("генератор форм не читается: {e}");
-            Generator::default()
-        });
-        g.id = SHAPES.into();
-        g.code = SHAPES_JS.into();
-        g.enabled = true;
-        g
-    })
-}
-
-pub fn is_builtin(deck: &str) -> bool {
-    deck == BUILTIN || deck == SHAPES
-}
 
 fn kind_spec(kind: &str) -> Option<(Mode, &'static str, &'static str)> {
     Some(match kind {
@@ -277,7 +194,7 @@ impl Default for Preset {
         Self {
             id: String::new(),
             name: String::new(),
-            sources: vec![Source { deck: BUILTIN.into(), topics: Vec::new() }],
+            sources: Vec::new(),
             order: Order::Smart,
             goal: GoalKind::Correct,
             amount: 10,
@@ -370,19 +287,6 @@ impl Default for Gate {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-#[serde(rename_all = "camelCase", default)]
-pub struct BuiltinPrefs {
-    pub gate: Gate,
-    pub strict_types: bool,
-}
-
-impl Default for BuiltinPrefs {
-    fn default() -> Self {
-        Self { gate: Gate { enabled: true, ..Gate::default() }, strict_types: true }
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct CardProgress {
@@ -451,12 +355,10 @@ pub struct SessionRecord {
 pub struct DrillState {
     pub presets: Vec<Preset>,
     pub default_preset: String,
-    pub python: BuiltinPrefs,
     pub progress: BTreeMap<String, CardProgress>,
     pub topics: BTreeMap<String, TopicState>,
     pub sessions: Vec<SessionRecord>,
     pub cursors: BTreeMap<String, usize>,
-    pub gates: BTreeMap<String, Gate>,
     pub checks: Vec<CheckTemplate>,
     pub checks_seeded: bool,
 }
@@ -721,9 +623,8 @@ pub struct Catalog {
 impl Catalog {
     pub fn load(store: &Store) -> Self {
         let mut banks: HashMap<String, Arc<Bank>> = stored_banks(store).into_iter().map(|b| (b.id.clone(), b)).collect();
-        banks.insert(BUILTIN.into(), bank().clone());
         let mut gens = HashMap::new();
-        for g in std::iter::once(shapes().clone()).chain(user_gens(store)) {
+        for g in user_gens(store) {
             banks.insert(g.id.clone(), Arc::new(gen_bank(&g)));
             gens.insert(g.id.clone(), g);
         }
@@ -761,13 +662,14 @@ impl Catalog {
         }
     }
 
-    fn gate(&self, state: &DrillState, deck: &str) -> Gate {
-        if deck == BUILTIN {
-            return state.python.gate.clone();
-        }
-        if is_builtin(deck) {
-            return state.gates.get(deck).cloned().unwrap_or_default();
-        }
+    fn ids(&self) -> Vec<String> {
+        let mut all: Vec<(String, String)> =
+            self.decks.values().map(|d| (d.created_at.clone(), d.id.clone())).chain(self.banks.values().map(|b| (b.created_at.clone(), b.id.clone()))).collect();
+        all.sort();
+        all.into_iter().map(|(_, id)| id).collect()
+    }
+
+    fn gate(&self, deck: &str) -> Gate {
         match self.banks.get(deck) {
             Some(b) => b.gate.clone(),
             None => self.decks.get(deck).map(|d| d.gate.clone()).unwrap_or_default(),
@@ -823,7 +725,7 @@ fn gen_bank(g: &Generator) -> Bank {
 }
 
 fn user_gens(store: &Store) -> Vec<Generator> {
-    store.list_items::<Generator>(GENS).into_iter().filter(|g| !g.id.is_empty() && !is_builtin(&g.id)).collect()
+    store.list_items::<Generator>(GENS).into_iter().filter(|g| !g.id.is_empty()).collect()
 }
 
 type BankCache = HashMap<PathBuf, ((SystemTime, u64), Arc<Bank>)>;
@@ -833,9 +735,6 @@ fn stored_banks(store: &Store) -> Vec<Arc<Bank>> {
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
     let mut out = Vec::new();
     for id in store.item_ids(BANKS) {
-        if is_builtin(&id) {
-            continue;
-        }
         let Some(stamp) = store.item_stamp(BANKS, &id) else { continue };
         let key = store.dir.join(BANKS).join(&id);
         let hit = cache.lock().unwrap_or_else(|e| e.into_inner()).get(&key).filter(|(s, _)| *s == stamp).map(|(_, b)| b.clone());
@@ -865,10 +764,11 @@ pub fn candidates(cat: &Catalog, state: &DrillState, preset: &Preset) -> Vec<Key
 fn source_keys(cat: &Catalog, state: &DrillState, preset: &Preset) -> Vec<Key> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();
-    for src in &preset.sources {
+    let sources: Vec<Source> = if preset.sources.is_empty() { cat.ids().into_iter().map(|deck| Source { deck, topics: Vec::new() }).collect() } else { preset.sources.clone() };
+    for src in &sources {
         let Some(topics) = cat.topics(&src.deck) else { continue };
         let allowed: Vec<String> = if src.topics.is_empty() {
-            topic_open(state, &src.deck, &topics, &cat.gate(state, &src.deck))
+            topic_open(state, &src.deck, &topics, &cat.gate(&src.deck))
         } else {
             src.topics.iter().filter(|t| topics.iter().any(|(id, _)| id == *t)).cloned().collect()
         };
@@ -1015,7 +915,7 @@ fn topic_title(cat: &Catalog, deck: &str, topic: &str) -> String {
     cat.topics(deck).and_then(|ts| ts.into_iter().find(|(id, _)| id == topic).map(|(_, t)| t)).unwrap_or_default()
 }
 
-fn resolve(cat: &Catalog, state: &DrillState, slot: &Slot) -> Option<Resolved> {
+fn resolve(cat: &Catalog, slot: &Slot) -> Option<Resolved> {
     let k = &slot.key;
     if let Some(b) = cat.banks.get(&k.deck) {
         let c = b.cards.iter().find(|c| c.id == k.card)?;
@@ -1023,9 +923,6 @@ fn resolve(cat: &Catalog, state: &DrillState, slot: &Slot) -> Option<Resolved> {
         let (mode, kind, ui) = kind_spec(&c.kind)?;
         let mut spec = c.check.clone().unwrap_or_default();
         spec.mode = mode;
-        if k.deck == BUILTIN {
-            spec.strict_types = state.python.strict_types;
-        }
         let mut expected = vec![v.answer.clone()];
         expected.extend(v.alternatives.iter().cloned());
         let explain = [c.rule.as_str(), v.explain.as_str()].into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>().join("\n\n");
@@ -1278,9 +1175,8 @@ pub struct SessionView {
 }
 
 pub fn view(s: &Session, at: NaiveDateTime) -> SessionView {
-    let state_stub = DrillState::default();
     let card = s.current.as_ref().and_then(|slot| {
-        let r = resolve(&s.catalog, &state_stub, slot)?;
+        let r = resolve(&s.catalog, slot)?;
         let self_check = s.preset.self_check || r.spec.mode == Mode::SelfCheck;
         Some(CardView {
             deck: r.deck_title,
@@ -1360,7 +1256,7 @@ pub fn answer(store: &Store, s: &mut Session, at: NaiveDateTime, input: AnswerIn
     let slot = s.current.clone().ok_or_else(|| tr!("Сеанс закончен.", "The session is over."))?;
     let _g = store.lock();
     let mut state = load_state(store);
-    let r = resolve(&s.catalog, &state, &slot).ok_or_else(|| tr!("Карточка пропала из набора.", "The card is gone from the deck."))?;
+    let r = resolve(&s.catalog, &slot).ok_or_else(|| tr!("Карточка пропала из набора.", "The card is gone from the deck."))?;
     let self_check = s.preset.self_check || r.spec.mode == Mode::SelfCheck;
     let given = input.text.clone().unwrap_or_default();
     let (correct, note) = if self_check {
@@ -1431,7 +1327,7 @@ pub fn answer(store: &Store, s: &mut Session, at: NaiveDateTime, input: AnswerIn
     if t.recent.len() > RECENT {
         t.recent.remove(0);
     }
-    let gate = s.catalog.gate(&state, &slot.key.deck);
+    let gate = s.catalog.gate(&slot.key.deck);
     let topics = s.catalog.topics(&slot.key.deck).unwrap_or_default();
     let opened = advance(&mut state, &slot.key.deck, &topics, &gate, at);
     save_state(store, &state)?;
@@ -1484,7 +1380,6 @@ pub struct DeckInfo {
     pub id: String,
     pub title: String,
     pub description: String,
-    pub builtin: bool,
     pub kind: DeckKind,
     pub enabled: bool,
     pub author: Author,
@@ -1526,7 +1421,6 @@ pub struct Overview {
     pub presets: Vec<Preset>,
     pub checks: Vec<CheckTemplate>,
     pub default_preset: String,
-    pub python: BuiltinPrefs,
     pub decks: Vec<DeckInfo>,
     pub streak: u32,
     pub best_streak: u32,
@@ -1538,7 +1432,7 @@ pub struct Overview {
 
 fn deck_info(cat: &Catalog, state: &DrillState, deck: &str, today: NaiveDate) -> Option<DeckInfo> {
     let topics = cat.topics(deck)?;
-    let gate = cat.gate(state, deck);
+    let gate = cat.gate(deck);
     let open = topic_open(state, deck, &topics, &gate);
     let keys = cat.keys(deck);
     let infos = topics
@@ -1570,7 +1464,7 @@ fn deck_info(cat: &Catalog, state: &DrillState, deck: &str, today: NaiveDate) ->
             (d.description.clone(), d.author, Some(d.check.clone()), d.updated_at.clone(), true, 0)
         }
     };
-    Some(DeckInfo { id: deck.into(), title: cat.title(deck), description, builtin: is_builtin(deck), kind, enabled, author, cards: keys.len(), variants, check, gate, topics: infos, updated_at })
+    Some(DeckInfo { id: deck.into(), title: cat.title(deck), description, kind, enabled, author, cards: keys.len(), variants, check, gate, topics: infos, updated_at })
 }
 
 fn streaks(state: &DrillState, dsh: u32, today: NaiveDate) -> (u32, u32) {
@@ -1651,16 +1545,7 @@ pub fn overview(store: &Store, at: NaiveDateTime) -> Overview {
     let cat = Catalog::load(store);
     let dsh = store.load_settings().day_start_hour;
     let today = clock::logical_date(at, dsh);
-    let mut ids = vec![BUILTIN.to_string(), SHAPES.to_string()];
-    let mut users: Vec<(String, String)> = cat
-        .decks
-        .values()
-        .map(|d| (d.created_at.clone(), d.id.clone()))
-        .chain(cat.banks.values().filter(|b| !is_builtin(&b.id)).map(|b| (b.created_at.clone(), b.id.clone())))
-        .collect();
-    users.sort();
-    ids.extend(users.into_iter().map(|(_, id)| id));
-    let decks: Vec<DeckInfo> = ids.iter().filter_map(|id| deck_info(&cat, &state, id, today)).collect();
+    let decks: Vec<DeckInfo> = cat.ids().iter().filter_map(|id| deck_info(&cat, &state, id, today)).collect();
     let (streak, best_streak) = streaks(&state, dsh, today);
     let mut count = DayCount { sessions: 0, answers: 0, correct: 0 };
     for r in &state.sessions {
@@ -1679,7 +1564,6 @@ pub fn overview(store: &Store, at: NaiveDateTime) -> Overview {
         presets: state.presets.clone(),
         checks: state.checks.clone(),
         default_preset: state.default_preset.clone(),
-        python: state.python.clone(),
         decks,
         streak,
         best_streak,
@@ -1831,9 +1715,6 @@ pub fn edit_deck(store: &Store, at: NaiveDateTime, id: &str, patch: DeckPatch) -
 }
 
 pub fn delete_deck(store: &Store, id: &str) -> Result<(), String> {
-    if is_builtin(id) {
-        return Err(tr!("Встроенный набор удалить нельзя.", "The built-in deck can't be deleted."));
-    }
     let _g = store.lock();
     let sub = [DECKS, BANKS, GENS].into_iter().find(|s| store.has_item(s, id)).ok_or_else(|| tr!("Набор не найден.", "Deck not found."))?;
     store.delete_item(sub, id)?;
@@ -1849,9 +1730,6 @@ pub fn delete_deck(store: &Store, id: &str) -> Result<(), String> {
     }
     for p in state.presets.iter_mut() {
         p.sources.retain(|s| s.deck != id);
-        if p.sources.is_empty() {
-            p.sources.push(Source { deck: BUILTIN.into(), topics: Vec::new() });
-        }
     }
     save_state(store, &state)
 }
@@ -1864,7 +1742,6 @@ pub fn get_deck(store: &Store, id: &str) -> Result<Value, String> {
             "kind": "generator",
             "title": g.title,
             "description": g.description,
-            "builtin": is_builtin(id),
             "author": g.author,
             "enabled": g.enabled,
             "topics": g.topics,
@@ -1888,7 +1765,7 @@ pub fn get_deck(store: &Store, id: &str) -> Result<Value, String> {
                 })
             })
             .collect();
-        return Ok(json!({ "id": b.id, "kind": "bank", "title": b.title, "description": b.description, "builtin": is_builtin(id), "author": b.author, "topics": b.topics, "cards": cards }));
+        return Ok(json!({ "id": b.id, "kind": "bank", "title": b.title, "description": b.description, "author": b.author, "topics": b.topics, "cards": cards }));
     }
     let d = cat.decks.get(id).ok_or_else(|| tr!("Набор не найден.", "Deck not found."))?;
     serde_json::to_value(d).map_err(|e| e.to_string())
@@ -1918,9 +1795,6 @@ pub fn clean_preset(store: &Store, mut p: Preset) -> Result<Preset, String> {
         if !sources.iter().any(|x| x.deck == s.deck) {
             sources.push(Source { deck: s.deck, topics: picked });
         }
-    }
-    if sources.is_empty() {
-        return Err(tr!("Выбери хотя бы один набор.", "Choose at least one deck."));
     }
     p.sources = sources;
     let max = if p.goal == GoalKind::Minutes { 180 } else { 200 };
@@ -1973,13 +1847,6 @@ pub fn set_default(store: &Store, id: &str) -> Result<(), String> {
         return Err(tr!("Режим не найден.", "Mode not found."));
     }
     state.default_preset = id.into();
-    save_state(store, &state)
-}
-
-pub fn set_prefs(store: &Store, prefs: BuiltinPrefs) -> Result<(), String> {
-    let _g = store.lock();
-    let mut state = load_state(store);
-    state.python = BuiltinPrefs { gate: clean_gate(prefs.gate), strict_types: prefs.strict_types };
     save_state(store, &state)
 }
 
@@ -2075,15 +1942,6 @@ pub fn reset_checks(store: &Store) -> Result<usize, String> {
 pub fn set_gate(store: &Store, deck: &str, gate: Gate) -> Result<(), String> {
     let gate = clean_gate(gate);
     let _g = store.lock();
-    if is_builtin(deck) {
-        let mut state = load_state(store);
-        if deck == BUILTIN {
-            state.python.gate = gate;
-        } else {
-            state.gates.insert(deck.into(), gate);
-        }
-        return save_state(store, &state);
-    }
     if let Some(mut g) = store.load_item::<Generator>(GENS, deck) {
         g.gate = gate;
         return store.save_item(GENS, deck, &g);
@@ -2256,21 +2114,27 @@ pub struct GeneratorInput {
 fn existing_gen(store: &Store, id: Option<&str>) -> Result<Option<Generator>, String> {
     match id.filter(|i| !i.is_empty()) {
         None => Ok(None),
-        Some(i) if is_builtin(i) => Err(tr!("Встроенный генератор менять нельзя.", "The built-in generator can't be changed.")),
         Some(i) => store.load_item(GENS, i).map(Some).ok_or_else(|| tr!("Генератор не найден.", "Generator not found.")),
     }
 }
 
 pub fn get_generator(store: &Store, id: &str) -> Result<Generator, String> {
-    if id == SHAPES {
-        return Ok(shapes().clone());
-    }
     store.load_item(GENS, id).ok_or_else(|| tr!("Генератор не найден.", "Generator not found."))
+}
+
+fn fresh_id(store: &Store, wanted: &str) -> String {
+    let ok = !wanted.is_empty() && wanted.len() <= 40 && wanted.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    if ok && ![DECKS, BANKS, GENS].iter().any(|s| store.has_item(s, wanted)) {
+        wanted.to_string()
+    } else {
+        uid()
+    }
 }
 
 pub fn save_generator(store: &Store, at: NaiveDateTime, input: GeneratorInput, author: Author) -> Result<Generator, String> {
     let _g = store.lock();
-    let existing = existing_gen(store, input.id.as_deref())?;
+    let wanted = input.id.clone().unwrap_or_default();
+    let existing: Option<Generator> = store.load_item(GENS, &wanted);
     if existing.is_none() && deck_count(store) >= MAX_DECKS {
         return Err(tr!("Наборов не больше {MAX_DECKS}.", "At most {MAX_DECKS} decks."));
     }
@@ -2287,7 +2151,7 @@ pub fn save_generator(store: &Store, at: NaiveDateTime, input: GeneratorInput, a
     let (topics, templates) = clean_meta(input.topics, &input.templates)?;
     let now = fmt_dt(at);
     let g = Generator {
-        id: existing.as_ref().map(|g| g.id.clone()).unwrap_or_else(uid),
+        id: existing.as_ref().map(|g| g.id.clone()).unwrap_or_else(|| fresh_id(store, &wanted)),
         title,
         description: text(&input.description, 1000, &tr!("Описание", "Description"))?,
         author: existing.as_ref().map(|g| g.author).unwrap_or(author),
@@ -2304,7 +2168,7 @@ pub fn save_generator(store: &Store, at: NaiveDateTime, input: GeneratorInput, a
 }
 
 pub fn install_generator(store: &Store, at: NaiveDateTime, id: Option<String>, title: String, description: Option<String>, code: String) -> Result<Generator, String> {
-    let base = existing_gen(store, id.as_deref())?.unwrap_or_default();
+    let base: Generator = id.as_deref().and_then(|i| store.load_item(GENS, i)).unwrap_or_default();
     let input = GeneratorInput { id, title, description: description.unwrap_or(base.description), code, enabled: false, topics: base.topics, templates: base.templates };
     save_generator(store, at, input, Author::Ai)
 }
@@ -2377,6 +2241,7 @@ pub fn gen_sources(store: &Store, preset_id: &str) -> Result<Vec<GenSource>, Str
 #[derive(Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct BankInput {
+    pub id: String,
     pub title: String,
     pub description: String,
     pub gate: Option<Gate>,
@@ -2419,7 +2284,6 @@ pub fn read_bank_file(path: &str) -> Result<BankInput, String> {
 pub fn import_bank(store: &Store, at: NaiveDateTime, input: BankInput, replace: Option<&str>, author: Author) -> Result<ImportReport, String> {
     let _g = store.lock();
     let existing: Option<Bank> = match replace.filter(|r| !r.is_empty()) {
-        Some(r) if is_builtin(r) => return Err(tr!("Встроенный набор заменить нельзя.", "The built-in deck can't be replaced.")),
         Some(r) => Some(store.load_item(BANKS, r).ok_or_else(|| tr!("Банк для замены не найден.", "The bank to replace was not found."))?),
         None => None,
     };
@@ -2480,7 +2344,7 @@ pub fn import_bank(store: &Store, at: NaiveDateTime, input: BankInput, replace: 
     let now = fmt_dt(at);
     let gate = input.gate.or_else(|| existing.as_ref().map(|b| b.gate.clone())).unwrap_or_default();
     let b = Bank {
-        id: existing.as_ref().map(|b| b.id.clone()).unwrap_or_else(uid),
+        id: existing.as_ref().map(|b| b.id.clone()).unwrap_or_else(|| fresh_id(store, &input.id)),
         title,
         description: text(&input.description, 1000, &tr!("Описание", "Description"))?,
         author: existing.as_ref().map(|b| b.author).unwrap_or(author),
@@ -2532,9 +2396,9 @@ pub struct ArticleInput {
     pub body: String,
 }
 
-fn builtin_articles(cat: &Catalog) -> Vec<Article> {
+fn bank_articles(cat: &Catalog) -> Vec<Article> {
     let mut banks: Vec<&Arc<Bank>> = cat.banks.values().collect();
-    banks.sort_by_key(|b| (b.id != BUILTIN, b.id != SHAPES, b.created_at.clone(), b.id.clone()));
+    banks.sort_by_key(|b| (b.created_at.clone(), b.id.clone()));
     banks
         .into_iter()
         .flat_map(|b| {
@@ -2554,7 +2418,7 @@ fn builtin_articles(cat: &Catalog) -> Vec<Article> {
 }
 
 pub fn articles(store: &Store) -> Vec<Article> {
-    let mut out = builtin_articles(&Catalog::load(store));
+    let mut out = bank_articles(&Catalog::load(store));
     let mut own: Vec<Article> = store.list_items(THEORY);
     own.sort_by(|a, b| a.created_at.cmp(&b.created_at).then_with(|| a.id.cmp(&b.id)));
     out.extend(own);
@@ -2584,7 +2448,7 @@ pub fn save_article(store: &Store, at: NaiveDateTime, input: ArticleInput, autho
     }
     let _g = store.lock();
     let existing: Option<Article> = match input.id.as_deref().filter(|i| !i.is_empty()) {
-        Some(i) if builtin_articles(&cat).iter().any(|a| a.id == i) => return Err(tr!("Встроенную статью менять нельзя, добавь свою.", "Built-in articles can't be changed, add your own.")),
+        Some(i) if bank_articles(&cat).iter().any(|a| a.id == i) => return Err(tr!("Статью банка или генератора менять нельзя, добавь свою.", "Articles of banks and generators can't be changed, add your own.")),
         Some(i) => Some(store.load_item(THEORY, i).ok_or_else(|| tr!("Статья не найдена.", "Article not found."))?),
         None => None,
     };
@@ -2605,8 +2469,8 @@ pub fn save_article(store: &Store, at: NaiveDateTime, input: ArticleInput, autho
 }
 
 pub fn delete_article(store: &Store, id: &str) -> Result<(), String> {
-    if builtin_articles(&Catalog::load(store)).iter().any(|a| a.id == id) {
-        return Err(tr!("Встроенную статью удалить нельзя.", "Built-in articles can't be deleted."));
+    if bank_articles(&Catalog::load(store)).iter().any(|a| a.id == id) {
+        return Err(tr!("Статью банка или генератора удалить нельзя.", "Articles of banks and generators can't be deleted."));
     }
     let _g = store.lock();
     store.delete_item(THEORY, id)
@@ -2632,41 +2496,34 @@ mod tests {
         save_deck(store, at("2026-10-16T10:00:00"), DeckInput { title: "Слова".into(), cards, ..Default::default() }, Author::User).unwrap()
     }
 
-    #[test]
-    fn bank_loads() {
-        let b = bank();
-        assert!(!b.topics.is_empty());
-        assert!(b.cards.iter().all(|c| c.variants.len() >= 30));
-        for c in &b.cards {
-            for v in &c.variants {
-                if matches!(c.kind.as_str(), "value" | "trace" | "step" | "pick") {
-                    assert!(pylit::parse(&v.answer).is_ok(), "{} {}", c.id, v.answer);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn builtin_answers_check_against_themselves() {
-        let state = DrillState::default();
-        let cat = Catalog { decks: HashMap::new(), banks: HashMap::from([(BUILTIN.to_string(), bank().clone())]), gens: HashMap::new() };
-        for c in &bank().cards {
-            let slot = Slot { key: Key { deck: BUILTIN.into(), card: c.id.clone(), topic: c.topic.clone() }, variant: 0, retry: false, revealed: false, hinted: false, choices: vec![] };
-            let r = resolve(&cat, &state, &slot).unwrap();
-            let exp: Vec<&str> = r.expected.iter().map(String::as_str).collect();
-            assert!(pylit::check(&r.spec, &exp, &r.shown).correct, "{}", c.id);
-        }
+    fn code_bank(store: &Store) -> String {
+        let walk = json!({ "steps": [[1, null, [["x", "1", "int"]]]], "focus": { "step": 1, "line": 1, "inputs": [], "target": "x" }, "error": null });
+        let card = |id: String, topic: &str, n: usize| {
+            let variants: Vec<Value> = (0..3).map(|k| json!({ "code": format!("x = {}", n + k), "question": "What is in `x`?", "answer": (n + k).to_string(), "walk": walk })).collect();
+            json!({ "id": id, "topic": topic, "kind": "value", "rule": format!("rule {n}"), "variants": variants })
+        };
+        let cards: Vec<Value> = (0..16).map(|i| card(format!("c{i}"), if i < 12 { "t01" } else { "t02" }, i * 10)).collect();
+        let input: BankInput = serde_json::from_value(json!({
+            "id": "python",
+            "title": "Code",
+            "gate": { "enabled": true, "percent": 85, "window": 20 },
+            "topics": [{ "id": "t01", "title": "One", "theory": "## One" }, { "id": "t02", "title": "Two" }],
+            "cards": cards
+        }))
+        .unwrap();
+        import_bank(store, at("2026-10-16T09:00:00"), input, None, Author::User).unwrap().id
     }
 
     #[test]
     fn session_until_ten_correct_with_retry() {
         let store = tmp_store("ten");
         let t0 = at("2026-10-16T10:00:00");
+        code_bank(&store);
         let mut s = start(&store, t0, "lock", Generated::new()).unwrap();
         let mut answered = 0;
         while s.ended.is_none() && answered < 100 {
             let slot = s.current.clone().unwrap();
-            let r = resolve(&s.catalog, &load_state(&store), &slot).unwrap();
+            let r = resolve(&s.catalog, &slot).unwrap();
             let text = if answered % 3 == 0 { "definitely wrong".to_string() } else { r.shown.clone() };
             let v = answer(&store, &mut s, t0 + Duration::seconds(answered as i64 * 10), AnswerInput { text: Some(text), knew: None }).unwrap();
             assert_eq!(v.correct, answered % 3 != 0);
@@ -2734,21 +2591,24 @@ mod tests {
     fn topics_open_by_accuracy() {
         let store = tmp_store("gate");
         let t0 = at("2026-10-16T10:00:00");
+        let id = code_bank(&store);
+        assert_eq!(id, "python");
+        assert_ne!(code_bank(&store), "python");
         let mut st = load_state(&store);
         let cat = Catalog::load(&store);
-        let topics = bank_topics(bank());
-        let gate = st.python.gate.clone();
-        assert_eq!(topic_open(&st, BUILTIN, &topics, &gate), vec![topics[0].0.clone()]);
-        st.topics.entry(tkey(BUILTIN, &topics[0].0)).or_default().recent = [vec![true; 16], vec![false; 4]].concat();
-        assert_eq!(advance(&mut st, BUILTIN, &topics, &gate, t0), None);
-        st.topics.get_mut(&tkey(BUILTIN, &topics[0].0)).unwrap().recent = [vec![false; 3], vec![true; 17]].concat();
-        assert_eq!(advance(&mut st, BUILTIN, &topics, &gate, t0), Some(topics[1].1.clone()));
+        let topics = cat.topics(&id).unwrap();
+        let gate = cat.gate(&id);
+        assert_eq!(topic_open(&st, &id, &topics, &gate), vec![topics[0].0.clone()]);
+        st.topics.entry(tkey(&id, &topics[0].0)).or_default().recent = [vec![true; 16], vec![false; 4]].concat();
+        assert_eq!(advance(&mut st, &id, &topics, &gate, t0), None);
+        st.topics.get_mut(&tkey(&id, &topics[0].0)).unwrap().recent = [vec![false; 3], vec![true; 17]].concat();
+        assert_eq!(advance(&mut st, &id, &topics, &gate, t0), Some(topics[1].1.clone()));
         let preset = Preset::default();
         let keys = candidates(&cat, &st, &preset);
         assert!(!keys.is_empty());
         assert!(keys.iter().all(|k| k.topic == topics[0].0 || k.topic == topics[1].0));
         let last = topics.last().unwrap().0.clone();
-        let picked = Preset { sources: vec![Source { deck: BUILTIN.into(), topics: vec![last.clone()] }], ..Preset::default() };
+        let picked = Preset { sources: vec![Source { deck: id.clone(), topics: vec![last.clone()] }], ..Preset::default() };
         let keys = candidates(&cat, &st, &picked);
         assert!(!keys.is_empty());
         assert!(keys.iter().all(|k| k.topic == last));
@@ -2834,13 +2694,15 @@ mod tests {
         assert_eq!(e.created_at, d.created_at);
         delete_deck(&store, &d.id).unwrap();
         assert!(user_decks(&store).is_empty());
-        assert!(delete_deck(&store, BUILTIN).is_err());
+        assert!(delete_deck(&store, "nope").is_err());
     }
 
     #[test]
     fn lock_ceiling_times_out() {
         let store = tmp_store("ceiling");
         let t0 = at("2026-10-16T10:00:00");
+        assert!(start(&store, t0, "lock", Generated::new()).is_err());
+        code_bank(&store);
         let mut s = start(&store, t0, "lock", Generated::new()).unwrap();
         assert!(tick(&store, &mut s, t0 + Duration::minutes(29)).is_none());
         let rec = tick(&store, &mut s, t0 + Duration::minutes(30)).unwrap();
@@ -2863,7 +2725,8 @@ mod tests {
         let list = topic_articles(&store, &d.id, "A");
         assert_eq!(list.iter().map(|x| x.id.clone()).collect::<Vec<_>>(), vec![a.id.clone(), b.id.clone()]);
         assert!(topic_articles(&store, &d.id, "B").iter().all(|x| x.topic.is_empty()));
-        assert!(delete_article(&store, "python-t01").is_err());
+        let bank = code_bank(&store);
+        assert!(delete_article(&store, &format!("{bank}-t01")).is_err());
         let p = save_preset(&store, Preset { name: "h".into(), sources: vec![Source { deck: d.id.clone(), topics: vec![] }], order: Order::Sequence, goal: GoalKind::Cards, amount: 2, retry: false, screen: Screen::Window, ..Preset::default() }, false).unwrap();
         assert_eq!(p.theory_label, "Теория");
         let mut s = start(&store, t0, &p.id, Generated::new()).unwrap();
@@ -2926,13 +2789,14 @@ mod tests {
         assert_eq!((d.kind, d.enabled, d.cards), (DeckKind::Generator, true, 2));
         disable_generator(&store, &g.id).unwrap();
         assert!(gen_sources(&store, &p.id).unwrap().is_empty());
-        assert!(save_generator(&store, t0, GeneratorInput { id: Some(SHAPES.into()), title: "x".into(), code: "y".into(), ..Default::default() }, Author::User).is_err());
+        let named = save_generator(&store, t0, GeneratorInput { id: Some("shapes".into()), title: "x".into(), code: "y".into(), ..Default::default() }, Author::User).unwrap();
+        assert_eq!(named.id, "shapes");
         delete_deck(&store, &g.id).unwrap();
         assert!(!Catalog::load(&store).gens.contains_key(&g.id));
     }
 
     #[test]
-    fn imported_bank_plays_like_builtin() {
+    fn imported_bank_plays_and_reimports() {
         let store = tmp_store("bank");
         let t0 = at("2026-10-16T10:00:00");
         let input = BankInput {
@@ -2953,7 +2817,7 @@ mod tests {
         let p = save_preset(&store, Preset { name: "b".into(), sources: vec![Source { deck: r.id.clone(), topics: vec!["Неправильные".into()] }], order: Order::Sequence, goal: GoalKind::Cards, amount: 1, screen: Screen::Window, ..Preset::default() }, false).unwrap();
         let mut s = start(&store, t0, &p.id, Generated::new()).unwrap();
         let slot = s.current.clone().unwrap();
-        let shown = resolve(&s.catalog, &load_state(&store), &slot).unwrap().shown;
+        let shown = resolve(&s.catalog, &slot).unwrap().shown;
         assert!(answer(&store, &mut s, t0, AnswerInput { text: Some(shown), knew: None }).unwrap().correct);
         assert_eq!(load_state(&store).progress[&slot.key.id()].last_variant, Some(slot.variant));
         assert!(articles(&store).iter().any(|a| a.deck == r.id && a.builtin));
@@ -2967,20 +2831,6 @@ mod tests {
         assert!(import_bank(&store, t0, BankInput { title: "x".into(), ..Default::default() }, None, Author::User).is_err());
         delete_deck(&store, &r.id).unwrap();
         assert!(!Catalog::load(&store).banks.contains_key(&r.id));
-    }
-
-    #[test]
-    fn shapes_generator_is_declared() {
-        let g = shapes();
-        assert!(g.enabled && g.code.contains("const plugin"));
-        assert!(g.templates.len() >= 30);
-        let (topics, cards) = clean_meta(g.topics.clone(), &g.templates).unwrap();
-        assert_eq!(topics.len(), g.topics.len());
-        assert!(cards.iter().all(|c| c.kind == "pick"));
-        assert!(g.topics.iter().all(|t| !t.theory.is_empty() && !t.theory.contains(['\u{2013}', '\u{2014}'])));
-        let cat = Catalog::load(&tmp_store("shapes"));
-        assert_eq!(cat.kind(SHAPES), Some(DeckKind::Generator));
-        assert!(builtin_articles(&cat).iter().any(|a| a.deck == SHAPES));
     }
 
     #[test]

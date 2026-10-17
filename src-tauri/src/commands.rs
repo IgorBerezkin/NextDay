@@ -337,13 +337,6 @@ pub fn drill_set_default(app: AppHandle, store: State<'_, Store>, id: String) ->
 }
 
 #[tauri::command]
-pub fn drill_set_prefs(app: AppHandle, store: State<'_, Store>, prefs: drill::BuiltinPrefs) -> Result<(), String> {
-    drill::set_prefs(&store, prefs)?;
-    drill_changed(&app);
-    Ok(())
-}
-
-#[tauri::command]
 pub fn drill_set_topic(app: AppHandle, store: State<'_, Store>, deck: String, topic: String, open: bool) -> Result<(), String> {
     drill::set_topic(&store, clock::now(), &deck, &topic, open)?;
     drill_changed(&app);

@@ -128,6 +128,24 @@ export function DrillScreen() {
               )}
             </div>
           )}
+          {!ov.decks.length && (
+            <section className="card drill-empty">
+              <h2 className="card-title">
+                <Px name="cards" scale={2} /> {t("Наборов пока нет", "No decks yet")}
+              </h2>
+              <p>
+                {t(
+                  "Зубрилка учит всему, что можно разложить на вопросы и ответы. Собери свой набор карточек, загрузи готовый банк из файла или попроси ИИ собрать набор через MCP.",
+                  "The drill trainer teaches anything you can split into questions and answers. Build your own deck of cards, load a ready bank from a file or ask an AI to build a deck over MCP.",
+                )}
+              </p>
+              <div className="row">
+                <Button icon="arrowR" onClick={() => setTab("decks")}>
+                  {t("К наборам", "Go to decks")}
+                </Button>
+              </div>
+            </section>
+          )}
           {last && (
             <section className={`card drill-last ${last.outcome}`}>
               <h2 className="card-title">

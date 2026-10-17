@@ -379,7 +379,6 @@ pub fn run() {
             commands::drill_save_preset,
             commands::drill_delete_preset,
             commands::drill_set_default,
-            commands::drill_set_prefs,
             commands::drill_set_topic,
             commands::drill_start,
             commands::drill_session,

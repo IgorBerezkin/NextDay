@@ -11,17 +11,7 @@ import sample from "./sample.plugin.js?raw";
 
 type Result = { meta: GenMeta; made: Record<string, GenVariant[]>; errors: Record<string, string>; check: GenCheck; code: string };
 
-export function GeneratorEditor({
-  id,
-  builtin,
-  onClose,
-  onSaved,
-}: {
-  id: string | null;
-  builtin: boolean;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
+export function GeneratorEditor({ id, onClose, onSaved }: { id: string | null; onClose: () => void; onSaved: () => void }) {
   const [code, setCode] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -73,7 +63,7 @@ export function GeneratorEditor({
     setBusy(true);
     try {
       await api.drillSaveGenerator({
-        id: id ?? undefined,
+        id: id ?? (result.meta.id || undefined),
         title: title.trim() || result.meta.title || t("Генератор", "Generator"),
         description,
         code,
@@ -115,26 +105,18 @@ export function GeneratorEditor({
   return (
     <Modal
       wide
-      title={
-        builtin
-          ? t("Встроенный генератор", "Built-in generator")
-          : id
-            ? t("Генератор карточек", "Card generator")
-            : t("Новый генератор", "New generator")
-      }
+      title={id ? t("Генератор карточек", "Card generator") : t("Новый генератор", "New generator")}
       onClose={onClose}
       footer={
         <>
           {result && !fresh && <span className="muted">{t("Код изменился, проверь ещё раз.", "The code changed, test it again.")}</span>}
           <span className="grow" />
           <Button kind="paper" onClick={onClose}>
-            {builtin ? t("Закрыть", "Close") : t("Отмена", "Cancel")}
+            {t("Отмена", "Cancel")}
           </Button>
-          {!builtin && (
-            <Button icon="check" disabled={busy || !fresh || !result || result.check.ready === 0} onClick={() => void save()}>
-              {t("Сохранить и включить", "Save and enable")}
-            </Button>
-          )}
+          <Button icon="check" disabled={busy || !fresh || !result || result.check.ready === 0} onClick={() => void save()}>
+            {t("Сохранить и включить", "Save and enable")}
+          </Button>
         </>
       }
     >
@@ -145,30 +127,27 @@ export function GeneratorEditor({
             "A generator is a JavaScript script that makes up cards with new data at the start of every session. A miss comes back as the same task with other data. The script runs in a sandbox: no network and no access to the app. Usually AI writes it over MCP.",
           )}
         </p>
-        {!builtin && (
-          <div className="row">
-            <label className="drill-field grow">
-              <span>{t("Название", "Title")}</span>
-              <input
-                className="field"
-                value={title}
-                maxLength={80}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={t("Из plugin.title", "From plugin.title")}
-              />
-            </label>
-            <label className="drill-field grow">
-              <span>{t("Описание", "Description")}</span>
-              <input className="field" value={description} maxLength={1000} onChange={(e) => setDescription(e.target.value)} />
-            </label>
-          </div>
-        )}
+        <div className="row">
+          <label className="drill-field grow">
+            <span>{t("Название", "Title")}</span>
+            <input
+              className="field"
+              value={title}
+              maxLength={80}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={t("Из plugin.title", "From plugin.title")}
+            />
+          </label>
+          <label className="drill-field grow">
+            <span>{t("Описание", "Description")}</span>
+            <input className="field" value={description} maxLength={1000} onChange={(e) => setDescription(e.target.value)} />
+          </label>
+        </div>
         <div className="drill-field">
           <span>{t("Код", "Code")}</span>
           <textarea
             className="field area gen-code"
             value={code}
-            readOnly={builtin}
             spellCheck={false}
             onChange={(e) => setCode(e.target.value)}
             placeholder={
@@ -179,17 +158,13 @@ export function GeneratorEditor({
           />
         </div>
         <div className="row">
-          {!builtin && (
-            <>
-              <input ref={file} type="file" accept=".js,.txt" hidden onChange={(e) => void open(e.target.files?.[0])} />
-              <Button kind="paper" small icon="folder" onClick={() => file.current?.click()}>
-                {t("Открыть файл", "Open file")}
-              </Button>
-              <Button kind="paper" small icon="note" disabled={!!code.trim()} onClick={() => setCode(t(sample, sampleEn))}>
-                {t("Пример", "Example")}
-              </Button>
-            </>
-          )}
+          <input ref={file} type="file" accept=".js,.txt" hidden onChange={(e) => void open(e.target.files?.[0])} />
+          <Button kind="paper" small icon="folder" onClick={() => file.current?.click()}>
+            {t("Открыть файл", "Open file")}
+          </Button>
+          <Button kind="paper" small icon="note" disabled={!!code.trim()} onClick={() => setCode(t(sample, sampleEn))}>
+            {t("Пример", "Example")}
+          </Button>
           <span className="grow" />
           <Button kind={fresh ? "paper" : "primary"} icon="sBolt" disabled={busy || !code.trim()} onClick={() => void check()}>
             {busy ? t("Проверяю…", "Testing...") : t("Проверить", "Test")}

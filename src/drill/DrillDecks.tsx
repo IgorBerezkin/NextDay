@@ -38,7 +38,7 @@ function sizeText(d: DrillDeckInfo, checks: CheckTemplate[]): string {
 
 export function DrillDecks({ ov, reload }: { ov: DrillOverview; reload: () => Promise<void> }) {
   const [editing, setEditing] = useState<DrillDeckInput | null>(null);
-  const [gen, setGen] = useState<{ id: string | null; builtin: boolean } | null>(null);
+  const [gen, setGen] = useState<{ id: string | null } | null>(null);
   const [eater, setEater] = useState(false);
   const [sure, setSure] = useState<{ text: string; run: () => Promise<void> } | null>(null);
 
@@ -66,8 +66,7 @@ export function DrillDecks({ ov, reload }: { ov: DrillOverview; reload: () => Pr
         <section key={d.id} className={`card drill-deck${d.kind === "generator" && !d.enabled ? " off" : ""}`}>
           <h2 className="card-title">
             <Px name={d.kind === "generator" ? "sBolt" : "cards"} scale={2} /> {d.title}
-            {d.builtin && <span className="drill-chip">{t("встроенный", "built-in")}</span>}
-            {d.kind === "bank" && !d.builtin && <span className="drill-chip">{t("банк", "bank")}</span>}
+            {d.kind === "bank" && <span className="drill-chip">{t("банк", "bank")}</span>}
             {d.kind === "generator" && <span className="drill-chip gen">{t("генератор", "generator")}</span>}
             {d.kind === "generator" && !d.enabled && <span className="drill-chip again">{t("выключен", "off")}</span>}
             {d.author === "ai" && <span className="drill-chip ai">{t("от ИИ", "by AI")}</span>}
@@ -95,15 +94,8 @@ export function DrillDecks({ ov, reload }: { ov: DrillOverview; reload: () => Pr
               ))}
             </div>
           ) : null}
-          {d.id === "python" ? (
-            <BuiltinPrefs
-              gate={ov.python.gate}
-              strict={ov.python.strictTypes}
-              onChange={(gate, strictTypes) => void run(() => api.drillSetPrefs({ gate, strictTypes }))}
-            />
-          ) : (
-            d.kind !== "deck" &&
-            d.topics.length > 1 && <GatePrefs gate={d.gate} onChange={(gate) => void run(() => api.drillSetGate(d.id, gate))} />
+          {d.kind !== "deck" && d.topics.length > 1 && (
+            <GatePrefs gate={d.gate} onChange={(gate) => void run(() => api.drillSetGate(d.id, gate))} />
           )}
           <div className="row">
             {d.kind === "deck" && (
@@ -112,15 +104,11 @@ export function DrillDecks({ ov, reload }: { ov: DrillOverview; reload: () => Pr
               </Button>
             )}
             {d.kind === "generator" && (
-              <Button kind={d.enabled ? "paper" : "primary"} small icon="sBolt" onClick={() => setGen({ id: d.id, builtin: d.builtin })}>
-                {d.builtin
-                  ? t("Код и примеры", "Code and samples")
-                  : d.enabled
-                    ? t("Код и проверка", "Code and test")
-                    : t("Проверить и включить", "Test and enable")}
+              <Button kind={d.enabled ? "paper" : "primary"} small icon="sBolt" onClick={() => setGen({ id: d.id })}>
+                {d.enabled ? t("Код и проверка", "Code and test") : t("Проверить и включить", "Test and enable")}
               </Button>
             )}
-            {d.kind === "generator" && d.enabled && !d.builtin && (
+            {d.kind === "generator" && d.enabled && (
               <Button kind="ghost" small icon="cross" onClick={() => void run(() => api.drillDisableGenerator(d.id))}>
                 {t("Выключить", "Turn off")}
               </Button>
@@ -141,24 +129,22 @@ export function DrillDecks({ ov, reload }: { ov: DrillOverview; reload: () => Pr
             >
               {t("Сбросить прогресс", "Reset progress")}
             </Button>
-            {!d.builtin && (
-              <Button
-                kind="ghost"
-                small
-                icon="trash"
-                onClick={() =>
-                  setSure({
-                    text: t(
-                      `Удалить ${d.kind === "generator" ? "генератор" : d.kind === "bank" ? "банк" : "набор"} «${d.title}» вместе с прогрессом?`,
-                      `Delete the ${d.kind === "generator" ? "generator" : d.kind === "bank" ? "bank" : "deck"} "${d.title}" with its progress?`,
-                    ),
-                    run: () => run(() => api.drillDeleteDeck(d.id)),
-                  })
-                }
-              >
-                {t("Удалить", "Delete")}
-              </Button>
-            )}
+            <Button
+              kind="ghost"
+              small
+              icon="trash"
+              onClick={() =>
+                setSure({
+                  text: t(
+                    `Удалить ${d.kind === "generator" ? "генератор" : d.kind === "bank" ? "банк" : "набор"} «${d.title}» вместе с прогрессом?`,
+                    `Delete the ${d.kind === "generator" ? "generator" : d.kind === "bank" ? "bank" : "deck"} "${d.title}" with its progress?`,
+                  ),
+                  run: () => run(() => api.drillDeleteDeck(d.id)),
+                })
+              }
+            >
+              {t("Удалить", "Delete")}
+            </Button>
           </div>
         </section>
       ))}
@@ -170,7 +156,7 @@ export function DrillDecks({ ov, reload }: { ov: DrillOverview; reload: () => Pr
         >
           {t("Новый набор", "New deck")}
         </Button>
-        <Button kind="paper" icon="sBolt" onClick={() => setGen({ id: null, builtin: false })}>
+        <Button kind="paper" icon="sBolt" onClick={() => setGen({ id: null })}>
           {t("Новый генератор", "New generator")}
         </Button>
         <Button kind="paper" icon="folder" onClick={() => setEater(true)}>
@@ -199,7 +185,6 @@ export function DrillDecks({ ov, reload }: { ov: DrillOverview; reload: () => Pr
       {gen && (
         <GeneratorEditor
           id={gen.id}
-          builtin={gen.builtin}
           onClose={() => setGen(null)}
           onSaved={async () => {
             setGen(null);
@@ -209,7 +194,7 @@ export function DrillDecks({ ov, reload }: { ov: DrillOverview; reload: () => Pr
       )}
       {eater && (
         <DataEater
-          banks={ov.decks.filter((d) => d.kind === "bank" && !d.builtin)}
+          banks={ov.decks.filter((d) => d.kind === "bank")}
           onClose={() => setEater(false)}
           onDone={() => {
             toast(t("Банк импортирован.", "Bank imported."), "good");
@@ -322,19 +307,6 @@ function GatePrefs({ gate, onChange }: { gate: Gate; onChange: (g: Gate) => void
   return (
     <div className="drill-prefs">
       <GateFields gate={gate} onChange={onChange} />
-    </div>
-  );
-}
-
-function BuiltinPrefs({ gate, strict, onChange }: { gate: Gate; strict: boolean; onChange: (g: Gate, strict: boolean) => void }) {
-  return (
-    <div className="drill-prefs">
-      <GateFields gate={gate} onChange={(g) => onChange(g, strict)} />
-      <Check
-        checked={strict}
-        onChange={(v) => onChange(gate, v)}
-        label={t("Строгие типы: 3 и 3.0, кортеж и список различаются", "Strict types: 3 and 3.0, tuple and list differ")}
-      />
     </div>
   );
 }

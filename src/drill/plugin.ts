@@ -1,7 +1,7 @@
 import type { BankCard, BankTopic, GenVariant } from "../api";
 import { lang, t } from "../i18n";
 
-export type GenMeta = { title: string; description: string; topics: BankTopic[]; templates: BankCard[] };
+export type GenMeta = { id: string; title: string; description: string; topics: BankTopic[]; templates: BankCard[] };
 export type GenOutput = { variants: Record<string, GenVariant[]>; errors: Record<string, string> };
 
 const PRELUDE = `
@@ -41,6 +41,7 @@ const HARNESS = `
       if (req.op === "meta") {
         const topics = Array.isArray(P.topics) ? P.topics : [];
         postMessage({ ok: true, data: {
+          id: str(P.id),
           title: str(P.title),
           description: str(P.description),
           topics: topics.map((t) => ({ id: str(t && t.id), title: str(t && t.title), theory: str(t && t.theory) })),
