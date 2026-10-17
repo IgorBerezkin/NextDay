@@ -1,6 +1,6 @@
 # Next Day
 
-Next Day is a pixel art day planner for Windows. Every evening you plan only the next day: give it a name, write what you will do and make a checklist. During the day you tick what is done, and in the evening you collect the results on a board and seal the day. Big goals become maps of topics, and the app puts their tasks into your plan by itself. A drill trainer helps you learn words, formulas and rules by heart. A built-in MCP server lets AI assistants such as Claude read your history and build goals with you. The interface is in Russian.
+Next Day is a pixel art day planner for Windows. Every evening you plan only the next day: give it a name, write what you will do and make a checklist. During the day you tick what is done, and in the evening you collect the results on a board and seal the day. Big goals become maps of topics, and the app puts their tasks into your plan by itself. A drill trainer works for any subject that fits into questions and answers, from foreign words to driving test questions. A built-in MCP server lets AI assistants such as Claude read your history and build goals with you. The interface is in Russian.
 
 Download the installer from [Releases](https://github.com/IgorBerezkin/NextDay/releases/latest).
 
@@ -9,7 +9,7 @@ Download the installer from [Releases](https://github.com/IgorBerezkin/NextDay/r
 
 ## Next Day
 
-Планировщик на один день вперёд для Windows. Вечером вы называете завтрашний день и решаете, чем будете заниматься. Днём отмечаете сделанное, вечером собираете итоги и запечатываете день. Большие цели раскладываются на темы, и программа сама ставит их задачи в план. В зубрилке можно выучить наизусть слова, формулы и правила. Программа запускается вместе с Windows, живёт в трее и напоминает о себе утром и вечером.
+Планировщик на один день вперёд для Windows. Вечером вы называете завтрашний день и решаете, чем будете заниматься. Днём отмечаете сделанное, вечером собираете итоги и запечатываете день. Большие цели раскладываются на темы, и программа сама ставит их задачи в план. В зубрилке можно учить любую тему, которая раскладывается на вопросы и ответы, от иностранных слов до билетов ПДД. Программа запускается вместе с Windows, живёт в трее и напоминает о себе утром и вечером.
 
 Планировать можно только завтрашний день, один план на день.
 
@@ -63,7 +63,7 @@ Download the installer from [Releases](https://github.com/IgorBerezkin/NextDay/r
 
 ![Зубрилка](screenshots/drill.png)
 
-Зубрилка помогает выучить то, что нужно помнить без подсказок: слова, формулы, определения, правила. Карточки идут подряд, пока не наберётся цель сеанса: нужное число верных ответов, карточек или минут. Что повторять и как, задаёт режим. Сеанс идёт в обычном окне или под замком на весь экран: из замка можно выйти, только если держать Esc пять секунд, или когда выйдет время. Серия считает дни подряд, в которые сеанс пройден до конца.
+Зубрилка подходит для любой темы, которую можно разложить на вопросы и ответы: иностранные слова, химия, билеты ПДД, даты по истории, термины к экзамену. Наборы вы собираете сами, загружаете готовые из файла или просите собрать ИИ. Карточки идут подряд, пока не наберётся цель сеанса: нужное число верных ответов, карточек или минут. Что повторять и как, задаёт режим. Сеанс идёт в обычном окне или под замком на весь экран: из замка можно выйти, только если держать Esc пять секунд, или когда выйдет время. Серия считает дни подряд, в которые сеанс пройден до конца.
 
 #### Карточки
 
@@ -666,7 +666,7 @@ MIT
 
 ## Next Day
 
-A planner for one day ahead, for Windows. In the evening you name the next day and decide what you will do. During the day you tick what is done, and in the evening you collect the results and seal the day. Big goals are split into topics, and the app puts their tasks into your plan by itself. The drill trainer helps you learn words, formulas and rules by heart. The app starts with Windows, lives in the tray and reminds you about the plan in the morning and in the evening.
+A planner for one day ahead, for Windows. In the evening you name the next day and decide what you will do. During the day you tick what is done, and in the evening you collect the results and seal the day. Big goals are split into topics, and the app puts their tasks into your plan by itself. The drill trainer works for any subject that fits into questions and answers, from foreign words to driving test questions. The app starts with Windows, lives in the tray and reminds you about the plan in the morning and in the evening.
 
 Only the next day can be planned, one plan per day. The interface is in Russian for now.
 
@@ -720,7 +720,7 @@ The Goals tab shows what is planned for today and what the app will plan for the
 
 ![Drill trainer](screenshots/drill.png)
 
-The drill trainer helps you learn what you need to remember without hints: words, formulas, definitions, rules. Cards come one after another until the session goal is met: a number of right answers, of cards or of minutes. A mode sets what to drill and how. A session runs in the normal window or behind a full screen lock: you leave the lock only by holding Esc for five seconds, or when the time is up. The streak counts the days in a row with a finished session.
+The drill trainer works for any subject you can split into questions and answers: foreign words, chemistry, driving test questions, history dates, terms for an exam. You build decks yourself, load ready ones from a file or ask an AI to make them. Cards come one after another until the session goal is met: a number of right answers, of cards or of minutes. A mode sets what to drill and how. A session runs in the normal window or behind a full screen lock: you leave the lock only by holding Esc for five seconds, or when the time is up. The streak counts the days in a row with a finished session.
 
 #### Cards
 
