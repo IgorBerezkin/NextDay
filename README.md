@@ -295,7 +295,7 @@ Next Day это локальный однопользовательский пл
 
 ##### Банк
 
-`{id, title, description, gate, topics, cards}`: формат `import_drill_bank`. `id` необязателен: если он свободен (латинские буквы, цифры, `-` и `_`, до 40 символов), банк его сохранит, и прогресс переживёт повторный импорт после удаления банка.
+`{id, title, description, gate, topics, cards}`: формат `import_drill_bank`. `id` необязателен: если он свободен (латинские буквы, цифры, `-` и `_`, до 40 символов), банк получит его как идентификатор набора, иначе программа придумает свой.
 
 - `topics`: до 100 `{id, title, theory}`. `theory` это Markdown в диалекте программы (смотрите «Статья справочника»), он становится статьёй темы только для чтения. Темы без карточек отбрасываются.
 - `cards`: до 2000 `{id, topic, kind, rule, check, variants}`. `id` до 60 символов и не повторяется; `topic` это идентификатор или название темы; `rule` (до 2000 символов) показывается после промаха; `check` может настроить сравнение (caseSensitive, ignoreSpaces, tolerance, strictTypes, hint), а режим всегда берётся из `kind`.
@@ -340,7 +340,7 @@ const plugin = {
 };
 ```
 
-- `plugin.id` необязателен: если он свободен, установленный генератор его сохранит, и прогресс переживёт переустановку.
+- `plugin.id` необязателен: если он свободен, установленный генератор получит его как идентификатор набора.
 - Шаблон карточки это `{id, topic, kind, rule, check, make}`. `id` до 60 символов и не должен меняться: по нему хранится прогресс. `kind` берётся из таблицы банка, по умолчанию choice. `make(r)` возвращает один вариант с полями варианта банка.
 - `r` это источник случайных чисел с зерном: `r.random()`, `r.int(a, b)` с обоими концами, `r.pick(list)`, `r.chance(p)`, `r.shuffle(list)` (возвращает копию), `r.sample(list, k)`. Используйте его вместо Math.random. Числа в ответах и вариантах становятся строками.
 - В начале сеанса программа вызывает `make` до 12 раз на шаблон, убирает повторы и проверяет каждый вариант как вариант банка. Весь прогон должен уложиться в 6 секунд.
@@ -951,7 +951,7 @@ A deck or a card copies the check of its template. Changing or deleting the temp
 
 ##### Bank
 
-`{id, title, description, gate, topics, cards}`: the format of `import_drill_bank`. `id` is optional: when it is free (letters, digits, `-` and `_`, up to 40 chars) the bank keeps it, so progress survives a fresh import after the bank was deleted.
+`{id, title, description, gate, topics, cards}`: the format of `import_drill_bank`. `id` is optional: when it is free (letters, digits, `-` and `_`, up to 40 chars) the bank gets it as its deck id, otherwise the app makes one up.
 
 - `topics`: up to 100 `{id, title, theory}`. `theory` is Markdown in the app's dialect (see Theory article) and becomes a read-only article of the topic. Topics without cards are dropped.
 - `cards`: up to 2000 `{id, topic, kind, rule, check, variants}`. `id` is up to 60 chars and unique; `topic` is a topic id or title; `rule` (up to 2000 chars) is shown after a miss; `check` may tune the comparison (caseSensitive, ignoreSpaces, tolerance, strictTypes, hint) while its mode always comes from `kind`.
@@ -996,7 +996,7 @@ const plugin = {
 };
 ```
 
-- `plugin.id` is optional: when it is free, the installed generator keeps it, so progress survives a reinstall.
+- `plugin.id` is optional: when it is free, the installed generator gets it as its deck id.
 - A template is `{id, topic, kind, rule, check, make}`. `id` is up to 60 chars and must stay stable: progress is stored by it. `kind` is one from the Bank table, choice by default. `make(r)` returns one variant with the fields of a bank variant.
 - `r` is a seeded random source: `r.random()`, `r.int(a, b)` with both ends included, `r.pick(list)`, `r.chance(p)`, `r.shuffle(list)` (returns a copy), `r.sample(list, k)`. Use it instead of Math.random. Numbers in answers and choices become strings.
 - At the start of a session the app calls `make` up to 12 times per template, drops repeats and checks every variant like a bank variant. The whole run must finish within 6 seconds.
