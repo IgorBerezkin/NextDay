@@ -1,6 +1,7 @@
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { errText } from "../api";
+import { t } from "../i18n";
 import { sfx } from "../sound";
 import type { IconName } from "./icons";
 import { Px } from "./Px";
@@ -104,7 +105,7 @@ export function Modal({
         <div className="modal-head">
           <h2>{title}</h2>
           {onClose && (
-            <button className="icon-btn" onClick={onClose} title="Закрыть">
+            <button className="icon-btn" onClick={onClose} title={t("Закрыть", "Close")}>
               <Px name="cross" scale={2} />
             </button>
           )}
@@ -178,7 +179,7 @@ export async function openTarget(target: string) {
     if (/^https?:\/\//i.test(target)) await openUrl(target);
     else await openPath(target);
   } catch (e) {
-    toast(`Не открывается: ${errText(e)}`, "error");
+    toast(t(`Не открывается: ${errText(e)}`, `Can't open: ${errText(e)}`), "error");
   }
 }
 
@@ -191,7 +192,7 @@ export function Linkify({ text, inert }: { text: string; inert?: boolean }) {
     if (m.index > last) parts.push(text.slice(last, m.index));
     const target = m[1] ?? m[2] ?? m[3];
     const cls = m[1] ? "link" : "link path";
-    const label = m[1] ? "ссылка" : fileName(target);
+    const label = m[1] ? t("ссылка", "link") : fileName(target);
     parts.push(
       inert ? (
         <span key={m.index} className={`${cls} inert`} title={target}>
@@ -233,10 +234,10 @@ export function AttachChip({ target, onRemove }: { target: string; onRemove?: ()
     <span className="chip" title={target}>
       <button className="chip-main" onClick={() => void openTarget(target)}>
         <Px name={isUrl ? "arrowR" : "folder"} scale={1.5} />
-        <span>{isUrl ? "ссылка" : fileName(target)}</span>
+        <span>{isUrl ? t("ссылка", "link") : fileName(target)}</span>
       </button>
       {onRemove && (
-        <button className="chip-x" onClick={onRemove} title="Убрать">
+        <button className="chip-x" onClick={onRemove} title={t("Убрать", "Remove")}>
           <Px name="cross" scale={1} />
         </button>
       )}

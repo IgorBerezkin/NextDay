@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Nav } from "../App";
 import { api, type Goal, type GoalInput, type GoalStatus } from "../api";
+import { t } from "../i18n";
 import { sfx } from "../sound";
 import { Button, Linkify, Progress, toast, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
@@ -62,31 +63,48 @@ export function GoalsScreen({ nav, focus }: { nav: Nav; focus?: string }) {
   return (
     <div className="screen goals-screen">
       <div className="goals-head">
-        <h1 className="screen-title">Цели</h1>
+        <h1 className="screen-title">{t("Цели", "Goals")}</h1>
         {goals.length > 0 && (
           <Button icon="plus" onClick={() => setView({ mode: "edit" })}>
-            Новая цель
+            {t("Новая цель", "New goal")}
           </Button>
         )}
       </div>
       {goals.length === 0 ? (
         <div className="empty goals-empty">
           <Px name="flag" scale={5} />
-          <h2 className="empty-title">Целей пока нет</h2>
+          <h2 className="empty-title">{t("Целей пока нет", "No goals yet")}</h2>
           <p>
-            Цель это большой результат, разложенный на темы: что нужно уметь и в каком порядке. У каждой темы свои задачи, от простых к
-            сложным. Пока цель идёт, Next Day сам ставит её задачи в план на завтра, сколько помещается в твоё время на день.
+            {t(
+              <>
+                Цель это большой результат, разложенный на темы: что нужно уметь и в каком порядке. У каждой темы свои задачи, от простых к
+                сложным. Пока цель идёт, Next Day сам ставит её задачи в план на завтра, сколько помещается в твоё время на день.
+              </>,
+              <>
+                A goal is a big result broken into topics: what you need to master and in what order. Each topic has its own tasks, from
+                simple to hard. While a goal is active, Next Day adds its tasks to your plan for tomorrow on its own, as many as fit into
+                your daily time.
+              </>,
+            )}
           </p>
           <p className="muted">
-            Темы и задачи можно расписать самому на вкладке «Карта» или поручить ИИ: включи «ИИ через MCP» в настройках, и Claude составит
-            карту по твоей истории. Его черновик появится здесь, останется только принять.
+            {t(
+              <>
+                Темы и задачи можно расписать самому на вкладке «Карта» или поручить ИИ: включи «ИИ через MCP» в настройках, и Claude
+                составит карту по твоей истории. Его черновик появится здесь, останется только принять.
+              </>,
+              <>
+                You can lay out topics and tasks yourself on the "Map" tab or hand them to AI: turn on "AI over MCP" in Settings, and Claude
+                will build a map from your history. Its draft appears here for you to accept.
+              </>,
+            )}
           </p>
           <div className="row">
             <Button icon="plus" onClick={() => setView({ mode: "edit" })}>
-              Новая цель
+              {t("Новая цель", "New goal")}
             </Button>
             <Button kind="paper" icon="gear" onClick={() => go({ name: "settings" })}>
-              Настройки ИИ
+              {t("Настройки ИИ", "AI settings")}
             </Button>
           </div>
         </div>
@@ -112,7 +130,7 @@ function GoalCard({ goal, today, onOpen }: { goal: Goal; today: string; onOpen: 
         <Px name="flag" scale={2} />
         <b>{goal.title}</b>
         <span className={`goal-status s-${goal.status}`}>{GOAL_STATUS[goal.status]}</span>
-        {goal.author === "ai" && <span className="ai-chip">ИИ</span>}
+        {goal.author === "ai" && <span className="ai-chip">{t("ИИ", "AI")}</span>}
       </span>
       {goal.outcome && (
         <span className="goal-outcome">
@@ -121,19 +139,15 @@ function GoalCard({ goal, today, onOpen }: { goal: Goal; today: string; onOpen: 
       )}
       <Progress value={p.tasksTotal ? p.tasksDone / p.tasksTotal : 0} />
       <span className="goal-meta">
-        <span>
-          темы {p.topicsDone} из {p.topicsTotal}
-        </span>
-        <span>
-          задачи {p.tasksDone} из {p.tasksTotal}
-        </span>
-        {p.readiness != null && <span>готовность {p.readiness}%</span>}
+        <span>{t(`темы ${p.topicsDone} из ${p.topicsTotal}`, `${p.topicsDone} of ${p.topicsTotal} topics`)}</span>
+        <span>{t(`задачи ${p.tasksDone} из ${p.tasksTotal}`, `${p.tasksDone} of ${p.tasksTotal} tasks`)}</span>
+        {p.readiness != null && <span>{t(`готовность ${p.readiness}%`, `readiness ${p.readiness}%`)}</span>}
         {left && <span>{left}</span>}
       </span>
       {finish && <span className={`goal-finish${finish.late ? " late" : ""}`}>{finish.text}</span>}
       {next && (
         <span className="goal-next">
-          {next.date === today ? "Сегодня" : `${shortWeekday(next.date)}, ${dayMonth(next.date)}`}:{" "}
+          {next.date === today ? t("Сегодня", "Today") : `${shortWeekday(next.date)}, ${dayMonth(next.date)}`}:{" "}
           {next.tasks
             .map((id) => findTask(goal, id)?.task.text)
             .filter(Boolean)
@@ -173,7 +187,11 @@ function GoalDetail({
     try {
       onChanged(await api.setGoalStatus(goal.id, s));
       sfx.save();
-      if (s === "active") toast("Цель идёт: её задачи уже в плане на завтра.", "good");
+      if (s === "active")
+        toast(
+          t("Цель идёт: её задачи уже в плане на завтра.", "The goal is active: its tasks are already in your plan for tomorrow."),
+          "good",
+        );
     } catch (e) {
       toastError(e);
     }
@@ -193,46 +211,46 @@ function GoalDetail({
     <div className="goal-detail">
       <div className="goal-detail-head">
         <Button kind="ghost" icon="arrowL" onClick={onBack}>
-          Все цели
+          {t("Все цели", "All goals")}
         </Button>
         <span className="grow" />
         {goal.status === "draft" && (
           <Button kind="green" icon="check" disabled={busy} onClick={() => void status("active")}>
-            Принять и начать
+            {t("Принять и начать", "Accept and start")}
           </Button>
         )}
         {running && (
           <Button kind="paper" disabled={busy} onClick={() => void status("paused")}>
-            Пауза
+            {t("Пауза", "Pause")}
           </Button>
         )}
         {(goal.status === "paused" || goal.status === "done" || goal.status === "archived") && (
           <Button kind="paper" disabled={busy} onClick={() => void status("active")}>
-            Продолжить
+            {t("Продолжить", "Resume")}
           </Button>
         )}
         {running && (
           <Button kind="paper" icon="star" disabled={busy} onClick={() => void status("done")}>
-            Достигнута
+            {t("Достигнута", "Achieved")}
           </Button>
         )}
         <Button kind="paper" icon="map" onClick={() => go({ name: "map", focus: goal.id })}>
-          Карта
+          {t("Карта", "Map")}
         </Button>
         <Button kind="paper" icon="pencil" onClick={onEdit}>
-          Изменить
+          {t("Изменить", "Edit")}
         </Button>
         {goal.status !== "archived" && goal.status !== "draft" && (
           <Button kind="ghost" disabled={busy} onClick={() => void status("archived")}>
-            В архив
+            {t("В архив", "Archive")}
           </Button>
         )}
         {confirmDelete ? (
           <Button kind="danger" icon="trash" onClick={() => void remove()}>
-            Точно удалить
+            {t("Точно удалить", "Really delete")}
           </Button>
         ) : (
-          <Button kind="ghost" icon="trash" title="Удалить цель" onClick={() => setConfirmDelete(true)} />
+          <Button kind="ghost" icon="trash" title={t("Удалить цель", "Delete goal")} onClick={() => setConfirmDelete(true)} />
         )}
       </div>
 
@@ -241,31 +259,44 @@ function GoalDetail({
           <h1 className="goal-title">
             <Px name="flag" scale={3} /> {goal.title}
             <span className={`goal-status s-${goal.status}`}>{GOAL_STATUS[goal.status]}</span>
-            {goal.author === "ai" && <span className="ai-chip">план от ИИ</span>}
+            {goal.author === "ai" && <span className="ai-chip">{t("план от ИИ", "plan by AI")}</span>}
           </h1>
           {goal.status === "draft" && (
             <p className="goal-draft-note">
-              Это черновик. Посмотри темы на карте, поправь, если нужно, и нажми «Принять и начать»: с этого момента Next Day сам ставит
-              задачи цели в план на завтра.
+              {t(
+                <>
+                  Это черновик. Посмотри темы на карте, поправь, если нужно, и нажми «Принять и начать»: с этого момента Next Day сам ставит
+                  задачи цели в план на завтра.
+                </>,
+                <>
+                  This is a draft. Look over the topics on the map, fix them if needed, and press "Accept and start": from then on Next Day
+                  adds the goal's tasks to your plan for tomorrow on its own.
+                </>,
+              )}
             </p>
           )}
           {goal.outcome && (
             <p className="goal-outcome-big">
-              <b>Итог:</b> <Linkify text={goal.outcome} />
+              <b>{t("Итог:", "Outcome:")}</b> <Linkify text={goal.outcome} />
             </p>
           )}
           {goal.topics.length === 0 ? (
             <div className="goal-empty-map">
-              <p>В цели пока нет тем. Разложи её на темы и задачи на карте или попроси ИИ составить карту.</p>
+              <p>
+                {t(
+                  "В цели пока нет тем. Разложи её на темы и задачи на карте или попроси ИИ составить карту.",
+                  "This goal has no topics yet. Break it into topics and tasks on the map or ask AI to build the map.",
+                )}
+              </p>
               <Button kind="paper" icon="map" onClick={() => go({ name: "map", focus: goal.id })}>
-                Открыть карту
+                {t("Открыть карту", "Open map")}
               </Button>
             </div>
           ) : (
             <>
               {todayTasks.length > 0 && (
                 <section className="plan-days">
-                  <h2 className="route-title">Сегодня</h2>
+                  <h2 className="route-title">{t("Сегодня", "Today")}</h2>
                   <ul className="day-tasks">
                     {todayTasks.map(({ topic, task }) => (
                       <li key={task.id} className={task.status === "done" ? "done" : ""}>
@@ -280,14 +311,18 @@ function GoalDetail({
                 </section>
               )}
               <section className="plan-days">
-                <h2 className="route-title">{running ? "Ближайшие дни" : "Если начать сейчас"}</h2>
+                <h2 className="route-title">{running ? t("Ближайшие дни", "Coming days") : t("Если начать сейчас", "If you start now")}</h2>
                 {goal.forecast.length === 0 ? (
-                  <p className="muted">{p.tasksLeft ? "Оставшиеся задачи уже стоят в плане на сегодня." : "Все задачи сделаны."}</p>
+                  <p className="muted">
+                    {p.tasksLeft
+                      ? t("Оставшиеся задачи уже стоят в плане на сегодня.", "The remaining tasks are already in today's plan.")
+                      : t("Все задачи сделаны.", "All tasks are done.")}
+                  </p>
                 ) : (
                   goal.forecast.map((d) => (
                     <div className="plan-day" key={d.date}>
                       <div className="plan-day-head">
-                        <b>{d.date === ov.tomorrow ? "Завтра" : `${shortWeekday(d.date)}, ${dayMonth(d.date)}`}</b>
+                        <b>{d.date === ov.tomorrow ? t("Завтра", "Tomorrow") : `${shortWeekday(d.date)}, ${dayMonth(d.date)}`}</b>
                         {d.minutes > 0 && <span className="muted">{mins(d.minutes)}</span>}
                       </div>
                       <ul className="day-tasks">
@@ -307,8 +342,16 @@ function GoalDetail({
                 )}
                 {running && (
                   <p className="hint">
-                    План на завтра ставится сам и подстраивается, когда ты отмечаешь задачи, правишь карту или запечатываешь день. Чтобы
-                    пропустить дни, поставь цель на паузу.
+                    {t(
+                      <>
+                        План на завтра ставится сам и подстраивается, когда ты отмечаешь задачи, правишь карту или запечатываешь день. Чтобы
+                        пропустить дни, поставь цель на паузу.
+                      </>,
+                      <>
+                        The plan for tomorrow fills in by itself and adjusts when you check off tasks, edit the map or seal the day. To skip
+                        days, pause the goal.
+                      </>,
+                    )}
                   </p>
                 )}
               </section>
@@ -318,53 +361,62 @@ function GoalDetail({
         <div className="col-side">
           <section className="card">
             <h2 className="card-title">
-              <Px name="flag" scale={2} /> Прогресс
+              <Px name="flag" scale={2} /> {t("Прогресс", "Progress")}
             </h2>
             <Progress value={p.tasksTotal ? p.tasksDone / p.tasksTotal : 0} />
             <p>
-              Темы: {p.topicsDone} из {p.topicsTotal}
+              {t(`Темы: ${p.topicsDone} из ${p.topicsTotal}`, `Topics: ${p.topicsDone} of ${p.topicsTotal}`)}
               <br />
-              Задачи: {p.tasksDone} из {p.tasksTotal}
+              {t(`Задачи: ${p.tasksDone} из ${p.tasksTotal}`, `Tasks: ${p.tasksDone} of ${p.tasksTotal}`)}
               {p.minutesTotal > 0 && (
                 <>
                   <br />
-                  Время: {mins(p.minutesDone)} из {mins(p.minutesTotal)}
+                  {t(`Время: ${mins(p.minutesDone)} из ${mins(p.minutesTotal)}`, `Time: ${mins(p.minutesDone)} of ${mins(p.minutesTotal)}`)}
                 </>
               )}
               {p.checksTotal > 0 && (
                 <>
                   <br />
-                  Проверки: {p.checksDone} из {p.checksTotal}
+                  {t(`Проверки: ${p.checksDone} из ${p.checksTotal}`, `Checks: ${p.checksDone} of ${p.checksTotal}`)}
                 </>
               )}
             </p>
-            {p.readiness != null && <p className="readiness">Готовность по проверкам: {p.readiness}%</p>}
-            {finish && <p className={`goal-finish${finish.late ? " late" : ""}`}>Прогноз: {finish.text}</p>}
+            {p.readiness != null && (
+              <p className="readiness">{t(`Готовность по проверкам: ${p.readiness}%`, `Readiness from checks: ${p.readiness}%`)}</p>
+            )}
+            {finish && (
+              <p className={`goal-finish${finish.late ? " late" : ""}`}>
+                {t("Прогноз:", "Forecast:")} {finish.text}
+              </p>
+            )}
           </section>
           <section className="card">
             <h2 className="card-title">
-              <Px name="calendar" scale={2} /> Режим
+              <Px name="calendar" scale={2} /> {t("Режим", "Schedule")}
             </h2>
             <p>
-              В день: {mins(goal.minutesPerDay ?? 60)}
+              {t("В день:", "Per day:")} {mins(goal.minutesPerDay ?? 60)}
               <br />
-              Дни: {goal.days.length === 0 || goal.days.length === 7 ? "каждый день" : goal.days.map((d) => WEEK[d - 1]).join(" ")}
+              {t("Дни:", "Days:")}{" "}
+              {goal.days.length === 0 || goal.days.length === 7
+                ? t("каждый день", "every day")
+                : goal.days.map((d) => WEEK[d - 1]).join(" ")}
               {goal.startHour != null && (
                 <>
                   <br />
-                  Начало: {hh(goal.startHour)}
+                  {t("Начало:", "Start:")} {hh(goal.startHour)}
                 </>
               )}
               {left && (
                 <>
                   <br />
-                  Срок: {left}
+                  {t("Срок:", "Deadline:")} {left}
                 </>
               )}
             </p>
             {running && (
               <Button kind="paper" small icon="moon" onClick={() => go({ name: "tomorrow" })}>
-                План на завтра
+                {t("План на завтра", "Plan for tomorrow")}
               </Button>
             )}
           </section>
@@ -393,12 +445,12 @@ function GoalEditor({ goal, onCancel, onSaved }: { goal?: Goal; onCancel: () => 
 
   const save = async () => {
     if (!title.trim()) {
-      toast("Дай цели название.", "error");
+      toast(t("Дай цели название.", "Give the goal a name."), "error");
       return;
     }
     const h = parseHours(budget);
     if (h !== null && (isNaN(h) || h <= 0 || h > 16)) {
-      toast("Время в день: число часов, например 2 или 1,5.", "error");
+      toast(t("Время в день: число часов, например 2 или 1,5.", "Time per day: a number of hours, like 2 or 1.5."), "error");
       return;
     }
     const input: GoalInput = {
@@ -424,40 +476,49 @@ function GoalEditor({ goal, onCancel, onSaved }: { goal?: Goal; onCancel: () => 
 
   return (
     <div className="goal-editor">
-      <h1 className="screen-title">{goal ? "Изменить цель" : "Новая цель"}</h1>
+      <h1 className="screen-title">{goal ? t("Изменить цель", "Edit goal") : t("Новая цель", "New goal")}</h1>
       <div className="ge-grid">
         <label className="ge-field wide">
-          <span>Название</span>
+          <span>{t("Название", "Name")}</span>
           <input
             className="field big"
             autoFocus
             maxLength={80}
             value={title}
-            placeholder="Например: собеседование по ML"
+            placeholder={t("Например: собеседование по ML", "For example: ML interview")}
             onChange={(e) => setTitle(e.target.value)}
           />
         </label>
         <label className="ge-field wide">
-          <span>Итог: как понять, что цель достигнута</span>
+          <span>{t("Итог: как понять, что цель достигнута", "Outcome: how you know the goal is achieved")}</span>
           <textarea
             className="field area"
             rows={2}
             maxLength={600}
             value={outcome}
-            placeholder="Например: сам решаю 3 задачи из 6 на пробном контесте за 6 часов"
+            placeholder={t(
+              "Например: сам решаю 3 задачи из 6 на пробном контесте за 6 часов",
+              "For example: I solve 3 of 6 problems on my own in a 6-hour mock contest",
+            )}
             onChange={(e) => setOutcome(e.target.value)}
           />
         </label>
         <label className="ge-field">
-          <span>Срок</span>
+          <span>{t("Срок", "Deadline")}</span>
           <input className="field" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
         </label>
         <label className="ge-field">
-          <span>Часов в день</span>
-          <input className="field" maxLength={6} value={budget} placeholder="например 2" onChange={(e) => setBudget(e.target.value)} />
+          <span>{t("Часов в день", "Hours per day")}</span>
+          <input
+            className="field"
+            maxLength={6}
+            value={budget}
+            placeholder={t("например 2", "e.g. 2")}
+            onChange={(e) => setBudget(e.target.value)}
+          />
         </label>
         <label className="ge-field">
-          <span>Начинать в</span>
+          <span>{t("Начинать в", "Start at")}</span>
           <select
             className="field select"
             value={startHour ?? ""}
@@ -472,7 +533,7 @@ function GoalEditor({ goal, onCancel, onSaved }: { goal?: Goal; onCancel: () => 
           </select>
         </label>
         <div className="ge-field">
-          <span>Дни</span>
+          <span>{t("Дни", "Days")}</span>
           <div className="ge-days">
             {WEEK.map((w, i) => {
               const d = i + 1;
@@ -488,22 +549,31 @@ function GoalEditor({ goal, onCancel, onSaved }: { goal?: Goal; onCancel: () => 
             })}
           </div>
           <span className="hint">
-            {days.length === 0 ? "Ничего не выбрано: каждый день." : `${plural(days.length, "день", "дня", "дней")} в неделю.`}
+            {days.length === 0
+              ? t("Ничего не выбрано: каждый день.", "Nothing picked: every day.")
+              : `${plural(days.length, "день", "дня", "дней", "day", "days")} ${t("в неделю.", "a week.")}`}
           </span>
         </div>
         <label className="ge-field wide">
-          <span>Заметка: уровень, материалы, ограничения</span>
+          <span>{t("Заметка: уровень, материалы, ограничения", "Note: level, materials, limits")}</span>
           <textarea className="field area" rows={2} maxLength={4000} value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
       </div>
-      {!goal && <p className="hint">Дальше откроется карта: там цель раскладывается на темы и задачи.</p>}
+      {!goal && (
+        <p className="hint">
+          {t(
+            "Дальше откроется карта: там цель раскладывается на темы и задачи.",
+            "Next, the map opens: there you break the goal into topics and tasks.",
+          )}
+        </p>
+      )}
       <div className="wiz-foot">
         <Button kind="ghost" onClick={onCancel}>
-          Отмена
+          {t("Отмена", "Cancel")}
         </Button>
         <span className="grow" />
         <Button kind="green" icon="check" disabled={busy} onClick={() => void save()}>
-          {goal ? "Сохранить" : "Дальше: карта"}
+          {goal ? t("Сохранить", "Save") : t("Дальше: карта", "Next: map")}
         </Button>
       </div>
     </div>

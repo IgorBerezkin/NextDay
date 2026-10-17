@@ -1,4 +1,5 @@
 import type { DrillOverview } from "../api";
+import { t } from "../i18n";
 import { Px } from "../ui/Px";
 import { stamp } from "../util";
 import { Boxes } from "./DrillDecks";
@@ -10,41 +11,53 @@ export function DrillStats({ ov }: { ov: DrillOverview }) {
   return (
     <>
       <div className="drill-stats big">
-        <Stat label="дней подряд" value={ov.streak} sub={`лучшая серия ${ov.bestStreak}`} />
-        <Stat label="сеансов сегодня" value={ov.today.sessions} />
-        <Stat label="ответов сегодня" value={ov.today.answers} sub={acc !== null ? `${acc}% верно` : undefined} />
-        <Stat label="к повтору" value={ov.due} />
+        <Stat
+          label={t("дней подряд", "days in a row")}
+          value={ov.streak}
+          sub={t(`лучшая серия ${ov.bestStreak}`, `best streak ${ov.bestStreak}`)}
+        />
+        <Stat label={t("сеансов сегодня", "sessions today")} value={ov.today.sessions} />
+        <Stat
+          label={t("ответов сегодня", "answers today")}
+          value={ov.today.answers}
+          sub={acc !== null ? t(`${acc}% верно`, `${acc}% right`) : undefined}
+        />
+        <Stat label={t("к повтору", "due")} value={ov.due} />
       </div>
 
       <section className="card">
         <h2 className="card-title">
-          <Px name="map" scale={2} /> Темы
+          <Px name="map" scale={2} /> {t("Темы", "Topics")}
         </h2>
         <table className="drill-table">
           <thead>
             <tr>
-              <th>Тема</th>
-              <th>Открыта</th>
-              <th>Встречалось</th>
-              <th>Верно из последних</th>
-              <th>Коробки</th>
+              <th>{t("Тема", "Topic")}</th>
+              <th>{t("Открыта", "Open")}</th>
+              <th>{t("Встречалось", "Seen")}</th>
+              <th>{t("Верно из последних", "Recent right")}</th>
+              <th>{t("Коробки", "Boxes")}</th>
             </tr>
           </thead>
           <tbody>
             {ov.decks.flatMap((d) =>
-              d.topics.map((t) => (
-                <tr key={`${d.id}:${t.id}`}>
+              d.topics.map((topic) => (
+                <tr key={`${d.id}:${topic.id}`}>
                   <td>
                     {ov.decks.length > 1 && <span className="muted">{d.title}: </span>}
-                    {t.title}
+                    {topic.title}
                   </td>
-                  <td>{t.open ? "да" : "нет"}</td>
+                  <td>{topic.open ? t("да", "yes") : t("нет", "no")}</td>
                   <td>
-                    {t.seen} из {t.cards}
+                    {topic.seen} {t("из", "of")} {topic.cards}
                   </td>
-                  <td>{t.recent ? `${t.recentRight} из ${t.recent} (${Math.round((t.recentRight / t.recent) * 100)}%)` : "нет ответов"}</td>
                   <td>
-                    <Boxes boxes={t.boxes} />
+                    {topic.recent
+                      ? `${topic.recentRight} ${t("из", "of")} ${topic.recent} (${Math.round((topic.recentRight / topic.recent) * 100)}%)`
+                      : t("нет ответов", "no answers")}
+                  </td>
+                  <td>
+                    <Boxes boxes={topic.boxes} />
                   </td>
                 </tr>
               )),
@@ -55,15 +68,15 @@ export function DrillStats({ ov }: { ov: DrillOverview }) {
 
       <section className="card">
         <h2 className="card-title">
-          <Px name="cross" scale={2} /> Частые ошибки
+          <Px name="cross" scale={2} /> {t("Частые ошибки", "Common mistakes")}
         </h2>
-        {ov.weak.length === 0 && <p className="muted">Промахов пока нет.</p>}
+        {ov.weak.length === 0 && <p className="muted">{t("Промахов пока нет.", "No misses yet.")}</p>}
         {ov.weak.map((w) => (
           <div key={`${w.deck}:${w.card}`} className="drill-weak">
             <div className="row">
               {w.topic && <span className="drill-chip">{w.topic}</span>}
               <span className="muted">
-                мимо {w.wrong}, верно {w.right}, коробка {w.level}
+                {t(`мимо ${w.wrong}, верно ${w.right}, коробка ${w.level}`, `missed ${w.wrong}, right ${w.right}, box ${w.level}`)}
               </span>
             </div>
             {w.code && <Code code={w.code} />}
@@ -71,11 +84,11 @@ export function DrillStats({ ov }: { ov: DrillOverview }) {
               <Prompt text={w.prompt} />
             </p>
             <div className="drill-row">
-              <span className="muted">Правильно:</span> <code className="drill-ans">{w.answer}</code>
+              <span className="muted">{t("Правильно:", "Right answer:")}</span> <code className="drill-ans">{w.answer}</code>
             </div>
             {w.lastWrong.length > 0 && (
               <div className="drill-row">
-                <span className="muted">Ты отвечал:</span>
+                <span className="muted">{t("Ты отвечал:", "You answered:")}</span>
                 {w.lastWrong.map((x, i) => (
                   <code key={i} className="drill-given">
                     {x}
@@ -94,20 +107,20 @@ export function DrillStats({ ov }: { ov: DrillOverview }) {
 
       <section className="card">
         <h2 className="card-title">
-          <Px name="calendar" scale={2} /> Сеансы
+          <Px name="calendar" scale={2} /> {t("Сеансы", "Sessions")}
         </h2>
         {ov.sessions.length === 0 ? (
-          <p className="muted">Сеансов ещё не было.</p>
+          <p className="muted">{t("Сеансов ещё не было.", "No sessions yet.")}</p>
         ) : (
           <table className="drill-table">
             <thead>
               <tr>
-                <th>Когда</th>
-                <th>Режим</th>
-                <th>Итог</th>
-                <th>Верно</th>
-                <th>С первого раза</th>
-                <th>Время</th>
+                <th>{t("Когда", "When")}</th>
+                <th>{t("Режим", "Mode")}</th>
+                <th>{t("Итог", "Result")}</th>
+                <th>{t("Верно", "Right")}</th>
+                <th>{t("С первого раза", "First try")}</th>
+                <th>{t("Время", "Time")}</th>
               </tr>
             </thead>
             <tbody>
@@ -117,7 +130,7 @@ export function DrillStats({ ov }: { ov: DrillOverview }) {
                   <td>{r.name}</td>
                   <td>{OUTCOME[r.outcome]}</td>
                   <td>
-                    {r.correct} из {r.answered}
+                    {r.correct} {t("из", "of")} {r.answered}
                   </td>
                   <td>{r.firstTry}</td>
                   <td>{spent(r.seconds)}</td>

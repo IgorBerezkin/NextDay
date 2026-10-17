@@ -2113,8 +2113,8 @@ button.yc:not(:disabled):hover {
   position: absolute;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px 10px;
+  gap: 4px;
+  padding: 6px 10px;
   border: 0;
   font: 20px/1.15 var(--font);
   text-align: left;

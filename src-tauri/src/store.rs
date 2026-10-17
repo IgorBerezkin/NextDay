@@ -17,7 +17,7 @@ impl Store {
     pub fn open(dir: PathBuf) -> Result<Self, String> {
         for sub in ["days", "boards", "assets", "goals", "drill", "theory", "banks", "gens"] {
             fs::create_dir_all(dir.join(sub))
-                .map_err(|e| format!("Не удалось создать папку {}: {e}", dir.join(sub).display()))?;
+                .map_err(|e| tr!("Не удалось создать папку {}: {e}", "Could not create the folder {}: {e}", dir.join(sub).display()))?;
         }
         Ok(Self { dir, lock: Mutex::new(()) })
     }
@@ -49,7 +49,7 @@ impl Store {
     pub fn delete_day(&self, date: &str) -> Result<(), String> {
         let p = self.day_path(date);
         if p.exists() {
-            fs::remove_file(&p).map_err(|e| format!("Не удалось удалить день: {e}"))?;
+            fs::remove_file(&p).map_err(|e| tr!("Не удалось удалить день: {e}", "Could not delete the day: {e}"))?;
         }
         Ok(())
     }
@@ -88,13 +88,13 @@ impl Store {
     }
 
     pub fn save_goal(&self, goal: &Goal) -> Result<(), String> {
-        let p = self.goal_path(&goal.id).ok_or("Неправильный идентификатор цели.")?;
+        let p = self.goal_path(&goal.id).ok_or_else(|| tr!("Неправильный идентификатор цели.", "Invalid goal id."))?;
         write_json(&p, goal)
     }
 
     pub fn delete_goal(&self, id: &str) -> Result<(), String> {
-        let p = self.goal_path(id).ok_or("Неправильный идентификатор цели.")?;
-        fs::remove_file(&p).map_err(|e| format!("Не удалось удалить цель: {e}"))
+        let p = self.goal_path(id).ok_or_else(|| tr!("Неправильный идентификатор цели.", "Invalid goal id."))?;
+        fs::remove_file(&p).map_err(|e| tr!("Не удалось удалить цель: {e}", "Could not delete the goal: {e}"))
     }
 
     pub fn list_goals(&self) -> Vec<Goal> {
@@ -123,12 +123,12 @@ impl Store {
     }
 
     pub fn save_item<T: Serialize>(&self, sub: &str, id: &str, v: &T) -> Result<(), String> {
-        let p = self.item_path(sub, id).ok_or("Неправильный идентификатор.")?;
+        let p = self.item_path(sub, id).ok_or_else(|| tr!("Неправильный идентификатор.", "Invalid id."))?;
         write_json(&p, v)
     }
 
     pub fn save_item_compact<T: Serialize>(&self, sub: &str, id: &str, v: &T) -> Result<(), String> {
-        let p = self.item_path(sub, id).ok_or("Неправильный идентификатор.")?;
+        let p = self.item_path(sub, id).ok_or_else(|| tr!("Неправильный идентификатор.", "Invalid id."))?;
         let text = serde_json::to_string(v).map_err(|e| e.to_string())?;
         write_text(&p, &text)
     }
@@ -156,8 +156,8 @@ impl Store {
     }
 
     pub fn delete_item(&self, sub: &str, id: &str) -> Result<(), String> {
-        let p = self.item_path(sub, id).ok_or("Неправильный идентификатор.")?;
-        fs::remove_file(&p).map_err(|e| format!("Не удалось удалить: {e}"))
+        let p = self.item_path(sub, id).ok_or_else(|| tr!("Неправильный идентификатор.", "Invalid id."))?;
+        fs::remove_file(&p).map_err(|e| tr!("Не удалось удалить: {e}", "Could not delete: {e}"))
     }
 
     pub fn list_items<T: DeserializeOwned>(&self, sub: &str) -> Vec<T> {
@@ -254,6 +254,6 @@ fn write_json<T: Serialize>(p: &Path, v: &T) -> Result<(), String> {
 
 fn write_text(p: &Path, text: &str) -> Result<(), String> {
     let tmp = p.with_extension("tmp");
-    fs::write(&tmp, text).map_err(|e| format!("Не удалось записать {}: {e}", p.display()))?;
-    fs::rename(&tmp, p).map_err(|e| format!("Не удалось сохранить {}: {e}", p.display()))
+    fs::write(&tmp, text).map_err(|e| tr!("Не удалось записать {}: {e}", "Could not write {}: {e}", p.display()))?;
+    fs::rename(&tmp, p).map_err(|e| tr!("Не удалось сохранить {}: {e}", "Could not save {}: {e}", p.display()))
 }

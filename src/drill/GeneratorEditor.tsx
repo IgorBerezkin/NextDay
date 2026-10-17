@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { api, errText, type GenCheck, type GenVariant } from "../api";
+import { t } from "../i18n";
 import { Button, Modal, toast, toastError } from "../ui/kit";
 import { plural } from "../util";
 import { Code, LETTERS, Prompt } from "./drillKit";
 import { Markdown } from "./Markdown";
 import { genMeta, genVariants, type GenMeta } from "./plugin";
+import sampleEn from "./sample.plugin.en.js?raw";
 import sample from "./sample.plugin.js?raw";
 
 type Result = { meta: GenMeta; made: Record<string, GenVariant[]>; errors: Record<string, string>; check: GenCheck; code: string };
@@ -72,14 +74,20 @@ export function GeneratorEditor({
     try {
       await api.drillSaveGenerator({
         id: id ?? undefined,
-        title: title.trim() || result.meta.title || "Генератор",
+        title: title.trim() || result.meta.title || t("Генератор", "Generator"),
         description,
         code,
         enabled: true,
         topics: result.meta.topics,
         templates: result.meta.templates,
       });
-      toast("Генератор включён. Добавь его в режим, и карточки пойдут в сеансы.", "good");
+      toast(
+        t(
+          "Генератор включён. Добавь его в режим, и карточки пойдут в сеансы.",
+          "Generator enabled. Add it to a mode, and its cards go into sessions.",
+        ),
+        "good",
+      );
       onSaved();
     } catch (e) {
       toastError(e);
@@ -107,18 +115,24 @@ export function GeneratorEditor({
   return (
     <Modal
       wide
-      title={builtin ? "Встроенный генератор" : id ? "Генератор карточек" : "Новый генератор"}
+      title={
+        builtin
+          ? t("Встроенный генератор", "Built-in generator")
+          : id
+            ? t("Генератор карточек", "Card generator")
+            : t("Новый генератор", "New generator")
+      }
       onClose={onClose}
       footer={
         <>
-          {result && !fresh && <span className="muted">Код изменился, проверь ещё раз.</span>}
+          {result && !fresh && <span className="muted">{t("Код изменился, проверь ещё раз.", "The code changed, test it again.")}</span>}
           <span className="grow" />
           <Button kind="paper" onClick={onClose}>
-            {builtin ? "Закрыть" : "Отмена"}
+            {builtin ? t("Закрыть", "Close") : t("Отмена", "Cancel")}
           </Button>
           {!builtin && (
             <Button icon="check" disabled={busy || !fresh || !result || result.check.ready === 0} onClick={() => void save()}>
-              Сохранить и включить
+              {t("Сохранить и включить", "Save and enable")}
             </Button>
           )}
         </>
@@ -126,29 +140,31 @@ export function GeneratorEditor({
     >
       <div className="drill-form">
         <p className="muted">
-          Генератор это скрипт на JavaScript, который в начале каждого сеанса придумывает карточки с новыми данными. Промах вернётся той же
-          задачей, но с другими данными. Скрипт работает в песочнице: без сети и без доступа к приложению. Обычно его пишет ИИ через MCP.
+          {t(
+            "Генератор это скрипт на JavaScript, который в начале каждого сеанса придумывает карточки с новыми данными. Промах вернётся той же задачей, но с другими данными. Скрипт работает в песочнице: без сети и без доступа к приложению. Обычно его пишет ИИ через MCP.",
+            "A generator is a JavaScript script that makes up cards with new data at the start of every session. A miss comes back as the same task with other data. The script runs in a sandbox: no network and no access to the app. Usually AI writes it over MCP.",
+          )}
         </p>
         {!builtin && (
           <div className="row">
             <label className="drill-field grow">
-              <span>Название</span>
+              <span>{t("Название", "Title")}</span>
               <input
                 className="field"
                 value={title}
                 maxLength={80}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Из plugin.title"
+                placeholder={t("Из plugin.title", "From plugin.title")}
               />
             </label>
             <label className="drill-field grow">
-              <span>Описание</span>
+              <span>{t("Описание", "Description")}</span>
               <input className="field" value={description} maxLength={1000} onChange={(e) => setDescription(e.target.value)} />
             </label>
           </div>
         )}
         <div className="drill-field">
-          <span>Код</span>
+          <span>{t("Код", "Code")}</span>
           <textarea
             className="field area gen-code"
             value={code}
@@ -156,7 +172,9 @@ export function GeneratorEditor({
             spellCheck={false}
             onChange={(e) => setCode(e.target.value)}
             placeholder={
-              loaded ? "const plugin = { title, topics: [...], templates: [{ id, topic, kind, rule, make(r) { ... } }] };" : "Загрузка…"
+              loaded
+                ? "const plugin = { title, topics: [...], templates: [{ id, topic, kind, rule, make(r) { ... } }] };"
+                : t("Загрузка…", "Loading...")
             }
           />
         </div>
@@ -165,27 +183,36 @@ export function GeneratorEditor({
             <>
               <input ref={file} type="file" accept=".js,.txt" hidden onChange={(e) => void open(e.target.files?.[0])} />
               <Button kind="paper" small icon="folder" onClick={() => file.current?.click()}>
-                Открыть файл
+                {t("Открыть файл", "Open file")}
               </Button>
-              <Button kind="paper" small icon="note" disabled={!!code.trim()} onClick={() => setCode(sample)}>
-                Пример
+              <Button kind="paper" small icon="note" disabled={!!code.trim()} onClick={() => setCode(t(sample, sampleEn))}>
+                {t("Пример", "Example")}
               </Button>
             </>
           )}
           <span className="grow" />
           <Button kind={fresh ? "paper" : "primary"} icon="sBolt" disabled={busy || !code.trim()} onClick={() => void check()}>
-            {busy ? "Проверяю…" : "Проверить"}
+            {busy ? t("Проверяю…", "Testing...") : t("Проверить", "Test")}
           </Button>
         </div>
 
-        {fail && <p className="drill-err">Не сработало: {fail}</p>}
+        {fail && <p className="drill-err">{t(`Не сработало: ${fail}`, `Failed: ${fail}`)}</p>}
 
         {result && (
           <div className="gen-result">
             <p className={result.check.ready ? "good" : "drill-err"}>
-              {plural(result.check.templates, "шаблон", "шаблона", "шаблонов")}, работают {result.check.ready}, в пробе{" "}
-              {plural(result.check.variants, "карточка", "карточки", "карточек")}. Тем: {result.meta.topics.length || "нет"}, теория у{" "}
-              {result.meta.topics.filter((t) => t.theory.trim()).length}.
+              {t(
+                <>
+                  {plural(result.check.templates, "шаблон", "шаблона", "шаблонов", "template", "templates")}, работают {result.check.ready},
+                  в пробе {plural(result.check.variants, "карточка", "карточки", "карточек", "card", "cards")}. Тем:{" "}
+                  {result.meta.topics.length || "нет"}, теория у {result.meta.topics.filter((topic) => topic.theory.trim()).length}.
+                </>,
+                <>
+                  {plural(result.check.templates, "шаблон", "шаблона", "шаблонов", "template", "templates")}, {result.check.ready} work,{" "}
+                  {plural(result.check.variants, "карточка", "карточки", "карточек", "card", "cards")} in the test run. Topics:{" "}
+                  {result.meta.topics.length || "none"}, with theory: {result.meta.topics.filter((topic) => topic.theory.trim()).length}.
+                </>,
+              )}
             </p>
             {problems.length > 0 && (
               <ul className="gen-problems">
@@ -195,7 +222,7 @@ export function GeneratorEditor({
               </ul>
             )}
             <div className="row">
-              <span>Пример карточек шаблона</span>
+              <span>{t("Пример карточек шаблона", "Sample cards for template")}</span>
               <select className="field select" value={pick} onChange={(e) => setPick(e.target.value)}>
                 {result.meta.templates.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -227,7 +254,7 @@ export function GeneratorEditor({
                     </div>
                   )}
                   <p>
-                    <span className="muted">Ответ:</span> <code className="drill-ans">{v.answer}</code>
+                    <span className="muted">{t("Ответ:", "Answer:")}</span> <code className="drill-ans">{v.answer}</code>
                   </p>
                   {v.explain && (
                     <div className="gen-explain">
@@ -236,7 +263,7 @@ export function GeneratorEditor({
                   )}
                 </div>
               ))}
-              {!samples.length && <p className="muted">Этот шаблон не дал карточек.</p>}
+              {!samples.length && <p className="muted">{t("Этот шаблон не дал карточек.", "This template made no cards.")}</p>}
             </div>
           </div>
         )}

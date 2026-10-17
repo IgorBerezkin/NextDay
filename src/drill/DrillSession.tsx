@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errText, type DrillAnswer, type DrillRecord, type DrillSessionView } from "../api";
+import { t } from "../i18n";
 import { sfx } from "../sound";
 import { Button, Modal, Progress } from "../ui/kit";
 import { Px } from "../ui/Px";
@@ -204,10 +205,19 @@ export function DrillSession({ initial, lock, onDone }: { initial: DrillSessionV
 
   const progress =
     view.goal === "correct"
-      ? { text: `Верно ${view.correct} из ${view.amount}`, value: view.correct / view.amount }
+      ? { text: t(`Верно ${view.correct} из ${view.amount}`, `${view.correct} of ${view.amount} right`), value: view.correct / view.amount }
       : view.goal === "cards"
-        ? { text: `Карточка ${Math.min(view.answered + 1, view.amount)} из ${view.amount}`, value: view.answered / view.amount }
-        : { text: `Осталось ${mmss(view.amount * 60 - elapsed)}`, value: elapsed / (view.amount * 60) };
+        ? {
+            text: t(
+              `Карточка ${Math.min(view.answered + 1, view.amount)} из ${view.amount}`,
+              `Card ${Math.min(view.answered + 1, view.amount)} of ${view.amount}`,
+            ),
+            value: view.answered / view.amount,
+          }
+        : {
+            text: t(`Осталось ${mmss(view.amount * 60 - elapsed)}`, `${mmss(view.amount * 60 - elapsed)} left`),
+            value: elapsed / (view.amount * 60),
+          };
 
   const left = view.limit !== null ? view.limit - elapsed : null;
 
@@ -222,12 +232,12 @@ export function DrillSession({ initial, lock, onDone }: { initial: DrillSessionV
           <span>{progress.text}</span>
           <Progress value={ended ? 1 : progress.value} cells={view.goal === "minutes" ? 20 : Math.min(20, view.amount)} />
         </div>
-        <div className="drill-clock" title="Сколько идёт сеанс">
+        <div className="drill-clock" title={t("Сколько идёт сеанс", "Session time")}>
           <Px name="clock" scale={1.5} /> {mmss(elapsed)}
         </div>
         {!lock && !ended && (
           <Button kind="ghost" small onClick={() => void stop()}>
-            Закончить
+            {t("Закончить", "Finish")}
           </Button>
         )}
       </header>
@@ -239,14 +249,19 @@ export function DrillSession({ initial, lock, onDone }: { initial: DrillSessionV
           <div className="drill-meta">
             {card.topic && <span className="drill-chip">{card.topic}</span>}
             <span className="drill-kind">{card.kind}</span>
-            {card.retry && <span className="drill-chip again">ещё раз, новые данные</span>}
+            {card.retry && <span className="drill-chip again">{t("ещё раз, новые данные", "again, new data")}</span>}
             <span className="grow" />
             <span className="muted">{card.deck}</span>
             <button
               className={`drill-bulb${card.hinted ? " used" : ""}`}
               onClick={() => void openTheory()}
               title={
-                phase === "ask" ? "Открыть теорию. Ответ после подсказки не повысит карточку, если так настроен режим." : "Открыть теорию"
+                phase === "ask"
+                  ? t(
+                      "Открыть теорию. Ответ после подсказки не повысит карточку, если так настроен режим.",
+                      "Open theory. If the mode is set that way, an answer after a hint won't promote the card.",
+                    )
+                  : t("Открыть теорию", "Open theory")
               }
             >
               <Px name="sIdea" scale={2} />
@@ -270,14 +285,14 @@ export function DrillSession({ initial, lock, onDone }: { initial: DrillSessionV
 
           {phase === "ask" && card.mode === "self" && !card.revealed && (
             <Button kind="paper" icon="note" onClick={() => void reveal()}>
-              Показать ответ (Enter)
+              {t("Показать ответ (Enter)", "Show answer (Enter)")}
             </Button>
           )}
 
           {phase === "ask" && card.mode === "self" && card.revealed && (
             <div className="drill-verdict">
               <div className="drill-row">
-                <span className="muted">Ответ:</span> <code className="drill-ans">{card.revealed.expected}</code>
+                <span className="muted">{t("Ответ:", "Answer:")}</span> <code className="drill-ans">{card.revealed.expected}</code>
               </div>
               {card.revealed.explain && (
                 <div className="drill-rule">
@@ -286,10 +301,10 @@ export function DrillSession({ initial, lock, onDone }: { initial: DrillSessionV
               )}
               <div className="row">
                 <Button kind="green" icon="check" disabled={busy} onClick={() => void submit({ knew: true })}>
-                  Знал (1)
+                  {t("Знал (1)", "I knew it (1)")}
                 </Button>
                 <Button kind="danger" icon="cross" disabled={busy} onClick={() => void submit({ knew: false })}>
-                  Не знал (2)
+                  {t("Не знал (2)", "I didn't (2)")}
                 </Button>
               </div>
             </div>
@@ -309,12 +324,12 @@ export function DrillSession({ initial, lock, onDone }: { initial: DrillSessionV
                 value={text}
                 spellCheck={false}
                 autoComplete="off"
-                placeholder="Ответ"
+                placeholder={t("Ответ", "Answer")}
                 onChange={(e) => setText(e.target.value)}
                 disabled={busy}
               />
               <Button type="submit" disabled={busy || !text.trim()}>
-                Ответить
+                {t("Ответить", "Answer")}
               </Button>
             </form>
           )}
@@ -324,7 +339,7 @@ export function DrillSession({ initial, lock, onDone }: { initial: DrillSessionV
             <div className={`drill-verdict ${last.correct ? "ok" : "bad"}`}>
               <div className="drill-verdict-head">
                 <Px name={last.correct ? "check" : "cross"} scale={2} />
-                {last.correct ? (last.hinted ? "Верно, с подсказкой" : "Верно") : "Мимо"}
+                {last.correct ? (last.hinted ? t("Верно, с подсказкой", "Right, with a hint") : t("Верно", "Right")) : t("Мимо", "Miss")}
               </div>
               {last.note && <p className="drill-note">{last.note}</p>}
               {!last.correct ? (
@@ -346,10 +361,10 @@ export function DrillSession({ initial, lock, onDone }: { initial: DrillSessionV
                   </div>
                 )
               )}
-              {last.opened && <p className="drill-opened">Открыта новая тема: {last.opened}</p>}
+              {last.opened && <p className="drill-opened">{t(`Открыта новая тема: ${last.opened}`, `New topic opened: ${last.opened}`)}</p>}
               {phase === "result" && (
                 <Button icon="arrowR" onClick={advance}>
-                  Дальше (Enter)
+                  {t("Дальше (Enter)", "Next (Enter)")}
                 </Button>
               )}
             </div>
@@ -358,7 +373,7 @@ export function DrillSession({ initial, lock, onDone }: { initial: DrillSessionV
         </div>
       ) : (
         <div className="drill-card">
-          <p className="muted">Карточки закончились.</p>
+          <p className="muted">{t("Карточки закончились.", "Out of cards.")}</p>
         </div>
       )}
 
@@ -367,16 +382,23 @@ export function DrillSession({ initial, lock, onDone }: { initial: DrillSessionV
           {view.escape === "hold" ? (
             hold !== null ? (
               <div className="drill-hold">
-                <span>Держи Esc ещё {Math.ceil((5000 - hold) / 1000)}</span>
+                <span>{t(`Держи Esc ещё ${Math.ceil((5000 - hold) / 1000)}`, `Keep holding Esc: ${Math.ceil((5000 - hold) / 1000)}`)}</span>
                 <Progress value={hold / 5000} cells={10} />
               </div>
             ) : (
-              <span className="muted">Экстренный выход: держать Esc 5 секунд. Сеанс запишется как побег.</span>
+              <span className="muted">
+                {t(
+                  "Экстренный выход: держать Esc 5 секунд. Сеанс запишется как побег.",
+                  "Emergency exit: hold Esc for 5 seconds. The session counts as an escape.",
+                )}
+              </span>
             )
           ) : (
-            <span className="muted">Выход только через ответы.</span>
+            <span className="muted">{t("Выход только через ответы.", "The only way out is answering.")}</span>
           )}
-          {left !== null && <span className="muted">Замок откроется сам через {mmss(left)}</span>}
+          {left !== null && (
+            <span className="muted">{t(`Замок откроется сам через ${mmss(left)}`, `The lock opens by itself in ${mmss(left)}`)}</span>
+          )}
         </footer>
       )}
 
@@ -386,12 +408,12 @@ export function DrillSession({ initial, lock, onDone }: { initial: DrillSessionV
 
       {confirm && (
         <Modal
-          title="Сбежать из замка?"
+          title={t("Сбежать из замка?", "Escape the lock?")}
           onClose={() => setConfirm(false)}
           footer={
             <>
               <Button kind="paper" onClick={() => setConfirm(false)}>
-                Остаться
+                {t("Остаться", "Stay")}
               </Button>
               <Button
                 kind="danger"
@@ -404,14 +426,22 @@ export function DrillSession({ initial, lock, onDone }: { initial: DrillSessionV
                   }
                 }}
               >
-                Сбежать
+                {t("Сбежать", "Escape")}
               </Button>
             </>
           }
         >
-          <p>Сеанс запишется как побег, а серия дней со Зубрилкой прервётся.</p>
+          <p>
+            {t(
+              "Сеанс запишется как побег, а серия дней со Зубрилкой прервётся.",
+              "The session counts as an escape, and your Drill streak breaks.",
+            )}
+          </p>
           <p className="muted">
-            Верно {view.correct} из {view.amount}. Может, ещё пара карточек?
+            {t(
+              `Верно ${view.correct} из ${view.amount}. Может, ещё пара карточек?`,
+              `${view.correct} of ${view.amount} right. Maybe a couple more cards?`,
+            )}
           </p>
         </Modal>
       )}
@@ -424,34 +454,39 @@ function Summary({ rec, lock, onDone }: { rec: DrillRecord; lock: boolean; onDon
   return (
     <div className="drill-card drill-summary">
       <h2 className="drill-sum-title">
-        {rec.outcome === "done" ? "Сеанс пройден" : `Сеанс окончен: ${OUTCOME[rec.outcome].toLowerCase()}`}
+        {rec.outcome === "done"
+          ? t("Сеанс пройден", "Session complete")
+          : t(`Сеанс окончен: ${OUTCOME[rec.outcome].toLowerCase()}`, `Session over: ${OUTCOME[rec.outcome].toLowerCase()}`)}
       </h2>
       <div className="drill-stats">
         <div className="drill-stat">
           <b>{rec.correct}</b>
-          <span>верно из {plural(rec.answered, "ответа", "ответов", "ответов").replace(/^\d+ /, `${rec.answered} `)}</span>
+          <span>
+            {t("верно из", "right out of")}{" "}
+            {plural(rec.answered, "ответа", "ответов", "ответов", "answer", "answers").replace(/^\d+ /, `${rec.answered} `)}
+          </span>
         </div>
         <div className="drill-stat">
           <b>{rec.firstTry}</b>
-          <span>с первого раза</span>
+          <span>{t("с первого раза", "on the first try")}</span>
         </div>
         <div className="drill-stat">
           <b>{spent(rec.seconds)}</b>
-          <span>на сеанс</span>
+          <span>{t("на сеанс", "session time")}</span>
         </div>
         {rec.hinted > 0 && (
           <div className="drill-stat">
             <b>{rec.hinted}</b>
-            <span>с подсказкой</span>
+            <span>{t("с подсказкой", "with a hint")}</span>
           </div>
         )}
       </div>
-      {misses ? <p>{misses}</p> : rec.answered > 0 && <p className="good">Ни одного промаха.</p>}
+      {misses ? <p>{misses}</p> : rec.answered > 0 && <p className="good">{t("Ни одного промаха.", "Not a single miss.")}</p>}
       {lock ? (
-        <p className="muted">Замок открывается…</p>
+        <p className="muted">{t("Замок открывается…", "Unlocking...")}</p>
       ) : (
         <Button icon="check" onClick={onDone}>
-          Готово
+          {t("Готово", "Done")}
         </Button>
       )}
     </div>

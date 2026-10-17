@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { parsePy, reprPy, shapeOf, type Py } from "./pyval";
 
 const LIMIT = 10;
@@ -20,7 +21,7 @@ function Atom({ v }: { v: Py }) {
 }
 
 function More({ n }: { n: number }) {
-  return n > 0 ? <span className="dv-more">…ещё {n}</span> : null;
+  return n > 0 ? <span className="dv-more">{t(`…ещё ${n}`, `+${n} more`)}</span> : null;
 }
 
 function Node({ v, depth }: { v: Py; depth: number }) {
@@ -95,11 +96,11 @@ function Node({ v, depth }: { v: Py; depth: number }) {
 }
 
 function size(v: Py): string | null {
-  if (v.t === "str") return `длина ${v.v.length}`;
+  if (v.t === "str") return t(`длина ${v.v.length}`, `length ${v.v.length}`);
   if (v.t === "list" || v.t === "tuple" || v.t === "set" || v.t === "dict") {
     const grid = asGrid(v);
     if (grid) return `${grid.length} x ${grid[0].length}`;
-    return `длина ${v.v.length}`;
+    return t(`длина ${v.v.length}`, `length ${v.v.length}`);
   }
   return null;
 }

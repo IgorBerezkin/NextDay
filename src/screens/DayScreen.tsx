@@ -3,6 +3,7 @@ import type { Nav } from "../App";
 import { api, type Day } from "../api";
 import { parseBoard, boardHasContent, type Board } from "../board/model";
 import { BoardView } from "../board/Stage";
+import { t } from "../i18n";
 import { Button, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
 import { ChecklistView, DayHead, Description, SealInfo } from "./parts";
@@ -38,11 +39,25 @@ export function DayScreen({ nav, date }: { nav: Nav; date: string }) {
   const top = (
     <div className="dv-nav">
       <Button kind="ghost" small icon="arrowL" onClick={() => go({ name: "history" })}>
-        История
+        {t("История", "History")}
       </Button>
       <span className="grow" />
-      <Button kind="paper" small icon="arrowL" disabled={!older} onClick={() => older && go({ name: "day", date: older })} title="День раньше" />
-      <Button kind="paper" small icon="arrowR" disabled={!newer} onClick={() => newer && go({ name: "day", date: newer })} title="День позже" />
+      <Button
+        kind="paper"
+        small
+        icon="arrowL"
+        disabled={!older}
+        onClick={() => older && go({ name: "day", date: older })}
+        title={t("День раньше", "Earlier day")}
+      />
+      <Button
+        kind="paper"
+        small
+        icon="arrowR"
+        disabled={!newer}
+        onClick={() => newer && go({ name: "day", date: newer })}
+        title={t("День позже", "Later day")}
+      />
     </div>
   );
 
@@ -52,14 +67,21 @@ export function DayScreen({ nav, date }: { nav: Nav; date: string }) {
       <div className="screen">
         {top}
         <div className="empty small">
-          <p>У этого дня нет плана.</p>
+          <p>{t("У этого дня нет плана.", "This day has no plan.")}</p>
         </div>
       </div>
     );
 
   const plan = day.plan;
   const open = !day.result.sealed && (date === ov.today || date === ov.yesterday);
-  const label = date === ov.today ? "Сегодня" : date === ov.yesterday ? "Вчера" : date === ov.tomorrow ? "Завтра" : date.slice(0, 4);
+  const label =
+    date === ov.today
+      ? t("Сегодня", "Today")
+      : date === ov.yesterday
+        ? t("Вчера", "Yesterday")
+        : date === ov.tomorrow
+          ? t("Завтра", "Tomorrow")
+          : date.slice(0, 4);
 
   return (
     <div className="screen dayview">
@@ -69,7 +91,7 @@ export function DayScreen({ nav, date }: { nav: Nav; date: string }) {
           <DayHead label={label} date={date} plan={plan}>
             {day.result.sealed && (
               <span className="tag seal">
-                <Px name="lock" scale={1} /> запечатан
+                <Px name="lock" scale={1} /> {t("запечатан", "sealed")}
               </span>
             )}
           </DayHead>
@@ -86,12 +108,16 @@ export function DayScreen({ nav, date }: { nav: Nav; date: string }) {
         <div className="col-side">
           <section className="card">
             <h2 className="card-title">
-              <Px name="lock" scale={2} /> Итоги
+              <Px name="lock" scale={2} /> {t("Итоги", "Results")}
             </h2>
-            {day.result.sealed ? <SealInfo day={day} /> : <p className="muted">Итоги ещё не запечатаны.</p>}
+            {day.result.sealed ? (
+              <SealInfo day={day} />
+            ) : (
+              <p className="muted">{t("Итоги ещё не запечатаны.", "Results are not sealed yet.")}</p>
+            )}
             {open && (
               <Button icon="pencil" onClick={() => go({ name: "board", date })}>
-                Доска итогов
+                {t("Доска итогов", "Results board")}
               </Button>
             )}
           </section>
@@ -100,7 +126,7 @@ export function DayScreen({ nav, date }: { nav: Nav; date: string }) {
       {board && boardHasContent(board) && (
         <section className="dv-board">
           <h2 className="card-title">
-            <Px name="image" scale={2} /> Доска итогов
+            <Px name="image" scale={2} /> {t("Доска итогов", "Results board")}
           </h2>
           <BoardView
             board={board}

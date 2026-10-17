@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Nav } from "../App";
 import { api, type DaySummary } from "../api";
+import { t } from "../i18n";
 import { Button, Linkify, toastError } from "../ui/kit";
 import { Face, Px } from "../ui/Px";
 import type { IconName } from "../ui/icons";
@@ -41,16 +42,20 @@ export function HistoryScreen({ nav }: { nav: Nav }) {
   return (
     <div className="screen history">
       <div className="hist-top">
-        <h1 className="screen-title">История</h1>
+        <h1 className="screen-title">{t("История", "History")}</h1>
         <div className="stats">
-          <Stat icon="flame" value={ov.streak} label={`${plural(ov.streak, "день", "дня", "дней").replace(/^\d+ /, "")} подряд`} />
-          <Stat icon="sTrophy" value={ov.bestStreak} label="лучшая серия" />
-          <Stat icon="calendar" value={ov.totalDays} label="дней с именем" />
-          <Stat icon="sCheck" value={stats.pct === null ? "нет" : `${stats.pct}%`} label="пунктов сделано" />
+          <Stat
+            icon="flame"
+            value={ov.streak}
+            label={`${plural(ov.streak, "день", "дня", "дней", "day", "days").replace(/^\d+ /, "")} ${t("подряд", "in a row")}`}
+          />
+          <Stat icon="sTrophy" value={ov.bestStreak} label={t("лучшая серия", "best streak")} />
+          <Stat icon="calendar" value={ov.totalDays} label={t("дней с именем", "named days")} />
+          <Stat icon="sCheck" value={stats.pct === null ? t("нет", "none") : `${stats.pct}%`} label={t("пунктов сделано", "items done")} />
           <div className="stat">
             {stats.rated ? <Face rating={stats.avg} scale={2} /> : <Px name="sSmile" scale={2} />}
-            <b>{stats.rated ? hoursText(Math.round(stats.avg * 10) / 10) : "нет"}</b>
-            <span>средняя оценка</span>
+            <b>{stats.rated ? hoursText(Math.round(stats.avg * 10) / 10) : t("нет", "none")}</b>
+            <span>{t("средняя оценка", "average rating")}</span>
           </div>
         </div>
       </div>
@@ -67,27 +72,42 @@ export function HistoryScreen({ nav }: { nav: Nav }) {
 
       <div className="hist-list-head">
         <h2 className="card-title">
-          <Px name="calendar" scale={2} /> Дни
+          <Px name="calendar" scale={2} /> {t("Дни", "Days")}
         </h2>
-        <input className="field search" placeholder="Поиск по именам и описаниям" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input
+          className="field search"
+          placeholder={t("Поиск по именам и описаниям", "Search names and descriptions")}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
       </div>
 
       {days && days.length === 0 && (
         <div className="empty small">
           <Px name="moonColor" scale={4} />
           {ov.tomorrowDay?.plan ? (
-            <p>История начнётся завтра, с дня «{ov.tomorrowDay.plan.name}».</p>
+            <p>
+              {t(
+                `История начнётся завтра, с дня «${ov.tomorrowDay.plan.name}».`,
+                `History starts tomorrow, with "${ov.tomorrowDay.plan.name}".`,
+              )}
+            </p>
           ) : (
             <>
-              <p>История пока пустая. Назовите завтрашний день, с него всё и начнётся.</p>
+              <p>
+                {t(
+                  "История пока пустая. Назовите завтрашний день, с него всё и начнётся.",
+                  "No history yet. Name tomorrow, and it all starts there.",
+                )}
+              </p>
               <Button icon="moon" onClick={() => go({ name: "tomorrow" })}>
-                Назвать завтрашний день
+                {t("Назвать завтрашний день", "Name tomorrow")}
               </Button>
             </>
           )}
         </div>
       )}
-      {days && days.length > 0 && filtered.length === 0 && <p className="muted">Ничего не нашлось.</p>}
+      {days && days.length > 0 && filtered.length === 0 && <p className="muted">{t("Ничего не нашлось.", "Nothing found.")}</p>}
       <div className="hist-list">
         {filtered.map((d) => (
           <DayCard key={d.date} d={d} today={ov.today} onOpen={() => go({ name: "day", date: d.date })} />
@@ -107,7 +127,10 @@ function Stat({ icon, value, label }: { icon: IconName; value: React.ReactNode; 
   );
 }
 
-const MONTHS = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+const MONTHS = t(
+  ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"],
+  ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+);
 
 function YearPixels({
   year,
@@ -154,14 +177,24 @@ function YearPixels({
     <section className="card year">
       <div className="year-head">
         <h2 className="card-title">
-          <Px name="star" scale={2} /> Год в пикселях
+          <Px name="star" scale={2} /> {t("Год в пикселях", "Year in pixels")}
         </h2>
         <div className="year-nav">
-          <button className="icon-btn" disabled={idx <= 0} onClick={() => setYear(years[idx - 1])} title="Предыдущий год">
+          <button
+            className="icon-btn"
+            disabled={idx <= 0}
+            onClick={() => setYear(years[idx - 1])}
+            title={t("Предыдущий год", "Previous year")}
+          >
             <Px name="arrowL" scale={2} />
           </button>
           <b>{year}</b>
-          <button className="icon-btn" disabled={idx >= years.length - 1} onClick={() => setYear(years[idx + 1])} title="Следующий год">
+          <button
+            className="icon-btn"
+            disabled={idx >= years.length - 1}
+            onClick={() => setYear(years[idx + 1])}
+            title={t("Следующий год", "Next year")}
+          >
             <Px name="arrowR" scale={2} />
           </button>
         </div>
@@ -173,7 +206,7 @@ function YearPixels({
               {m.label}
             </span>
           ))}
-          {["пн", "", "ср", "", "пт", "", "вс"].map((w, i) => (
+          {t(["пн", "", "ср", "", "пт", "", "вс"], ["Mon", "", "Wed", "", "Fri", "", "Sun"]).map((w, i) => (
             <span key={i} className="yw" style={{ gridColumn: 1, gridRow: i + 2 }}>
               {w}
             </span>
@@ -192,8 +225,8 @@ function YearPixels({
                   ? "future"
                   : "none";
             const title = s
-              ? `${longDate(c.date)} · «${s.name}»${s.rating ? ` · ${RATING_LABELS[s.rating]}` : s.sealed ? " · без оценки" : " · итоги открыты"}`
-              : `${longDate(c.date)}${c.date <= today ? " · без имени" : ""}`;
+              ? `${longDate(c.date)} · ${t(`«${s.name}»`, `"${s.name}"`)}${s.rating ? ` · ${RATING_LABELS[s.rating]}` : s.sealed ? t(" · без оценки", " · no rating") : t(" · итоги открыты", " · results open")}`
+              : `${longDate(c.date)}${c.date <= today ? t(" · без имени", " · unnamed") : ""}`;
             return (
               <button
                 key={c.date}
@@ -209,13 +242,13 @@ function YearPixels({
       </div>
       <div className="year-legend">
         <span>
-          <i className="yc none" /> без имени
+          <i className="yc none" /> {t("без имени", "unnamed")}
         </span>
         <span>
-          <i className="yc open" /> итоги открыты
+          <i className="yc open" /> {t("итоги открыты", "results open")}
         </span>
         <span>
-          <i className="yc auto" /> без оценки
+          <i className="yc auto" /> {t("без оценки", "no rating")}
         </span>
         {[1, 2, 3, 4, 5].map((r) => (
           <span key={r}>
@@ -237,10 +270,17 @@ function DayCard({ d, today, onOpen }: { d: DaySummary; today: string; onOpen: (
         <span>{shortMonth(d.date)}</span>
       </div>
       <div className="dc-body">
-        <div className="dc-name">«{d.name}»</div>
+        <div className="dc-name">{t(`«${d.name}»`, `"${d.name}"`)}</div>
         {d.summary ? (
           <div className="dc-sum">
-            «<Linkify inert text={d.summary} />»
+            {t(
+              <>
+                «<Linkify inert text={d.summary} />»
+              </>,
+              <>
+                "<Linkify inert text={d.summary} />"
+              </>,
+            )}
           </div>
         ) : (
           d.description && (
@@ -250,7 +290,7 @@ function DayCard({ d, today, onOpen }: { d: DaySummary; today: string; onOpen: (
           )
         )}
         <div className="dc-meta">
-          {d.date === today && <span className="tag">сегодня</span>}
+          {d.date === today && <span className="tag">{t("сегодня", "today")}</span>}
           {d.hasChecklist && (
             <span>
               <Px name="check" scale={1.5} /> {d.itemsDone}/{d.itemsTotal}
@@ -258,19 +298,35 @@ function DayCard({ d, today, onOpen }: { d: DaySummary; today: string; onOpen: (
           )}
           {d.hoursTotal > 0 && (
             <span>
-              <Px name="clock" scale={1.5} /> {hoursText(d.hoursDone)} из {hoursText(d.hoursTotal)} ч
+              <Px name="clock" scale={1.5} />{" "}
+              {t(`${hoursText(d.hoursDone)} из ${hoursText(d.hoursTotal)} ч`, `${hoursText(d.hoursDone)} of ${hoursText(d.hoursTotal)} h`)}
             </span>
           )}
           {d.hasResult && (
             <span>
-              <Px name="image" scale={1.5} /> доска
+              <Px name="image" scale={1.5} /> {t("доска", "board")}
             </span>
           )}
-          {d.late && <span className="tag">назван в тот же день</span>}
+          {d.late && <span className="tag">{t("назван в тот же день", "named the same day")}</span>}
         </div>
       </div>
-      <div className="dc-right" title={d.rating ? RATING_LABELS[d.rating] : d.sealed ? "Запечатан без оценки" : "Итоги ещё открыты"}>
-        {d.rating ? <Face rating={d.rating} scale={3} /> : d.sealed ? <Px name="lock" scale={2} /> : <span className="tag open">открыт</span>}
+      <div
+        className="dc-right"
+        title={
+          d.rating
+            ? RATING_LABELS[d.rating]
+            : d.sealed
+              ? t("Запечатан без оценки", "Sealed, no rating")
+              : t("Итоги ещё открыты", "Results still open")
+        }
+      >
+        {d.rating ? (
+          <Face rating={d.rating} scale={3} />
+        ) : d.sealed ? (
+          <Px name="lock" scale={2} />
+        ) : (
+          <span className="tag open">{t("открыт", "open")}</span>
+        )}
       </div>
     </button>
   );

@@ -1,6 +1,7 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errText, type Day, type Overview } from "./api";
+import { follow, t } from "./i18n";
 import { BoardScreen } from "./board/BoardScreen";
 import { DrillScreen } from "./drill/DrillScreen";
 import { ClockScreen } from "./screens/ClockScreen";
@@ -63,6 +64,7 @@ export default function App() {
   const refresh = useCallback(async () => {
     try {
       const o = await api.overview();
+      follow(o.settings.language);
       setOv(o);
       setSoundEnabled(o.settings.sounds);
       setFatal(null);
@@ -133,8 +135,9 @@ export default function App() {
   const hour = ov ? Number(ov.now.slice(11, 13)) : new Date().getHours();
   const nav: Nav | null = ov ? { ov, go, refresh, patchDay } : null;
 
-  let screen: React.ReactNode = <div className="loading">Загрузка…</div>;
-  if (fatal && !ov) screen = <div className="loading error">Не удалось загрузить данные: {fatal}</div>;
+  let screen: React.ReactNode = <div className="loading">{t("Загрузка…", "Loading...")}</div>;
+  if (fatal && !ov)
+    screen = <div className="loading error">{t(`Не удалось загрузить данные: ${fatal}`, `Couldn't load data: ${fatal}`)}</div>;
   else if (nav) {
     switch (route.name) {
       case "today":

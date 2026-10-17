@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api, type DrillDeckInfo, type DrillGoal, type DrillOrder, type DrillOverview, type DrillPreset, type DrillSource } from "../api";
+import { t } from "../i18n";
 import { Button, Check, Modal, toastError } from "../ui/kit";
 
 const BLANK: DrillPreset = {
@@ -15,27 +16,43 @@ const BLANK: DrillPreset = {
   escape: "hold",
   limitMinutes: 30,
   selfCheck: false,
-  theoryLabel: "Теория",
+  theoryLabel: t("Теория", "Theory"),
   peekKeepsBox: true,
 };
 
 const ORDERS: { value: DrillOrder; label: string; hint: string }[] = [
   {
     value: "smart",
-    label: "Умный",
-    hint: "Интервальное повторение: сначала карточки, которым пора, и промахи, новые вперемешку, темы чередуются.",
+    label: t("Умный", "Smart"),
+    hint: t(
+      "Интервальное повторение: сначала карточки, которым пора, и промахи, новые вперемешку, темы чередуются.",
+      "Spaced repetition: due cards and misses first, new ones mixed in, topics take turns.",
+    ),
   },
-  { value: "random", label: "Случайно", hint: "Все карточки в случайном порядке." },
-  { value: "sequence", label: "По порядку", hint: "Как в наборе; следующий сеанс продолжит с места, где остановился прошлый." },
+  { value: "random", label: t("Случайно", "Random"), hint: t("Все карточки в случайном порядке.", "All cards in random order.") },
+  {
+    value: "sequence",
+    label: t("По порядку", "In order"),
+    hint: t(
+      "Как в наборе; следующий сеанс продолжит с места, где остановился прошлый.",
+      "As in the deck; the next session picks up where the last one stopped.",
+    ),
+  },
 ];
 
 const KIND_NOTE = (d: DrillDeckInfo) =>
-  d.kind === "generator" ? (d.enabled ? ", генератор" : ", генератор выключен") : d.kind === "bank" && !d.builtin ? ", банк" : "";
+  d.kind === "generator"
+    ? d.enabled
+      ? t(", генератор", ", generator")
+      : t(", генератор выключен", ", generator off")
+    : d.kind === "bank" && !d.builtin
+      ? t(", банк", ", bank")
+      : "";
 
 const GOALS: { value: DrillGoal; label: string }[] = [
-  { value: "correct", label: "верных ответов" },
-  { value: "cards", label: "карточек" },
-  { value: "minutes", label: "минут" },
+  { value: "correct", label: t("верных ответов", "right answers") },
+  { value: "cards", label: t("карточек", "cards") },
+  { value: "minutes", label: t("минут", "minutes") },
 ];
 
 export function PresetEditor({
@@ -49,7 +66,7 @@ export function PresetEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [p, setP] = useState<DrillPreset>(() => structuredClone(preset ?? { ...BLANK, name: "Новый режим" }));
+  const [p, setP] = useState<DrillPreset>(() => structuredClone(preset ?? { ...BLANK, name: t("Новый режим", "New mode") }));
   const [main, setMain] = useState(preset ? preset.id === ov.defaultPreset : false);
   const [busy, setBusy] = useState(false);
   const set = (patch: Partial<DrillPreset>) => setP((x) => ({ ...x, ...patch }));
@@ -81,28 +98,28 @@ export function PresetEditor({
   return (
     <Modal
       wide
-      title={preset ? "Режим Зубрилки" : "Новый режим"}
+      title={preset ? t("Режим Зубрилки", "Drill mode") : t("Новый режим", "New mode")}
       onClose={onClose}
       footer={
         <>
-          <Check checked={main} onChange={setMain} label="Основной режим" />
+          <Check checked={main} onChange={setMain} label={t("Основной режим", "Default mode")} />
           <span className="grow" />
           <Button kind="paper" onClick={onClose}>
-            Отмена
+            {t("Отмена", "Cancel")}
           </Button>
           <Button icon="check" disabled={busy || !p.sources.length} onClick={() => void save()}>
-            Сохранить
+            {t("Сохранить", "Save")}
           </Button>
         </>
       }
     >
       <div className="drill-form">
         <label className="drill-field">
-          <span>Название</span>
+          <span>{t("Название", "Name")}</span>
           <input className="field" value={p.name} maxLength={60} onChange={(e) => set({ name: e.target.value })} />
         </label>
 
-        <h3 className="drill-h">Что зубрить</h3>
+        <h3 className="drill-h">{t("Что зубрить", "What to drill")}</h3>
         <div className="drill-sources">
           {ov.decks.map((d) => {
             const src = source(d.id);
@@ -115,16 +132,23 @@ export function PresetEditor({
                       className={`drill-tchip${src.topics.length === 0 ? " on" : ""}`}
                       onClick={() => set({ sources: p.sources.map((s) => (s.deck === d.id ? { ...s, topics: [] } : s)) })}
                     >
-                      {d.gate.enabled ? "открытые темы" : "все темы"}
+                      {d.gate.enabled ? t("открытые темы", "open topics") : t("все темы", "all topics")}
                     </button>
-                    {d.topics.map((t) => (
+                    {d.topics.map((topic) => (
                       <button
-                        key={t.id}
-                        className={`drill-tchip${src.topics.includes(t.id) ? " on" : ""}${t.open ? "" : " locked"}`}
-                        title={t.open ? "" : "Тема ещё закрыта, но если выбрать её здесь, она попадёт в сеанс"}
-                        onClick={() => toggleTopic(src, t.id)}
+                        key={topic.id}
+                        className={`drill-tchip${src.topics.includes(topic.id) ? " on" : ""}${topic.open ? "" : " locked"}`}
+                        title={
+                          topic.open
+                            ? ""
+                            : t(
+                                "Тема ещё закрыта, но если выбрать её здесь, она попадёт в сеанс",
+                                "This topic is still locked, but if you pick it here, it goes into the session",
+                              )
+                        }
+                        onClick={() => toggleTopic(src, topic.id)}
                       >
-                        {t.title}
+                        {topic.title}
                       </button>
                     ))}
                   </div>
@@ -134,7 +158,7 @@ export function PresetEditor({
           })}
         </div>
 
-        <h3 className="drill-h">Как</h3>
+        <h3 className="drill-h">{t("Как", "How")}</h3>
         <div className="seg">
           {ORDERS.map((o) => (
             <button key={o.value} className={p.order === o.value ? "on" : ""} onClick={() => set({ order: o.value })}>
@@ -144,7 +168,7 @@ export function PresetEditor({
         </div>
         <p className="muted">{ORDERS.find((o) => o.value === p.order)?.hint}</p>
         <div className="row">
-          <span>Сеанс идёт до</span>
+          <span>{t("Сеанс идёт до", "Session ends at")}</span>
           <input
             className="field drill-num"
             type="number"
@@ -161,64 +185,94 @@ export function PresetEditor({
             ))}
           </select>
         </div>
-        <Check checked={p.retry} onChange={(v) => set({ retry: v })} label="Промах возвращается позже в том же сеансе (с новыми данными)" />
-        <Check checked={p.explain} onChange={(v) => set({ explain: v })} label="Показывать правило и после верного ответа" />
+        <Check
+          checked={p.retry}
+          onChange={(v) => set({ retry: v })}
+          label={t(
+            "Промах возвращается позже в том же сеансе (с новыми данными)",
+            "A miss comes back later in the same session (with new data)",
+          )}
+        />
+        <Check
+          checked={p.explain}
+          onChange={(v) => set({ explain: v })}
+          label={t("Показывать правило и после верного ответа", "Show the rule after a right answer too")}
+        />
 
-        <h3 className="drill-h">Как проверять ответы</h3>
+        <h3 className="drill-h">{t("Как проверять ответы", "How to check answers")}</h3>
         <div className="seg">
           <button className={!p.selfCheck ? "on" : ""} onClick={() => set({ selfCheck: false })}>
-            По правилам карточек
+            {t("По правилам карточек", "By card rules")}
           </button>
           <button className={p.selfCheck ? "on" : ""} onClick={() => set({ selfCheck: true })}>
-            Самопроверка
+            {t("Самопроверка", "Self-check")}
           </button>
         </div>
         <p className="muted">
           {p.selfCheck
-            ? "Ответ не печатаешь: вспоминаешь, открываешь правильный и честно отмечаешь, знал ли."
-            : "Каждый набор сам задаёт, как сравнивать ответ: текст, литерал Python, форма, число или выбор. Это меняется во вкладке «Наборы»."}
+            ? t(
+                "Ответ не печатаешь: вспоминаешь, открываешь правильный и честно отмечаешь, знал ли.",
+                "You don't type the answer: you recall it, reveal the right one and honestly mark if you knew it.",
+              )
+            : t(
+                "Каждый набор сам задаёт, как сравнивать ответ: текст, литерал Python, форма, число или выбор. Это меняется во вкладке «Наборы».",
+                'Each deck sets how to compare the answer: text, Python literal, shape, number or choice. You change this on the "Decks" tab.',
+              )}
         </p>
 
-        <h3 className="drill-h">Теория в сеансе</h3>
+        <h3 className="drill-h">{t("Теория в сеансе", "Theory during a session")}</h3>
         <div className="row">
-          <span>Подпись лампочки</span>
+          <span>{t("Подпись лампочки", "Bulb caption")}</span>
           <input
             className="field drill-label"
             value={p.theoryLabel}
             maxLength={24}
-            placeholder="только значок"
+            placeholder={t("только значок", "icon only")}
             onChange={(e) => set({ theoryLabel: e.target.value })}
           />
         </div>
-        <p className="muted">Лампочка в карточке открывает справочник в любой момент сеанса. Пустая подпись оставит только значок.</p>
+        <p className="muted">
+          {t(
+            "Лампочка в карточке открывает справочник в любой момент сеанса. Пустая подпись оставит только значок.",
+            "The bulb on a card opens the reference at any point in a session. An empty caption leaves just the icon.",
+          )}
+        </p>
         <Check
           checked={p.peekKeepsBox}
           onChange={(v) => set({ peekKeepsBox: v })}
-          label="Если открыл теорию до ответа, карточка не повышается и вернётся сегодня"
+          label={t(
+            "Если открыл теорию до ответа, карточка не повышается и вернётся сегодня",
+            "If you open theory before answering, the card stays in its box and comes back today",
+          )}
         />
 
-        <h3 className="drill-h">Условия</h3>
+        <h3 className="drill-h">{t("Условия", "Conditions")}</h3>
         <div className="seg">
           <button className={p.screen === "lock" ? "on" : ""} onClick={() => set({ screen: "lock" })}>
-            Замок на весь экран
+            {t("Замок на весь экран", "Full screen lock")}
           </button>
           <button className={p.screen === "window" ? "on" : ""} onClick={() => set({ screen: "window" })}>
-            Обычное окно
+            {t("Обычное окно", "Normal window")}
           </button>
         </div>
         {p.screen === "lock" ? (
           <>
-            <p className="muted">Окно закрывает все мониторы и возвращает себе фокус, Alt+F4 его не закрывает.</p>
+            <p className="muted">
+              {t(
+                "Окно закрывает все мониторы и возвращает себе фокус, Alt+F4 его не закрывает.",
+                "The window covers all monitors and takes the focus back; Alt+F4 does not close it.",
+              )}
+            </p>
             <div className="seg">
               <button className={p.escape === "hold" ? "on" : ""} onClick={() => set({ escape: "hold" })}>
-                Выход: Esc 5 секунд
+                {t("Выход: Esc 5 секунд", "Exit: hold Esc 5 s")}
               </button>
               <button className={p.escape === "none" ? "on" : ""} onClick={() => set({ escape: "none" })}>
-                Без выхода
+                {t("Без выхода", "No exit")}
               </button>
             </div>
             <div className="row">
-              <span>Замок откроется сам через</span>
+              <span>{t("Замок откроется сам через", "The lock opens by itself after")}</span>
               <input
                 className="field drill-num"
                 type="number"
@@ -227,11 +281,16 @@ export function PresetEditor({
                 value={p.limitMinutes}
                 onChange={(e) => set({ limitMinutes: Math.max(5, Math.min(180, Number(e.target.value) || 5)) })}
               />
-              <span>мин</span>
+              <span>{t("мин", "min")}</span>
             </div>
           </>
         ) : (
-          <p className="muted">Сеанс идёт во вкладке Зубрилки, его можно закончить в любой момент.</p>
+          <p className="muted">
+            {t(
+              "Сеанс идёт во вкладке Зубрилки, его можно закончить в любой момент.",
+              "The session runs in the Drill tab, and you can finish it at any time.",
+            )}
+          </p>
         )}
       </div>
     </Modal>

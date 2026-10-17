@@ -31,7 +31,7 @@ fn chars(s: &str) -> usize {
 fn text(s: &str, max: usize, what: &str) -> Result<String, String> {
     let t = s.trim().to_string();
     if chars(&t) > max {
-        return Err(format!("{what}: не длиннее {max} символов."));
+        return Err(tr!("{what}: не длиннее {max} символов.", "{what}: at most {max} characters."));
     }
     Ok(t)
 }
@@ -39,13 +39,13 @@ fn text(s: &str, max: usize, what: &str) -> Result<String, String> {
 fn date_opt(s: Option<&str>, what: &str) -> Result<Option<String>, String> {
     match s.map(str::trim).filter(|s| !s.is_empty()) {
         None => Ok(None),
-        Some(d) => parse_date(d).map(|_| Some(d.to_string())).ok_or_else(|| format!("{what}: дата нужна в виде ГГГГ-ММ-ДД.")),
+        Some(d) => parse_date(d).map(|_| Some(d.to_string())).ok_or_else(|| tr!("{what}: дата нужна в виде ГГГГ-ММ-ДД.", "{what}: the date must look like YYYY-MM-DD.")),
     }
 }
 
 fn hour(h: Option<u8>) -> Result<Option<u8>, String> {
     match h {
-        Some(h) if h > 23 => Err("Час начала должен быть от 0 до 23.".into()),
+        Some(h) if h > 23 => Err(tr!("Час начала должен быть от 0 до 23.", "The start hour must be from 0 to 23.")),
         _ => Ok(h),
     }
 }
@@ -53,7 +53,7 @@ fn hour(h: Option<u8>) -> Result<Option<u8>, String> {
 fn minutes(m: Option<u32>, max: u32) -> Result<Option<u32>, String> {
     match m {
         Some(0) => Ok(None),
-        Some(m) if m > max => Err(format!("Минут должно быть не больше {max}.")),
+        Some(m) if m > max => Err(tr!("Минут должно быть не больше {max}.", "Minutes must be at most {max}.")),
         _ => Ok(m),
     }
 }
@@ -62,7 +62,7 @@ fn days(d: &[u8]) -> Result<Vec<u8>, String> {
     let mut out: Vec<u8> = Vec::new();
     for &x in d {
         if !(1..=7).contains(&x) {
-            return Err("Дни недели задаются числами от 1 (понедельник) до 7 (воскресенье).".into());
+            return Err(tr!("Дни недели задаются числами от 1 (понедельник) до 7 (воскресенье).", "Weekdays are numbers from 1 (Monday) to 7 (Sunday)."));
         }
         if !out.contains(&x) {
             out.push(x);
@@ -89,14 +89,14 @@ fn fresh_id(want: Option<&str>, seen: &mut HashSet<String>) -> String {
 }
 
 fn apply_fields(goal: &mut Goal, input: &GoalInput) -> Result<(), String> {
-    let title = text(&input.title, 80, "Название цели")?;
+    let title = text(&input.title, 80, &tr!("Название цели", "Goal title"))?;
     if title.is_empty() {
-        return Err("Дай цели название.".into());
+        return Err(tr!("Дай цели название.", "Give the goal a title."));
     }
     goal.title = title;
-    goal.outcome = text(&input.outcome, 600, "Итог цели")?;
-    goal.note = text(&input.note, 4000, "Заметка цели")?;
-    goal.deadline = date_opt(input.deadline.as_deref(), "Срок")?;
+    goal.outcome = text(&input.outcome, 600, &tr!("Итог цели", "Goal outcome"))?;
+    goal.note = text(&input.note, 4000, &tr!("Заметка цели", "Goal note"))?;
+    goal.deadline = date_opt(input.deadline.as_deref(), &tr!("Срок", "Deadline"))?;
     goal.minutes_per_day = minutes(input.minutes_per_day, 960)?;
     goal.days = days(&input.days)?;
     goal.start_hour = hour(input.start_hour)?;
@@ -122,7 +122,7 @@ pub fn find_task<'a>(goal: &'a Goal, id: &str) -> Option<(&'a Topic, &'a GoalTas
 fn build_tasks(inputs: &[GoalTaskInput], old: &[GoalTask], seen: &mut HashSet<String>) -> Result<Vec<GoalTask>, String> {
     let mut out: Vec<GoalTask> = Vec::new();
     for inp in inputs {
-        let txt = text(&inp.text, 300, "Задача")?;
+        let txt = text(&inp.text, 300, &tr!("Задача", "Task"))?;
         if txt.is_empty() {
             continue;
         }
@@ -134,13 +134,13 @@ fn build_tasks(inputs: &[GoalTaskInput], old: &[GoalTask], seen: &mut HashSet<St
         task.text = txt;
         task.minutes = minutes(inp.minutes, 960)?;
         task.kind = inp.kind;
-        task.done_when = text(&inp.done_when, 300, "Критерий готовности")?;
+        task.done_when = text(&inp.done_when, 300, &tr!("Критерий готовности", "Done when"))?;
         out.push(task);
     }
     let mut all: Vec<GoalTask> = old.iter().filter(|t| t.status == TaskStatus::Done && !out.iter().any(|o| o.id == t.id)).cloned().collect();
     all.extend(out);
     if all.len() > MAX_TASKS {
-        return Err(format!("В теме может быть не больше {MAX_TASKS} задач."));
+        return Err(tr!("В теме может быть не больше {MAX_TASKS} задач.", "A topic can have at most {MAX_TASKS} tasks."));
     }
     Ok(all)
 }
@@ -211,13 +211,13 @@ fn upsert_topics(goal: &mut Goal, upsert: Vec<TopicInput>, remove: &[String]) ->
             }
         };
         if let Some(title) = inp.title.as_deref() {
-            goal.topics[idx].title = text(title, 120, "Название темы")?;
+            goal.topics[idx].title = text(title, 120, &tr!("Название темы", "Topic title"))?;
         }
         if goal.topics[idx].title.is_empty() {
-            return Err("У каждой темы должно быть название.".into());
+            return Err(tr!("У каждой темы должно быть название.", "Every topic needs a title."));
         }
         if let Some(note) = inp.note.as_deref() {
-            goal.topics[idx].note = text(note, 4000, "Заметка темы")?;
+            goal.topics[idx].note = text(note, 4000, &tr!("Заметка темы", "Topic note"))?;
         }
         if let Some(list) = inp.tasks.as_ref() {
             let old = std::mem::take(&mut goal.topics[idx].tasks);
@@ -228,21 +228,21 @@ fn upsert_topics(goal: &mut Goal, upsert: Vec<TopicInput>, remove: &[String]) ->
         }
     }
     if goal.topics.len() > MAX_TOPICS {
-        return Err(format!("В цели может быть не больше {MAX_TOPICS} тем."));
+        return Err(tr!("В цели может быть не больше {MAX_TOPICS} тем.", "A goal can have at most {MAX_TOPICS} topics."));
     }
     let titles: Vec<(String, String)> = goal.topics.iter().map(|t| (t.id.clone(), t.title.clone())).collect();
     let mut names = HashSet::new();
     for (_, t) in &titles {
         if !names.insert(t.to_lowercase()) {
-            return Err(format!("Две темы называются одинаково: «{t}»."));
+            return Err(tr!("Две темы называются одинаково: «{t}».", "Two topics have the same title: \"{t}\"."));
         }
     }
     for (id, raw) in wiring {
         let mut reqs: Vec<String> = Vec::new();
         for r in raw {
-            let rid = find_topic(&r, &alias, &titles).ok_or_else(|| format!("Неизвестная тема в зависимостях: «{r}»."))?;
+            let rid = find_topic(&r, &alias, &titles).ok_or_else(|| tr!("Неизвестная тема в зависимостях: «{r}».", "Unknown topic in prerequisites: \"{r}\"."))?;
             if rid == id {
-                return Err("Тема не может зависеть от самой себя.".into());
+                return Err(tr!("Тема не может зависеть от самой себя.", "A topic can't depend on itself."));
             }
             if !reqs.contains(&rid) {
                 reqs.push(rid);
@@ -253,7 +253,7 @@ fn upsert_topics(goal: &mut Goal, upsert: Vec<TopicInput>, remove: &[String]) ->
         }
     }
     if let Some(c) = find_cycle(&goal.topics) {
-        return Err(format!("Темы зависят друг от друга по кругу: {}.", c.join(" → ")));
+        return Err(tr!("Темы зависят друг от друга по кругу: {}.", "Topics depend on each other in a cycle: {}.", c.join(" → ")));
     }
     Ok(())
 }
@@ -262,7 +262,7 @@ pub fn save(store: &Store, at: NaiveDateTime, input: GoalInput, author: Author) 
     let _g = store.lock();
     let now = fmt_dt(at);
     let mut goal = match input.id.as_deref() {
-        Some(id) => store.load_goal(id).ok_or("Цель не найдена.")?,
+        Some(id) => store.load_goal(id).ok_or_else(|| tr!("Цель не найдена.", "Goal not found."))?,
         None => Goal { id: uid(), author, created_at: now.clone(), ..Goal::default() },
     };
     apply_fields(&mut goal, &input)?;
@@ -277,7 +277,7 @@ pub fn save(store: &Store, at: NaiveDateTime, input: GoalInput, author: Author) 
 
 pub fn update(store: &Store, at: NaiveDateTime, id: &str, patch: GoalPatch) -> Result<Goal, String> {
     let _g = store.lock();
-    let mut goal = store.load_goal(id).ok_or("Цель не найдена.")?;
+    let mut goal = store.load_goal(id).ok_or_else(|| tr!("Цель не найдена.", "Goal not found."))?;
     let input = GoalInput {
         id: Some(goal.id.clone()),
         title: patch.title.unwrap_or_else(|| goal.title.clone()),
@@ -298,7 +298,7 @@ pub fn update(store: &Store, at: NaiveDateTime, id: &str, patch: GoalPatch) -> R
 
 pub fn edit_topics(store: &Store, at: NaiveDateTime, id: &str, upsert: Vec<TopicInput>, remove: Vec<String>) -> Result<Goal, String> {
     let _g = store.lock();
-    let mut goal = store.load_goal(id).ok_or("Цель не найдена.")?;
+    let mut goal = store.load_goal(id).ok_or_else(|| tr!("Цель не найдена.", "Goal not found."))?;
     upsert_topics(&mut goal, upsert, &remove)?;
     goal.updated_at = fmt_dt(at);
     store.save_goal(&goal)?;
@@ -308,9 +308,9 @@ pub fn edit_topics(store: &Store, at: NaiveDateTime, id: &str, upsert: Vec<Topic
 
 pub fn set_status(store: &Store, at: NaiveDateTime, id: &str, status: GoalStatus) -> Result<Goal, String> {
     let _g = store.lock();
-    let mut goal = store.load_goal(id).ok_or("Цель не найдена.")?;
+    let mut goal = store.load_goal(id).ok_or_else(|| tr!("Цель не найдена.", "Goal not found."))?;
     if status == GoalStatus::Active && tasks(&goal).next().is_none() {
-        return Err("В цели нет ни одной задачи: добавь темы и задачи на карте.".into());
+        return Err(tr!("В цели нет ни одной задачи: добавь темы и задачи на карте.", "The goal has no tasks: add topics and tasks on the map."));
     }
     goal.status = status;
     goal.updated_at = fmt_dt(at);
@@ -351,19 +351,19 @@ fn tick_planned(store: &Store, at: NaiveDateTime, goal_id: &str, task_id: &str, 
 pub fn record(store: &Store, at: NaiveDateTime, goal_id: &str, task_id: &str, input: ResultInput, by: Author) -> Result<Goal, String> {
     let _g = store.lock();
     let c = ctx(store, at);
-    let mut goal = store.load_goal(goal_id).ok_or("Цель не найдена.")?;
+    let mut goal = store.load_goal(goal_id).ok_or_else(|| tr!("Цель не найдена.", "Goal not found."))?;
     if input.score.is_some_and(|s| s > 100) {
-        return Err("Балл задаётся от 0 до 100.".into());
+        return Err(tr!("Балл задаётся от 0 до 100.", "The score is from 0 to 100."));
     }
     if input.confidence.is_some_and(|c| !(1..=5).contains(&c)) {
-        return Err("Уверенность задаётся от 1 до 5.".into());
+        return Err(tr!("Уверенность задаётся от 1 до 5.", "Confidence is from 1 to 5."));
     }
     if input.status == Some(TaskStatus::Planned) {
-        return Err("Статус planned ставит само приложение, когда задача попадает в план.".into());
+        return Err(tr!("Статус planned ставит само приложение, когда задача попадает в план.", "The app sets the planned status itself when a task goes into a plan."));
     }
     let has_result = input.minutes.is_some() || input.score.is_some() || input.confidence.is_some() || input.note.is_some();
     if !has_result && input.status.is_none() {
-        return Err("Нечего записать: укажи статус или результат.".into());
+        return Err(tr!("Нечего записать: укажи статус или результат.", "Nothing to record: give a status or a result."));
     }
     let now = fmt_dt(at);
     let result = if has_result {
@@ -371,14 +371,14 @@ pub fn record(store: &Store, at: NaiveDateTime, goal_id: &str, task_id: &str, in
             minutes: minutes(input.minutes, 1440)?,
             score: input.score,
             confidence: input.confidence,
-            note: text(input.note.as_deref().unwrap_or(""), 2000, "Заметка к результату")?,
+            note: text(input.note.as_deref().unwrap_or(""), 2000, &tr!("Заметка к результату", "Result note"))?,
             at: now.clone(),
             by,
         })
     } else {
         None
     };
-    let task = tasks_mut(&mut goal).find(|t| t.id == task_id).ok_or("Задача не найдена.")?;
+    let task = tasks_mut(&mut goal).find(|t| t.id == task_id).ok_or_else(|| tr!("Задача не найдена.", "Task not found."))?;
     let planned = task.planned_for.clone();
     if result.is_some() {
         task.result = result;

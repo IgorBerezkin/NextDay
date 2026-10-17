@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { t } from "../i18n";
 import { parseBoard, type Board } from "./model";
 import { BoardView } from "./Stage";
 
@@ -32,7 +33,7 @@ export function BoardThumb({
   onOpen: () => void;
 }) {
   return (
-    <div className="thumb" title="Открыть доску">
+    <div className="thumb" title={t("Открыть доску", "Open board")}>
       <BoardView board={board} date={date} dataDir={dataDir} doneRefs={doneRefs} onClick={onOpen} />
     </div>
   );

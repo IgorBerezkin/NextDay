@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { t } from "../i18n";
 import { Linkify, openTarget } from "../ui/kit";
 import { DataView } from "./DataView";
 import { Code } from "./drillKit";
@@ -104,7 +105,7 @@ function parse(src: string): Block[] {
   return out;
 }
 
-const INLINE = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*\s][^*]*\*)|(\[[^\]]+\]\([^)\s]+\))/g;
+const INLINE = /(`[^`]+`)|(\*\*(?:`[^`]*`|[^*`]|\*(?!\*))+\*\*)|(\*[^*\s][^*]*\*)|(\[[^\]]+\]\([^)\s]+\))/g;
 
 function Inline({ text, inert }: { text: string; inert?: boolean }) {
   const parts: ReactNode[] = [];
@@ -120,7 +121,12 @@ function Inline({ text, inert }: { text: string; inert?: boolean }) {
           {tok.slice(1, -1)}
         </code>,
       );
-    else if (m[2]) parts.push(<b key={m.index}>{tok.slice(2, -2)}</b>);
+    else if (m[2])
+      parts.push(
+        <b key={m.index}>
+          <Inline text={tok.slice(2, -2)} inert={inert} />
+        </b>,
+      );
     else if (m[3]) parts.push(<i key={m.index}>{tok.slice(1, -1)}</i>);
     else {
       const lm = tok.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
@@ -183,11 +189,11 @@ function ChartBlock({ text }: { text: string }) {
   let err = "";
   try {
     spec = JSON.parse(text) as ChartSpec;
-    if (!Array.isArray(spec.series) || !spec.series.length) throw new Error("нет series");
+    if (!Array.isArray(spec.series) || !spec.series.length) throw new Error(t("нет series", "no series"));
   } catch (e) {
     err = (e as Error).message;
   }
-  if (!spec || err) return <pre className="viz-error">График не построен: {err}</pre>;
+  if (!spec || err) return <pre className="viz-error">{t(`График не построен: ${err}`, `Can't draw the chart: ${err}`)}</pre>;
   return <Chart spec={spec} />;
 }
 

@@ -1,3 +1,5 @@
+#[macro_use]
+mod i18n;
 mod ai_guide;
 mod autostart;
 mod clock;
@@ -197,8 +199,8 @@ pub fn hide_to_tray(app: &AppHandle) {
     if first_time {
         notify::show(
             app,
-            "Next Day работает в трее",
-            "Окно спрятано, напоминания придут вовремя.",
+            &tr!("Next Day работает в трее", "Next Day keeps running in the tray"),
+            &tr!("Окно спрятано, напоминания придут вовремя.", "The window is hidden, reminders will come on time."),
             "today",
             &[],
         );
@@ -292,6 +294,7 @@ pub fn run() {
             }
             let dir = data_dir(app)?;
             let store = store::Store::open(dir.clone())?;
+            i18n::set(&store.load_settings().language);
             if !store.settings_exist() {
                 let s = model::Settings::default();
                 store.save_settings(&s)?;

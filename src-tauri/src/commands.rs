@@ -72,10 +72,10 @@ pub async fn import_image(store: State<'_, Store>, request: Request<'_>) -> Resu
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string())
     };
-    let date = header("x-date").ok_or("Не указан день.")?;
+    let date = header("x-date").ok_or_else(|| tr!("Не указан день.", "No day given."))?;
     let ext = header("x-ext").unwrap_or_else(|| "png".into());
     let InvokeBody::Raw(bytes) = request.body() else {
-        return Err("Картинка пришла не байтами.".into());
+        return Err(tr!("Картинка пришла не байтами.", "The image did not arrive as bytes."));
     };
     logic::import_image(&store, clock::now(), &date, &ext, bytes)
 }
@@ -101,6 +101,8 @@ pub fn seal_day(
 #[tauri::command]
 pub fn save_settings(app: AppHandle, store: State<'_, Store>, settings: Settings) -> Result<Settings, String> {
     let s = logic::save_settings(&store, settings)?;
+    crate::i18n::set(&s.language);
+    crate::tray::relabel(&app);
     scheduler::refresh_tray(&app);
     Ok(s)
 }
@@ -114,10 +116,10 @@ pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<bool, String> {
 pub fn test_notification(app: AppHandle) {
     notify::show(
         &app,
-        "Проверка связи",
-        "Так будут выглядеть напоминания Next Day.",
+        &tr!("Проверка связи", "Connection test"),
+        &tr!("Так будут выглядеть напоминания Next Day.", "This is how Next Day reminders look."),
         "settings",
-        &[("Открыть", "open:settings")],
+        &[(tr!("Открыть", "Open").as_str(), "open:settings")],
     );
 }
 
@@ -154,7 +156,7 @@ pub fn install_update(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn debug_shift_time(app: AppHandle, minutes: i64) -> Result<String, String> {
     if !debug_mode() {
-        return Err("Доступно только в режиме отладки.".into());
+        return Err(tr!("Доступно только в режиме отладки.", "Available only in debug mode."));
     }
     clock::shift(minutes);
     scheduler::tick(&app);
@@ -165,7 +167,7 @@ pub fn debug_shift_time(app: AppHandle, minutes: i64) -> Result<String, String> 
 #[tauri::command]
 pub fn debug_tick(app: AppHandle) -> Result<(), String> {
     if !debug_mode() {
-        return Err("Доступно только в режиме отладки.".into());
+        return Err(tr!("Доступно только в режиме отладки.", "Available only in debug mode."));
     }
     scheduler::tick(&app);
     Ok(())
@@ -179,7 +181,7 @@ pub fn list_goals(store: State<'_, Store>) -> Vec<GoalView> {
 fn goal_changed(app: &AppHandle, store: &Store, id: &str) -> Result<GoalView, String> {
     scheduler::refresh_tray(app);
     let _ = app.emit("data-changed", ());
-    goals::view(store, clock::now(), id).ok_or_else(|| "Цель не найдена.".into())
+    goals::view(store, clock::now(), id).ok_or_else(|| tr!("Цель не найдена.", "Goal not found."))
 }
 
 #[tauri::command]
@@ -356,7 +358,7 @@ pub async fn drill_start(app: AppHandle, preset_id: String, generated: Option<dr
     let (id, lock_screen, view) = {
         let mut g = rt.0.lock().unwrap_or_else(|e| e.into_inner());
         if g.as_ref().is_some_and(|s| s.ended.is_none()) {
-            return Err("Сеанс уже идёт.".into());
+            return Err(tr!("Сеанс уже идёт.", "A session is already running."));
         }
         let s = drill::start(&store, now, &preset_id, generated.unwrap_or_default())?;
         let out = (s.id.clone(), s.preset.screen == drill::Screen::Lock, drill::view(&s, now));
@@ -367,7 +369,7 @@ pub async fn drill_start(app: AppHandle, preset_id: String, generated: Option<dr
         if let Err(e) = lock::open(&app) {
             rt.0.lock().unwrap_or_else(|e| e.into_inner()).take();
             lock::close_windows(&app);
-            return Err(format!("Не удалось закрыть экран: {e}"));
+            return Err(tr!("Не удалось закрыть экран: {e}", "Could not open the screen lock: {e}"));
         }
     }
     lock::watch(app.clone(), id);
@@ -450,7 +452,7 @@ pub fn drill_session(rt: State<'_, DrillRuntime>) -> Option<drill::SessionView> 
 #[tauri::command]
 pub fn drill_reveal(rt: State<'_, DrillRuntime>) -> Result<drill::SessionView, String> {
     let mut g = rt.0.lock().unwrap_or_else(|e| e.into_inner());
-    let s = g.as_mut().ok_or("Сеанса нет.")?;
+    let s = g.as_mut().ok_or_else(|| tr!("Сеанса нет.", "No session is running."))?;
     drill::reveal(s)?;
     Ok(drill::view(s, clock::now()))
 }
@@ -458,7 +460,7 @@ pub fn drill_reveal(rt: State<'_, DrillRuntime>) -> Result<drill::SessionView, S
 #[tauri::command]
 pub fn drill_answer(store: State<'_, Store>, rt: State<'_, DrillRuntime>, input: drill::AnswerInput) -> Result<drill::AnswerView, String> {
     let mut g = rt.0.lock().unwrap_or_else(|e| e.into_inner());
-    let s = g.as_mut().ok_or("Сеанса нет.")?;
+    let s = g.as_mut().ok_or_else(|| tr!("Сеанса нет.", "No session is running."))?;
     drill::answer(&store, s, clock::now(), input)
 }
 
@@ -468,9 +470,9 @@ pub async fn drill_escape(app: AppHandle) -> Result<drill::SessionRecord, String
     let rt = app.state::<DrillRuntime>();
     let (rec, id) = {
         let mut g = rt.0.lock().unwrap_or_else(|e| e.into_inner());
-        let s = g.as_mut().ok_or("Сеанса нет.")?;
+        let s = g.as_mut().ok_or_else(|| tr!("Сеанса нет.", "No session is running."))?;
         if s.preset.screen == drill::Screen::Lock && s.preset.escape == drill::Escape::Off && s.ended.is_none() {
-            return Err("В этом режиме выхода нет: только ответы или потолок времени.".into());
+            return Err(tr!("В этом режиме выхода нет: только ответы или потолок времени.", "This mode has no exit: only answers or the time limit."));
         }
         let outcome = if s.preset.screen == drill::Screen::Lock { drill::Outcome::Escape } else { drill::Outcome::Stopped };
         (drill::finish(&store, s, clock::now(), outcome), s.id.clone())

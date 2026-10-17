@@ -22,7 +22,7 @@ pub fn ctx(store: &Store, at: NaiveDateTime) -> Ctx {
 }
 
 fn date_arg(s: &str) -> Result<NaiveDate, String> {
-    parse_date(s).ok_or_else(|| format!("Непонятная дата: {s}"))
+    parse_date(s).ok_or_else(|| tr!("Непонятная дата: {s}", "Unclear date: {s}"))
 }
 
 fn chars(s: &str) -> usize {
@@ -31,10 +31,10 @@ fn chars(s: &str) -> usize {
 
 fn ensure_open(c: &Ctx, date: NaiveDate) -> Result<(), String> {
     if date > c.today {
-        return Err("Этот день ещё не начался.".into());
+        return Err(tr!("Этот день ещё не начался.", "This day has not started yet."));
     }
     if date < prev(c.today) {
-        return Err("Этот день уже закрыт, его можно только смотреть.".into());
+        return Err(tr!("Этот день уже закрыт, его можно только смотреть.", "This day is closed, you can only look at it."));
     }
     Ok(())
 }
@@ -52,9 +52,9 @@ fn open_day(store: &Store, c: &Ctx, date_s: &str) -> Result<Day, String> {
     let day = store
         .load_day(date_s)
         .filter(|d| d.has_plan())
-        .ok_or("У этого дня нет плана.")?;
+        .ok_or_else(|| tr!("У этого дня нет плана.", "This day has no plan."))?;
     if day.result.sealed {
-        return Err("День запечатан, его можно только смотреть.".into());
+        return Err(tr!("День запечатан, его можно только смотреть.", "The day is sealed, you can only look at it."));
     }
     Ok(arranged(day, c.settings.day_start_hour))
 }
@@ -71,25 +71,25 @@ pub fn save_plan(store: &Store, at: NaiveDateTime, date_s: &str, input: PlanInpu
         false
     } else if date == c.today {
         if has_plan {
-            return Err("Сегодняшний день уже начался, его план менять нельзя.".into());
+            return Err(tr!("Сегодняшний день уже начался, его план менять нельзя.", "Today has already started, its plan can't be changed."));
         }
         true
     } else if date > tomorrow {
-        return Err("Назвать можно только завтрашний день, дальше нельзя.".into());
+        return Err(tr!("Назвать можно только завтрашний день, дальше нельзя.", "Only tomorrow can be named, not later days."));
     } else {
-        return Err("Этот день уже прошёл.".into());
+        return Err(tr!("Этот день уже прошёл.", "This day is over."));
     };
 
     let name = input.name.trim().to_string();
     if name.is_empty() {
-        return Err("Дайте дню имя.".into());
+        return Err(tr!("Дайте дню имя.", "Give the day a name."));
     }
     if chars(&name) > 80 {
-        return Err("Имя дня должно быть не длиннее 80 символов.".into());
+        return Err(tr!("Имя дня должно быть не длиннее 80 символов.", "The day name must be at most 80 characters."));
     }
     let description = input.description.trim().to_string();
     if chars(&description) > 4000 {
-        return Err("Описание должно быть не длиннее 4000 символов.".into());
+        return Err(tr!("Описание должно быть не длиннее 4000 символов.", "The description must be at most 4000 characters."));
     }
 
     let checklist = match input.checklist {
@@ -103,12 +103,12 @@ pub fn save_plan(store: &Store, at: NaiveDateTime, date_s: &str, input: PlanInpu
                     continue;
                 }
                 if chars(&text) > 300 {
-                    return Err("Пункт чеклиста должен быть не длиннее 300 символов.".into());
+                    return Err(tr!("Пункт чеклиста должен быть не длиннее 300 символов.", "A checklist item must be at most 300 characters."));
                 }
                 let hours = match it.hours {
                     Some(h) if h.is_finite() && h > 0.0 => {
                         if h > 24.0 {
-                            return Err("На один пункт можно не больше 24 часов.".into());
+                            return Err(tr!("На один пункт можно не больше 24 часов.", "One item can take at most 24 hours."));
                         }
                         Some(((h * 4.0).round() / 4.0).max(0.25))
                     }
@@ -123,20 +123,20 @@ pub fn save_plan(store: &Store, at: NaiveDateTime, date_s: &str, input: PlanInpu
                         continue;
                     }
                     if chars(&text) > 300 {
-                        return Err("Подпункт должен быть не длиннее 300 символов.".into());
+                        return Err(tr!("Подпункт должен быть не длиннее 300 символов.", "A sub-item must be at most 300 characters."));
                     }
                     let id = unique_id(s.id, "s", &mut seen);
                     subs.push(SubItem { id, text, done: false, done_at: None });
                 }
                 if subs.len() > MAX_SUBS {
-                    return Err("У пункта может быть не больше трёх подпунктов.".into());
+                    return Err(tr!("У пункта может быть не больше трёх подпунктов.", "An item can have at most three sub-items."));
                 }
                 let start = check_hour(it.start)?;
                 let from = it.from.map(|r| resolve_ref(store, &r, date)).transpose()?;
                 out.push(CheckItem { id, text, hours, attach, done: false, done_at: None, subs, start, from, goal: it.goal });
             }
             if out.len() > 40 {
-                return Err("В чеклисте может быть не больше 40 пунктов.".into());
+                return Err(tr!("В чеклисте может быть не больше 40 пунктов.", "A checklist can have at most 40 items."));
             }
             goals::valid_refs(store, &mut out);
             Some(out)
@@ -179,9 +179,9 @@ pub fn set_check(store: &Store, at: NaiveDateTime, date_s: &str, item_id: &str, 
     let _g = store.lock();
     let c = ctx(store, at);
     let mut day = open_day(store, &c, date_s)?;
-    let plan = day.plan.as_mut().ok_or("У этого дня нет плана.")?;
+    let plan = day.plan.as_mut().ok_or_else(|| tr!("У этого дня нет плана.", "This day has no plan."))?;
     plan.auto = false;
-    let items = plan.checklist.as_mut().ok_or("В плане нет чеклиста.")?;
+    let items = plan.checklist.as_mut().ok_or_else(|| tr!("В плане нет чеклиста.", "The plan has no checklist."))?;
     let stamp = done.then(|| fmt_dt(c.at));
     if let Some(it) = items.iter_mut().find(|i| i.id == item_id) {
         it.done = done;
@@ -194,7 +194,7 @@ pub fn set_check(store: &Store, at: NaiveDateTime, date_s: &str, item_id: &str, 
         let it = items
             .iter_mut()
             .find(|i| i.subs.iter().any(|s| s.id == item_id))
-            .ok_or("Пункт не найден.")?;
+            .ok_or_else(|| tr!("Пункт не найден.", "Item not found."))?;
         if let Some(s) = it.subs.iter_mut().find(|s| s.id == item_id) {
             s.done = done;
             s.done_at = stamp.clone();
@@ -220,19 +220,19 @@ pub fn set_start(store: &Store, at: NaiveDateTime, date_s: &str, item_id: &str, 
     let date = date_arg(date_s)?;
     let hour = check_hour(hour)?;
     let mut day = if date == next(c.today) {
-        store.load_day(date_s).filter(|d| d.has_plan()).ok_or("У этого дня нет плана.")?
+        store.load_day(date_s).filter(|d| d.has_plan()).ok_or_else(|| tr!("У этого дня нет плана.", "This day has no plan."))?
     } else if date == c.today {
         open_day(store, &c, date_s)?
     } else {
-        return Err("Время задач можно ставить только на сегодня и завтра.".into());
+        return Err(tr!("Время задач можно ставить только на сегодня и завтра.", "Task times can be set only for today and tomorrow."));
     };
-    let plan = day.plan.as_mut().ok_or("У этого дня нет плана.")?;
+    let plan = day.plan.as_mut().ok_or_else(|| tr!("У этого дня нет плана.", "This day has no plan."))?;
     plan.auto = false;
     let item = plan
         .checklist
         .as_mut()
         .and_then(|items| items.iter_mut().find(|i| i.id == item_id))
-        .ok_or("Пункт не найден.")?;
+        .ok_or_else(|| tr!("Пункт не найден.", "Item not found."))?;
     item.start = hour;
     let day = arranged(day, c.settings.day_start_hour);
     store.save_day(&day)?;
@@ -240,7 +240,7 @@ pub fn set_start(store: &Store, at: NaiveDateTime, date_s: &str, item_id: &str, 
 }
 
 fn resolve_ref(store: &Store, r: &TaskRef, date: NaiveDate) -> Result<TaskRef, String> {
-    let missing = || "Задача, которую продолжает пункт, не найдена.".to_string();
+    let missing = || tr!("Задача, которую продолжает пункт, не найдена.", "The task this item continues was not found.");
     let source_date = parse_date(&r.date).filter(|d| *d < date).ok_or_else(missing)?;
     let day = store.load_day(&fmt_date(source_date)).ok_or_else(missing)?;
     let item = day
@@ -264,7 +264,7 @@ pub fn list_tasks(store: &Store) -> Vec<TaskNode> {
 
 fn check_hour(hour: Option<u8>) -> Result<Option<u8>, String> {
     match hour {
-        Some(h) if h > 23 => Err("Час задачи должен быть от 0 до 23.".into()),
+        Some(h) if h > 23 => Err(tr!("Час задачи должен быть от 0 до 23.", "The task hour must be from 0 to 23.")),
         h => Ok(h),
     }
 }
@@ -283,11 +283,11 @@ pub fn save_board(store: &Store, at: NaiveDateTime, date_s: &str, board: &Value)
     let c = ctx(store, at);
     let mut day = open_day(store, &c, date_s)?;
     if !board.is_object() {
-        return Err("Доска пришла в непонятном виде.".into());
+        return Err(tr!("Доска пришла в непонятном виде.", "The board came in an unknown format."));
     }
     let text = serde_json::to_string(board).map_err(|e| e.to_string())?;
     if text.len() > 16 * 1024 * 1024 {
-        return Err("Доска слишком большая.".into());
+        return Err(tr!("Доска слишком большая.", "The board is too large."));
     }
     let items = board.get("items").and_then(|v| v.as_array()).map_or(0, |a| a.len()) as u32;
     let has_ink = board.get("ink").and_then(|v| v.as_str()).is_some_and(|s| !s.is_empty());
@@ -308,7 +308,7 @@ fn image_ext(ext: &str) -> Result<String, String> {
     if IMAGE_EXT.contains(&e.as_str()) {
         Ok(e)
     } else {
-        Err(format!("Это не картинка (.{e}). Подойдут png, jpg, gif, webp, bmp."))
+        Err(tr!("Это не картинка (.{e}). Подойдут png, jpg, gif, webp, bmp.", "This is not an image (.{e}). Use png, jpg, gif, webp or bmp."))
     }
 }
 
@@ -318,27 +318,27 @@ pub fn import_image(store: &Store, at: NaiveDateTime, date_s: &str, ext: &str, b
     open_day(store, &c, date_s)?;
     let ext = image_ext(ext)?;
     if bytes.is_empty() {
-        return Err("Пустая картинка.".into());
+        return Err(tr!("Пустая картинка.", "The image is empty."));
     }
     if bytes.len() > MAX_IMAGE {
-        return Err("Картинка больше 40 МБ, она слишком тяжёлая.".into());
+        return Err(tr!("Картинка больше 40 МБ, она слишком тяжёлая.", "The image is larger than 40 MB, it is too heavy."));
     }
     let dir = store.assets_dir(date_s);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let file = format!("img-{}.{ext}", uid());
     let path = dir.join(&file);
-    std::fs::write(&path, bytes).map_err(|e| format!("Не удалось сохранить картинку: {e}"))?;
+    std::fs::write(&path, bytes).map_err(|e| tr!("Не удалось сохранить картинку: {e}", "Could not save the image: {e}"))?;
     Ok(AssetInfo { file, path: path.to_string_lossy().to_string() })
 }
 
 pub fn import_image_path(store: &Store, at: NaiveDateTime, date_s: &str, src: &Path) -> Result<AssetInfo, String> {
     let ext = src.extension().map(|e| e.to_string_lossy().to_string()).unwrap_or_default();
     image_ext(&ext)?;
-    let meta = std::fs::metadata(src).map_err(|e| format!("Файл не найден: {e}"))?;
+    let meta = std::fs::metadata(src).map_err(|e| tr!("Файл не найден: {e}", "File not found: {e}"))?;
     if meta.len() as usize > MAX_IMAGE {
-        return Err("Картинка больше 40 МБ, она слишком тяжёлая.".into());
+        return Err(tr!("Картинка больше 40 МБ, она слишком тяжёлая.", "The image is larger than 40 MB, it is too heavy."));
     }
-    let bytes = std::fs::read(src).map_err(|e| format!("Не удалось прочитать файл: {e}"))?;
+    let bytes = std::fs::read(src).map_err(|e| tr!("Не удалось прочитать файл: {e}", "Could not read the file: {e}"))?;
     import_image(store, at, date_s, &ext, &bytes)
 }
 
@@ -347,11 +347,11 @@ pub fn seal(store: &Store, at: NaiveDateTime, date_s: &str, rating: u8, summary:
     let c = ctx(store, at);
     let mut day = open_day(store, &c, date_s)?;
     if !(1..=5).contains(&rating) {
-        return Err("Оцените день от 1 до 5.".into());
+        return Err(tr!("Оцените день от 1 до 5.", "Rate the day from 1 to 5."));
     }
     let summary = summary.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
     if summary.as_deref().is_some_and(|s| chars(s) > 200) {
-        return Err("Главное за день должно быть не длиннее 200 символов.".into());
+        return Err(tr!("Главное за день должно быть не длиннее 200 символов.", "The summary must be at most 200 characters."));
     }
     day.result.rating = Some(rating);
     day.result.summary = summary;
@@ -516,17 +516,21 @@ pub fn save_settings(store: &Store, mut s: Settings) -> Result<Settings, String>
     let _g = store.lock();
     let old = store.load_settings();
     if s.day_start_hour > 6 {
-        return Err("Новый день может начинаться с 00:00 до 06:00.".into());
+        return Err(tr!("Новый день может начинаться с 00:00 до 06:00.", "A new day can start from 00:00 to 06:00."));
     }
     for t in [&s.evening_time, &s.morning_time] {
         if clock::parse_hm(t).is_none() {
-            return Err(format!("Непонятное время: {t}"));
+            return Err(tr!("Непонятное время: {t}", "Unclear time: {t}"));
         }
     }
     s.evening_repeat_min = s.evening_repeat_min.min(240);
     s.tray_hint_shown = old.tray_hint_shown;
     s.mcp_enabled = old.mcp_enabled;
+    s.language = crate::i18n::clean(&s.language);
     store.save_settings(&s)?;
+    if s.language != old.language {
+        crate::drill::relabel(store, &s.language)?;
+    }
     goals::plan_ahead(store, &ctx(store, clock::now()));
     Ok(s)
 }

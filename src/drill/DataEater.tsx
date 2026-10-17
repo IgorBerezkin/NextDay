@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { api, errText, type DrillDeckInfo, type ImportReport } from "../api";
+import { t } from "../i18n";
 import { Button, Modal } from "../ui/kit";
 import { plural } from "../util";
 
@@ -36,7 +37,7 @@ export function DataEater({ banks, onClose, onDone }: { banks: DrillDeckInfo[]; 
       setReplace(banks.find((b) => b.title === p.title)?.id ?? null);
     } catch (e) {
       setFile(null);
-      setFail(`Файл не читается как JSON: ${errText(e)}`);
+      setFail(t(`Файл не читается как JSON: ${errText(e)}`, `The file is not valid JSON: ${errText(e)}`));
     }
   };
 
@@ -60,17 +61,17 @@ export function DataEater({ banks, onClose, onDone }: { banks: DrillDeckInfo[]; 
   return (
     <Modal
       wide
-      title="DataEater: импорт банка"
+      title={t("DataEater: импорт банка", "DataEater: import a bank")}
       onClose={onClose}
       footer={
         <>
           <span className="grow" />
           <Button kind="paper" onClick={onClose}>
-            {report ? "Закрыть" : "Отмена"}
+            {report ? t("Закрыть", "Close") : t("Отмена", "Cancel")}
           </Button>
           {!report && (
             <Button icon="check" disabled={busy || !file} onClick={() => void run()}>
-              {busy ? "Ем…" : "Импортировать"}
+              {busy ? t("Ем…", "Eating...") : t("Импортировать", "Import")}
             </Button>
           )}
         </>
@@ -78,9 +79,10 @@ export function DataEater({ banks, onClose, onDone }: { banks: DrillDeckInfo[]; 
     >
       <div className="drill-form">
         <p className="muted">
-          DataEater ест готовые банки карточек: JSON в том же формате, что встроенный набор Python. В банке темы с теорией и карточки, у
-          каждой карточки много вариантов с разными данными. После промаха карточка вернётся с другим вариантом. Такой файл обычно собирает
-          скрипт, который сам выполняет код и считает ответы, или ИИ через MCP (import_drill_bank).
+          {t(
+            "DataEater ест готовые банки карточек: JSON в том же формате, что встроенный набор Python. В банке темы с теорией и карточки, у каждой карточки много вариантов с разными данными. После промаха карточка вернётся с другим вариантом. Такой файл обычно собирает скрипт, который сам выполняет код и считает ответы, или ИИ через MCP (import_drill_bank).",
+            "DataEater eats ready card banks: JSON in the same format as the built-in Python deck. A bank has topics with theory and cards, and each card has many variants with different data. After a miss the card comes back with another variant. Such a file is usually built by a script that runs the code and computes the answers itself, or by AI over MCP (import_drill_bank).",
+          )}
         </p>
         <pre className="eater-format">
           {
@@ -90,23 +92,24 @@ export function DataEater({ banks, onClose, onDone }: { banks: DrillDeckInfo[]; 
         <input ref={input} type="file" accept=".json,application/json" hidden onChange={(e) => void choose(e.target.files?.[0])} />
         <div className="row">
           <Button kind="paper" icon="folder" onClick={() => input.current?.click()}>
-            Выбрать файл .json
+            {t("Выбрать файл .json", "Choose a .json file")}
           </Button>
           {file && <span className="muted">{file.name}</span>}
         </div>
         {file && (
           <div className="eater-file">
             <p>
-              <b>{file.title || "без названия"}</b>: {plural(file.topics, "тема", "темы", "тем")},{" "}
-              {plural(file.cards, "карточка", "карточки", "карточек")}, {plural(file.variants, "вариант", "варианта", "вариантов")}.
+              <b>{file.title || t("без названия", "untitled")}</b>: {plural(file.topics, "тема", "темы", "тем", "topic", "topics")},{" "}
+              {plural(file.cards, "карточка", "карточки", "карточек", "card", "cards")},{" "}
+              {plural(file.variants, "вариант", "варианта", "вариантов", "variant", "variants")}.
             </p>
             {same && (
               <div className="seg">
                 <button className={replace === same.id ? "on" : ""} onClick={() => setReplace(same.id)}>
-                  Заменить «{same.title}», прогресс сохранится
+                  {t(`Заменить «${same.title}», прогресс сохранится`, `Replace "${same.title}", progress is kept`)}
                 </button>
                 <button className={replace === null ? "on" : ""} onClick={() => setReplace(null)}>
-                  Добавить новым банком
+                  {t("Добавить новым банком", "Add as a new bank")}
                 </button>
               </div>
             )}
@@ -116,10 +119,15 @@ export function DataEater({ banks, onClose, onDone }: { banks: DrillDeckInfo[]; 
         {report && (
           <div className="eater-file">
             <p className="good">
-              {report.replaced ? "Заменён" : "Добавлен"} банк «{report.title}»: {plural(report.topics, "тема", "темы", "тем")},{" "}
-              {plural(report.cards, "карточка", "карточки", "карточек")}, {plural(report.variants, "вариант", "варианта", "вариантов")}.
+              {t(
+                `${report.replaced ? "Заменён" : "Добавлен"} банк «${report.title}»`,
+                `${report.replaced ? "Replaced" : "Added"} the bank "${report.title}"`,
+              )}
+              : {plural(report.topics, "тема", "темы", "тем", "topic", "topics")},{" "}
+              {plural(report.cards, "карточка", "карточки", "карточек", "card", "cards")},{" "}
+              {plural(report.variants, "вариант", "варианта", "вариантов", "variant", "variants")}.
             </p>
-            {report.dropped > 0 && <p>Отброшено вариантов: {report.dropped}.</p>}
+            {report.dropped > 0 && <p>{t(`Отброшено вариантов: ${report.dropped}.`, `Variants dropped: ${report.dropped}.`)}</p>}
             {report.problems.length > 0 && (
               <ul className="gen-problems">
                 {report.problems.map((p, i) => (
@@ -127,7 +135,9 @@ export function DataEater({ banks, onClose, onDone }: { banks: DrillDeckInfo[]; 
                 ))}
               </ul>
             )}
-            <p className="muted">Чтобы зубрить банк, добавь его в режим на вкладке Старт.</p>
+            <p className="muted">
+              {t("Чтобы зубрить банк, добавь его в режим на вкладке Старт.", "To drill the bank, add it to a mode on the Start tab.")}
+            </p>
           </div>
         )}
       </div>

@@ -8,6 +8,7 @@ const TRAY: &[u8] = include_bytes!("../icons/tray.png");
 const TRAY_ALERT: &[u8] = include_bytes!("../icons/tray-alert.png");
 
 pub struct TrayState {
+    items: Vec<MenuItem<Wry>>,
     autostart: CheckMenuItem<Wry>,
     size: u32,
     last: Mutex<(Option<bool>, String)>,
@@ -32,32 +33,36 @@ fn icon(alert: bool, size: u32) -> Image<'static> {
     Image::new_owned(out, size, size)
 }
 
+fn labels() -> [(&'static str, String); 5] {
+    [
+        ("open", tr!("Открыть Next Day", "Open Next Day")),
+        ("today", tr!("Сегодня", "Today")),
+        ("tomorrow", tr!("Завтрашний день", "Tomorrow")),
+        ("history", tr!("История", "History")),
+        ("quit", tr!("Выход", "Quit")),
+    ]
+}
+
+fn autostart_label() -> String {
+    tr!("Запускать вместе с Windows", "Start with Windows")
+}
+
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Открыть Next Day", true, None::<&str>)?;
-    let today = MenuItem::with_id(app, "today", "Сегодня", true, None::<&str>)?;
-    let tomorrow = MenuItem::with_id(app, "tomorrow", "Завтрашний день", true, None::<&str>)?;
-    let history = MenuItem::with_id(app, "history", "История", true, None::<&str>)?;
-    let autostart = CheckMenuItem::with_id(
-        app,
-        "autostart",
-        "Запускать вместе с Windows",
-        true,
-        crate::autostart::is_enabled(),
-        None::<&str>,
-    )?;
-    let quit = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?;
+    let items = labels().into_iter().map(|(id, text)| MenuItem::with_id(app, id, text, true, None::<&str>)).collect::<tauri::Result<Vec<_>>>()?;
+    let [open, today, tomorrow, history, quit] = [&items[0], &items[1], &items[2], &items[3], &items[4]];
+    let autostart = CheckMenuItem::with_id(app, "autostart", autostart_label(), true, crate::autostart::is_enabled(), None::<&str>)?;
     let menu = Menu::with_items(
         app,
         &[
-            &open,
+            open,
             &PredefinedMenuItem::separator(app)?,
-            &today,
-            &tomorrow,
-            &history,
+            today,
+            tomorrow,
+            history,
             &PredefinedMenuItem::separator(app)?,
             &autostart,
             &PredefinedMenuItem::separator(app)?,
-            &quit,
+            quit,
         ],
     )?;
 
@@ -90,8 +95,16 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         })
         .build(app)?;
 
-    app.manage(TrayState { autostart, size, last: Mutex::new((None, String::new())) });
+    app.manage(TrayState { items, autostart, size, last: Mutex::new((None, String::new())) });
     Ok(())
+}
+
+pub fn relabel(app: &AppHandle) {
+    let Some(state) = app.try_state::<TrayState>() else { return };
+    for (item, (_, text)) in state.items.iter().zip(labels()) {
+        let _ = item.set_text(text);
+    }
+    let _ = state.autostart.set_text(autostart_label());
 }
 
 pub fn update(app: &AppHandle, alert: bool, tooltip: &str) {

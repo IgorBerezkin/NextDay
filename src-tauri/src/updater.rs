@@ -85,7 +85,7 @@ pub fn install(app: &AppHandle, hidden: bool) -> Result<(), String> {
         (s.installer.clone(), s.status.version.clone())
     };
     let (Some(path), Some(version)) = (path, version) else {
-        return Err("Обновление ещё не скачано.".into());
+        return Err(tr!("Обновление ещё не скачано.", "The update is not downloaded yet."));
     };
     remember_try(app, &version);
     set(app, Phase::Installing, Some(version.clone()), None);
@@ -99,13 +99,13 @@ pub fn install(app: &AppHandle, hidden: bool) -> Result<(), String> {
             let app = app.clone();
             std::thread::spawn(move || {
                 let _ = child.wait();
-                let msg = format!("Версия {version} не встала. Попробуйте ещё раз позже.");
+                let msg = tr!("Версия {version} не встала. Попробуйте ещё раз позже.", "Version {version} did not install. Try again later.");
                 set(&app, Phase::Failed, Some(version), Some(msg));
             });
             Ok(())
         }
         Err(e) => {
-            let msg = format!("Не удалось запустить установщик: {e}");
+            let msg = tr!("Не удалось запустить установщик: {e}", "Could not start the installer: {e}");
             set(app, Phase::Failed, Some(version), Some(msg.clone()));
             Err(msg)
         }
@@ -150,7 +150,7 @@ fn check(app: &AppHandle, manual: bool) -> bool {
         }
     };
     if !manual && tried(app, &m.version) {
-        let msg = format!("Версия {} не встала сама. Её можно поставить вручную.", m.version);
+        let msg = tr!("Версия {} не встала сама. Её можно поставить вручную.", "Version {} did not install by itself. You can install it by hand.", m.version);
         set(app, Phase::Failed, Some(m.version), Some(msg));
         return true;
     }
@@ -204,7 +204,7 @@ fn announce(app: &AppHandle) {
         upgraded
     };
     if upgraded {
-        notify::show(app, "Next Day обновился", &format!("Установлена версия {VERSION}."), "settings", &[]);
+        notify::show(app, &tr!("Next Day обновился", "Next Day updated"), &tr!("Установлена версия {VERSION}.", "Version {VERSION} is installed."), "settings", &[]);
     }
 }
 
@@ -247,9 +247,9 @@ fn agent() -> ureq::Agent {
 
 fn net_error(e: ureq::Error) -> String {
     match e {
-        ureq::Error::StatusCode(code) => format!("Сервер обновлений ответил ошибкой {code}."),
-        ureq::Error::Timeout(_) => "Сервер обновлений не ответил вовремя.".into(),
-        _ => "Не удалось связаться с сервером обновлений. Проверьте интернет.".into(),
+        ureq::Error::StatusCode(code) => tr!("Сервер обновлений ответил ошибкой {code}.", "The update server answered with error {code}."),
+        ureq::Error::Timeout(_) => tr!("Сервер обновлений не ответил вовремя.", "The update server did not answer in time."),
+        _ => tr!("Не удалось связаться с сервером обновлений. Проверьте интернет.", "Could not reach the update server. Check your internet connection."),
     }
 }
 
@@ -259,7 +259,7 @@ fn fetch_manifest() -> Result<Option<Manifest>, String> {
         Err(ureq::Error::StatusCode(404)) => return Ok(None),
         Err(e) => return Err(net_error(e)),
     };
-    serde_json::from_str(&text).map(Some).map_err(|_| "Описание обновления не читается.".into())
+    serde_json::from_str(&text).map(Some).map_err(|_| tr!("Описание обновления не читается.", "The update description can't be read."))
 }
 
 fn download(m: &Manifest) -> Result<PathBuf, String> {
@@ -267,14 +267,14 @@ fn download(m: &Manifest) -> Result<PathBuf, String> {
     let bytes = r.body_mut().with_config().limit(MAX_DOWNLOAD).read_to_vec().map_err(net_error)?;
     verify(&bytes, &m.signature, &m.version)?;
     let dir = download_dir();
-    fs::create_dir_all(&dir).map_err(|e| format!("Не удалось сохранить обновление: {e}"))?;
+    fs::create_dir_all(&dir).map_err(|e| tr!("Не удалось сохранить обновление: {e}", "Could not save the update: {e}"))?;
     let path = dir.join(format!("NextDaySetup-{}.exe", m.version));
-    fs::write(&path, &bytes).map_err(|e| format!("Не удалось сохранить обновление: {e}"))?;
+    fs::write(&path, &bytes).map_err(|e| tr!("Не удалось сохранить обновление: {e}", "Could not save the update: {e}"))?;
     Ok(path)
 }
 
 fn verify(data: &[u8], signature: &str, version: &str) -> Result<(), String> {
-    let bad = || "Подпись обновления не сошлась, ставить его небезопасно.".to_string();
+    let bad = || tr!("Подпись обновления не сошлась, ставить его небезопасно.", "The update signature does not match, it is not safe to install.");
     let key = unbase64(PUBLIC_KEY).and_then(|t| PublicKey::decode(&t).ok()).ok_or_else(bad)?;
     let sig = unbase64(signature).and_then(|t| Signature::decode(&t).ok()).ok_or_else(bad)?;
     key.verify(data, &sig, false).map_err(|_| bad())?;

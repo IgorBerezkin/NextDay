@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { DrillCardMode, Walk, WalkItem, WalkStep, WalkVar } from "../api";
+import { t } from "../i18n";
 import { Px } from "../ui/Px";
 import { DataView } from "./DataView";
 import { Prompt, type Tone } from "./drillKit";
@@ -9,11 +10,11 @@ import { explainDiff, parsePy, samePy, type Py } from "./pyval";
 type Tab = "diff" | "focus" | "steps" | "final" | "rule";
 
 const LABEL: Record<Tab, string> = {
-  diff: "Разница",
-  focus: "До и после",
-  steps: "По шагам",
-  final: "Итог",
-  rule: "Правило",
+  diff: t("Разница", "Difference"),
+  focus: t("До и после", "Before and after"),
+  steps: t("По шагам", "Step by step"),
+  final: t("Итог", "Result"),
+  rule: t("Правило", "Rule"),
 };
 
 const KEY = "drill.walkTab";
@@ -42,8 +43,16 @@ function lateNote(walk: Walk | null, want: Py, got: Py): string | null {
   const fin = end ? parsePy(end.repr) : null;
   if (!fin || !samePy(fin, got) || samePy(fin, want)) return null;
   const pass = walk.steps[f.step]?.[1];
-  const when = pass ? `сразу после ${pass}-го прохода цикла, когда цикл ещё не закончился` : `сразу после строки ${f.line}`;
-  return `Так \`${f.target}\` выглядит в конце программы. А вопрос про момент ${when}.`;
+  const when = pass
+    ? t(
+        `сразу после ${pass}-го прохода цикла, когда цикл ещё не закончился`,
+        `right after pass ${pass} of the loop, while the loop is still running`,
+      )
+    : t(`сразу после строки ${f.line}`, `right after line ${f.line}`);
+  return t(
+    `Так \`${f.target}\` выглядит в конце программы. А вопрос про момент ${when}.`,
+    `That is how \`${f.target}\` looks at the end of the program. But the question is about the moment ${when}.`,
+  );
 }
 
 function Items({ list }: { list: WalkItem[] }) {
@@ -52,7 +61,7 @@ function Items({ list }: { list: WalkItem[] }) {
       {list.map((it) => (
         <DataView
           key={it.name}
-          name={it.name === "вывод" ? "напечатано" : it.name}
+          name={it.name === "вывод" ? t("напечатано", "printed") : it.name}
           value={it.name === "вывод" ? JSON.stringify(it.repr) : it.repr}
           shape={it.shape}
         />
@@ -68,11 +77,18 @@ function Diff({ mode, expected, given, walk }: { mode: DrillCardMode; expected: 
     return (
       <div className="wk-diff">
         <p>
-          Код падает на строке {err.line}: <code className="drill-given">{`${err.type}: ${err.message}`}</code>
+          {t(
+            <>
+              Код падает на строке {err.line}: <code className="drill-given">{`${err.type}: ${err.message}`}</code>
+            </>,
+            <>
+              The code crashes on line {err.line}: <code className="drill-given">{`${err.type}: ${err.message}`}</code>
+            </>,
+          )}
         </p>
         {f && f.before.length > 0 && (
           <>
-            <p className="muted">Что было в переменных перед этой строкой:</p>
+            <p className="muted">{t("Что было в переменных перед этой строкой:", "What the variables held before this line:")}</p>
             <Items list={f.before} />
           </>
         )}
@@ -85,17 +101,17 @@ function Diff({ mode, expected, given, walk }: { mode: DrillCardMode; expected: 
       <div className="wk-diff">
         <div className="wk-pair">
           <div>
-            <span className="muted">Правильно</span>
+            <span className="muted">{t("Правильно", "Right")}</span>
             <code className="drill-ans">{expected}</code>
           </div>
           <div>
-            <span className="muted">У тебя</span>
-            <code className="drill-given">{given || "пусто"}</code>
+            <span className="muted">{t("У тебя", "Yours")}</span>
+            <code className="drill-given">{given || t("пусто", "empty")}</code>
           </div>
         </div>
         {after && (
           <>
-            <p className="muted">Вот само значение, у которого эта форма:</p>
+            <p className="muted">{t("Вот само значение, у которого эта форма:", "Here is the value that has this shape:")}</p>
             <DataView name={after.name} value={after.repr} shape={after.shape} />
           </>
         )}
@@ -110,12 +126,12 @@ function Diff({ mode, expected, given, walk }: { mode: DrillCardMode; expected: 
     <div className="wk-diff">
       <div className="wk-pair">
         <div>
-          <span className="muted">Правильно</span>
+          <span className="muted">{t("Правильно", "Right")}</span>
           {python ? <DataView value={expected} /> : <code className="drill-ans">{expected}</code>}
         </div>
         <div>
-          <span className="muted">У тебя</span>
-          {python && got ? <DataView value={given} /> : <code className="drill-given">{given || "пусто"}</code>}
+          <span className="muted">{t("У тебя", "Yours")}</span>
+          {python && got ? <DataView value={given} /> : <code className="drill-given">{given || t("пусто", "empty")}</code>}
         </div>
       </div>
       {late && (
@@ -145,12 +161,16 @@ function Focus({ walk, onMark }: { walk: Walk; onMark: Mark }) {
     <div className="wk-focus">
       <div className="wk-flow">
         <div className="wk-side">
-          <span className="muted">До строки {f.line}</span>
-          {f.before.length ? <Items list={f.before} /> : <p className="muted">Строка ничего не читает из переменных.</p>}
+          <span className="muted">{t(`До строки ${f.line}`, `Before line ${f.line}`)}</span>
+          {f.before.length ? (
+            <Items list={f.before} />
+          ) : (
+            <p className="muted">{t("Строка ничего не читает из переменных.", "The line reads no variables.")}</p>
+          )}
         </div>
         <span className="wk-arrow">→</span>
         <div className="wk-side">
-          <span className="muted">После</span>
+          <span className="muted">{t("После", "After")}</span>
           {f.after ? <Items list={[f.after]} /> : <code className="drill-given">{f.error}</code>}
         </div>
       </div>
@@ -175,21 +195,33 @@ function Steps({ walk, onMark }: { walk: Walk; onMark: Mark }) {
   return (
     <div className="wk-steps">
       <div className="wk-stepbar">
-        <button className="icon-btn" disabled={i === 0} onClick={() => setI(i - 1)} title="Назад (стрелка влево)">
+        <button className="icon-btn" disabled={i === 0} onClick={() => setI(i - 1)} title={t("Назад (стрелка влево)", "Back (left arrow)")}>
           <Px name="arrowL" scale={2} />
         </button>
         <span>
-          Шаг {i + 1} из {n}: строка {line}
-          {pass !== null ? `, проход ${pass}` : ""}
+          {t(`Шаг ${i + 1} из ${n}: строка ${line}`, `Step ${i + 1} of ${n}: line ${line}`)}
+          {pass !== null ? t(`, проход ${pass}`, `, pass ${pass}`) : ""}
         </span>
-        <button className="icon-btn" disabled={i >= n - 1} onClick={() => setI(i + 1)} title="Вперёд (стрелка вправо)">
+        <button
+          className="icon-btn"
+          disabled={i >= n - 1}
+          onClick={() => setI(i + 1)}
+          title={t("Вперёд (стрелка вправо)", "Forward (right arrow)")}
+        >
           <Px name="arrowR" scale={2} />
         </button>
       </div>
       <Items list={set.map(item)} />
       {i === n - 1 && walk.error && (
         <p>
-          Потом строка {walk.error.line} падает: <code className="drill-given">{`${walk.error.type}: ${walk.error.message}`}</code>
+          {t(
+            <>
+              Потом строка {walk.error.line} падает: <code className="drill-given">{`${walk.error.type}: ${walk.error.message}`}</code>
+            </>,
+            <>
+              Then line {walk.error.line} crashes: <code className="drill-given">{`${walk.error.type}: ${walk.error.message}`}</code>
+            </>,
+          )}
         </p>
       )}
     </div>

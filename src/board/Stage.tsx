@@ -1,6 +1,7 @@
 import { openPath } from "@tauri-apps/plugin-opener";
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { assetPath, assetUrl } from "../api";
+import { t } from "../i18n";
 import { Button, Linkify, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
 import { inkBounds, loadInk } from "./ink";
@@ -382,14 +383,14 @@ export function BoardViewer({ board, date, dataDir, doneRefs }: { board: Board; 
 export function ZoomBar({ zoom, children }: { zoom: Zoom; children?: ReactNode }) {
   return (
     <div className="zoom-bar">
-      <button className="tool" title="Отдалить (Ctrl+колесо)" onClick={() => zoom.zoomCenter(1 / 1.25)}>
+      <button className="tool" title={t("Отдалить (Ctrl+колесо)", "Zoom out (Ctrl+wheel)")} onClick={() => zoom.zoomCenter(1 / 1.25)}>
         <Px name="minus" scale={2} />
       </button>
       <span className="zoom-pct">{Math.round(zoom.scale * 100)}%</span>
-      <button className="tool" title="Приблизить (Ctrl+колесо)" onClick={() => zoom.zoomCenter(1.25)}>
+      <button className="tool" title={t("Приблизить (Ctrl+колесо)", "Zoom in (Ctrl+wheel)")} onClick={() => zoom.zoomCenter(1.25)}>
         <Px name="plus" scale={2} />
       </button>
-      <button className="tool" title="Вся доска" onClick={zoom.reset}>
+      <button className="tool" title={t("Вся доска", "Whole board")} onClick={zoom.reset}>
         <Px name="fit" scale={2} />
       </button>
       {children}
@@ -408,10 +409,10 @@ export function Lightbox({ item, date, dataDir, onClose }: { item: ImageItem; da
       <img src={assetUrl(dataDir, date, item.src)} alt="" />
       <div className="lightbox-bar" onClick={(e) => e.stopPropagation()}>
         <Button kind="paper" small icon="image" onClick={() => void openPath(assetPath(dataDir, date, item.src)).catch(toastError)}>
-          Открыть в просмотрщике
+          {t("Открыть в просмотрщике", "Open in viewer")}
         </Button>
         <Button kind="paper" small icon="cross" onClick={onClose}>
-          Закрыть
+          {t("Закрыть", "Close")}
         </Button>
       </div>
     </div>

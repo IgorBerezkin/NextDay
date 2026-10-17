@@ -1,20 +1,26 @@
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
 import { api, type Goal, type GoalStatus, type GoalTask, type TaskKind, type Topic } from "../api";
+import { t } from "../i18n";
 import { toastError } from "../ui/kit";
 import { dayMonth, duration, plural, toDate } from "../util";
 
 export const GOAL_STATUS: Record<GoalStatus, string> = {
-  draft: "Черновик",
-  active: "Идёт",
-  paused: "На паузе",
-  done: "Достигнута",
-  archived: "В архиве",
+  draft: t("Черновик", "Draft"),
+  active: t("Идёт", "Active"),
+  paused: t("На паузе", "Paused"),
+  done: t("Достигнута", "Achieved"),
+  archived: t("В архиве", "Archived"),
 };
 
-export const KIND: Record<TaskKind, string> = { learn: "Учёба", practice: "Практика", review: "Повторение", check: "Проверка" };
+export const KIND: Record<TaskKind, string> = {
+  learn: t("Учёба", "Learn"),
+  practice: t("Практика", "Practice"),
+  review: t("Повторение", "Review"),
+  check: t("Проверка", "Check"),
+};
 export const KINDS: TaskKind[] = ["learn", "practice", "review", "check"];
-export const WEEK = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+export const WEEK = t(["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"], ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]);
 export const HOURS = Array.from({ length: 24 }, (_, h) => h);
 export const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 export const mins = (m: number) => duration(m * 60);
@@ -75,18 +81,26 @@ export function useTaskIndex(on: boolean) {
 export function daysLeft(deadline: string | null, today: string): string | null {
   if (!deadline) return null;
   const n = Math.round((toDate(deadline).getTime() - toDate(today).getTime()) / 86_400_000);
-  if (n < 0) return `срок прошёл ${dayMonth(deadline)}`;
-  if (n === 0) return "срок сегодня";
-  return `до ${dayMonth(deadline)}, ${plural(n, "день", "дня", "дней")}`;
+  if (n < 0) return t(`срок прошёл ${dayMonth(deadline)}`, `deadline passed on ${dayMonth(deadline)}`);
+  if (n === 0) return t("срок сегодня", "due today");
+  const left = plural(n, "день", "дня", "дней", "day", "days");
+  return t(`до ${dayMonth(deadline)}, ${left}`, `until ${dayMonth(deadline)}, ${left}`);
 }
 
 export function finishText(goal: Goal): { text: string; late: boolean } | null {
   const p = goal.progress;
   if (p.tasksTotal === 0) return null;
-  if (p.tasksLeft === 0) return { text: "все задачи сделаны", late: false };
-  if (!goal.finish) return { text: "прогноз не сходится: часть тем закрыта навсегда", late: true };
+  if (p.tasksLeft === 0) return { text: t("все задачи сделаны", "all tasks done"), late: false };
+  if (!goal.finish)
+    return { text: t("прогноз не сходится: часть тем закрыта навсегда", "can't finish: some topics never unlock"), late: true };
   const late = !!goal.deadline && goal.finish > goal.deadline;
-  return { text: `${late ? "по прогнозу закончишь" : "закончишь"} к ${dayMonth(goal.finish)}`, late };
+  return {
+    text: t(
+      `${late ? "по прогнозу закончишь" : "закончишь"} к ${dayMonth(goal.finish)}`,
+      `${late ? "at this rate you finish" : "you finish"} by ${dayMonth(goal.finish)}`,
+    ),
+    late,
+  };
 }
 
 export function topicState(goal: Goal, topic: Topic): "done" | "going" | "open" | "locked" {
@@ -101,12 +115,14 @@ export function topicState(goal: Goal, topic: Topic): "done" | "going" | "open" 
 }
 
 export function taskWhen(task: GoalTask, today: string, tomorrow: string): string {
-  if (task.status === "done") return "сделано";
-  if (task.status === "skipped") return "пропущено";
+  if (task.status === "done") return t("сделано", "done");
+  if (task.status === "skipped") return t("пропущено", "skipped");
   if (task.status === "planned") {
-    if (task.plannedFor === today) return "сегодня";
-    if (task.plannedFor === tomorrow) return "завтра";
-    return task.plannedFor ? `в плане на ${dayMonth(task.plannedFor)}` : "в плане";
+    if (task.plannedFor === today) return t("сегодня", "today");
+    if (task.plannedFor === tomorrow) return t("завтра", "tomorrow");
+    return task.plannedFor
+      ? t(`в плане на ${dayMonth(task.plannedFor)}`, `planned for ${dayMonth(task.plannedFor)}`)
+      : t("в плане", "planned");
   }
   return "";
 }

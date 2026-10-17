@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Nav } from "../App";
+import { t } from "../i18n";
 import { Button, StampOverlay } from "../ui/kit";
 import { Px } from "../ui/Px";
 import { duration } from "../util";
@@ -27,7 +28,7 @@ export function TomorrowScreen({ nav }: { nav: Nav }) {
             const wasEdit = !!day?.plan;
             patchDay(d);
             setEditing(false);
-            setStampText(wasEdit ? "ИСПРАВЛЕНО" : "ЗАПИСАНО");
+            setStampText(wasEdit ? t("ИСПРАВЛЕНО", "UPDATED") : t("ЗАПИСАНО", "SAVED"));
             void refresh();
           }}
           onCancel={day?.plan ? () => setEditing(false) : undefined}
@@ -42,7 +43,7 @@ export function TomorrowScreen({ nav }: { nav: Nav }) {
     <div className="screen">
       <div className="cols">
         <div className="col-main">
-          <DayHead label="Завтра" date={day.date} plan={plan} />
+          <DayHead label={t("Завтра", "Tomorrow")} date={day.date} plan={plan} />
           <Description text={plan.description} />
           {plan.checklist && (
             <ChecklistView
@@ -53,38 +54,48 @@ export function TomorrowScreen({ nav }: { nav: Nav }) {
               onOpenGoal={(focus) => go({ name: "map", focus })}
             />
           )}
-          {!plan.checklist && !plan.description && <p className="muted">Только имя? Это тоже план.</p>}
+          {!plan.checklist && !plan.description && (
+            <p className="muted">{t("Только имя? Это тоже план.", "Just a name? That's a plan too.")}</p>
+          )}
         </div>
         <div className="col-side">
           {plan.auto && (
             <section className="card auto-card">
               <h2 className="card-title">
-                <Px name="flag" scale={2} /> План от целей
+                <Px name="flag" scale={2} /> {t("План от целей", "Plan from goals")}
               </h2>
               <p>
-                Этот день составился сам из задач твоих целей. Назови его по-своему и добавь свои пункты, если хочешь: задачи целей останутся
-                на месте.
+                {t(
+                  "Этот день составился сам из задач твоих целей. Назови его по-своему и добавь свои пункты, если хочешь: задачи целей останутся на месте.",
+                  "This day was built from your goal tasks. Give it your own name and add items if you like: goal tasks stay in place.",
+                )}
               </p>
               <Button kind="paper" icon="pencil" onClick={() => setEditing(true)}>
-                Назвать день
+                {t("Назвать день", "Name the day")}
               </Button>
             </section>
           )}
           <section className="card">
             <h2 className="card-title">
-              <Px name="clock" scale={2} /> До начала дня
+              <Px name="clock" scale={2} /> {t("До начала дня", "Until the day starts")}
             </h2>
             <p className="big-num">{duration(ov.nextDayInSec)}</p>
             <p className="muted">
-              План можно править, пока день не начался. Потом он запечатается, и останется только отмечать пункты чеклиста.
+              {t(
+                "План можно править, пока день не начался. Потом он запечатается, и останется только отмечать пункты чеклиста.",
+                "You can edit the plan until the day starts. Then it gets sealed, and you can only tick off checklist items.",
+              )}
             </p>
             <Button kind="paper" icon="pencil" onClick={() => setEditing(true)}>
-              Изменить план
+              {t("Изменить план", "Edit plan")}
             </Button>
           </section>
           <section className="card note-card">
             <p>
-              Назвать можно только завтрашний день: дальше загадывать не нужно. Утром напомню, как он называется.
+              {t(
+                "Назвать можно только завтрашний день: дальше загадывать не нужно. Утром напомню, как он называется.",
+                "You can only name tomorrow: no need to plan further ahead. In the morning I'll remind you of its name.",
+              )}
             </p>
           </section>
         </div>

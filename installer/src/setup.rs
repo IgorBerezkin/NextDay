@@ -140,7 +140,7 @@ pub fn check_dir(input: &str) -> Result<DirCheck, String> {
 fn normalize_dir(input: &str) -> Result<PathBuf, String> {
     let raw = input.trim().trim_matches('"').trim();
     if raw.is_empty() {
-        return Err("Укажите папку для установки.".into());
+        return Err(tr!("Укажите папку для установки.", "Choose a folder to install to."));
     }
     let mut s = raw.replace('/', "\\");
     while s.ends_with('\\') && !s.ends_with(":\\") {
@@ -151,7 +151,7 @@ fn normalize_dir(input: &str) -> Result<PathBuf, String> {
     }
     let p = PathBuf::from(s);
     if !p.is_absolute() {
-        return Err("Нужен полный путь, например D:\\Programs.".into());
+        return Err(tr!("Нужен полный путь, например D:\\Programs.", "Use a full path, for example D:\\Programs."));
     }
     let named = p.file_name().is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case(APP));
     Ok(if named { p } else { p.join(APP) })
@@ -162,11 +162,11 @@ fn check_writable(dir: &Path) -> Result<(), String> {
     while !probe_dir.exists() {
         match probe_dir.parent() {
             Some(p) => probe_dir = p.to_path_buf(),
-            None => return Err(format!("Диска {} нет.", dir.display())),
+            None => return Err(tr!("Диска {} нет.", "Drive not found: {}", dir.display())),
         }
     }
     if !probe_dir.is_dir() {
-        return Err(format!("Это файл, а не папка: {}", probe_dir.display()));
+        return Err(tr!("Это файл, а не папка: {}", "This is a file, not a folder: {}", probe_dir.display()));
     }
     let probe = probe_dir.join(format!(".nextday-check-{}", std::process::id()));
     match fs::write(&probe, b"ok") {
@@ -174,11 +174,12 @@ fn check_writable(dir: &Path) -> Result<(), String> {
             let _ = fs::remove_file(&probe);
             Ok(())
         }
-        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => Err(format!(
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => Err(tr!(
             "Нет прав на запись в {}. Выберите папку в своём профиле или на другом диске.",
+            "No permission to write to {}. Choose a folder in your user profile or on another drive.",
             probe_dir.display()
         )),
-        Err(e) => Err(format!("В {} записать не получается: {e}", probe_dir.display())),
+        Err(e) => Err(tr!("В {} записать не получается: {e}", "Could not write to {}: {e}", probe_dir.display())),
     }
 }
 
@@ -238,19 +239,19 @@ pub fn install(opts: &InstallOptions, emit: impl Fn(&[Step]), pace: bool) -> Res
 
     let mut labels = Vec::new();
     if running {
-        labels.push("Закрываю запущенный Next Day".to_string());
+        labels.push(tr!("Закрываю запущенный Next Day", "Closing the running Next Day"));
     }
-    labels.push("Копирую программу".into());
-    labels.push("Значок в меню «Пуск»".into());
+    labels.push(tr!("Копирую программу", "Copying the app"));
+    labels.push(tr!("Значок в меню «Пуск»", "Start menu shortcut"));
     if opts.desktop {
-        labels.push("Значок на рабочем столе".into());
+        labels.push(tr!("Значок на рабочем столе", "Desktop shortcut"));
     }
     if let Some(on) = opts.autostart {
-        labels.push(if on { "Автозапуск вместе с Windows" } else { "Без автозапуска" }.into());
+        labels.push(if on { tr!("Автозапуск вместе с Windows", "Autostart with Windows") } else { tr!("Без автозапуска", "No autostart") });
     }
-    labels.push("Запись в «Приложениях» Windows".into());
+    labels.push(tr!("Запись в «Приложениях» Windows", "Entry in Windows \"Apps\""));
     if old_dir.is_some() {
-        labels.push("Убираю старую копию".into());
+        labels.push(tr!("Убираю старую копию", "Removing the old copy"));
     }
 
     let mut st = Steps::new(labels, emit, pace);
@@ -270,7 +271,7 @@ pub fn install(opts: &InstallOptions, emit: impl Fn(&[Step]), pace: bool) -> Res
     if opts.desktop {
         st.run(i, || match desktop_lnk() {
             Some(p) => create_shortcut(&p, &exe, &dir),
-            None => Err("Не удалось найти рабочий стол.".into()),
+            None => Err(tr!("Не удалось найти рабочий стол.", "Could not find the desktop.")),
         })?;
         i += 1;
     } else if let Some(p) = desktop_lnk() {
@@ -299,13 +300,13 @@ fn same_path(a: &Path, b: &Path) -> bool {
 pub fn uninstall(remove_data: bool, emit: impl Fn(&[Step]), pace: bool) -> Result<(), String> {
     let dir = install_dir();
     let mut labels = vec![
-        "Закрываю Next Day".to_string(),
-        "Убираю значки".into(),
-        "Убираю автозапуск и записи в реестре".into(),
-        "Удаляю программу".into(),
+        tr!("Закрываю Next Day", "Closing Next Day"),
+        tr!("Убираю значки", "Removing shortcuts"),
+        tr!("Убираю автозапуск и записи в реестре", "Removing autostart and registry entries"),
+        tr!("Удаляю программу", "Deleting the app"),
     ];
     if remove_data {
-        labels.push("Удаляю мои дни и доски".into());
+        labels.push(tr!("Удаляю мои дни и доски", "Deleting your days and boards"));
     }
     let mut st = Steps::new(labels, emit, pace);
     st.run(0, || {
@@ -333,7 +334,7 @@ pub fn uninstall(remove_data: bool, emit: impl Fn(&[Step]), pace: bool) -> Resul
     st.run(3, || {
         let left = remove_own_files(&dir);
         if left {
-            Err(format!("Не удалось удалить файлы в {}.", dir.display()))
+            Err(tr!("Не удалось удалить файлы в {}.", "Could not delete the files in {}.", dir.display()))
         } else {
             Ok(())
         }
@@ -370,10 +371,10 @@ fn remove_own_files(dir: &Path) -> bool {
 }
 
 fn write_files(dir: &Path) -> Result<(), String> {
-    fs::create_dir_all(dir).map_err(|e| format!("Не удалось создать папку {}: {e}", dir.display()))?;
+    fs::create_dir_all(dir).map_err(|e| tr!("Не удалось создать папку {}: {e}", "Could not create the folder {}: {e}", dir.display()))?;
     let target = dir.join(EXE);
     let tmp = dir.join(format!("{EXE}.new"));
-    fs::write(&tmp, PAYLOAD).map_err(|e| format!("Не удалось записать программу: {e}"))?;
+    fs::write(&tmp, PAYLOAD).map_err(|e| tr!("Не удалось записать программу: {e}", "Could not write the app: {e}"))?;
     let mut last_err = None;
     for _ in 0..30 {
         match fs::rename(&tmp, &target) {
@@ -389,12 +390,12 @@ fn write_files(dir: &Path) -> Result<(), String> {
     }
     if let Some(e) = last_err {
         let _ = fs::remove_file(&tmp);
-        return Err(format!("Не удалось заменить программу: {e}"));
+        return Err(tr!("Не удалось заменить программу: {e}", "Could not replace the app: {e}"));
     }
     let me = std::env::current_exe().map_err(|e| e.to_string())?;
     let un = dir.join(UNINSTALLER);
     if !same_path(&me, &un) {
-        fs::copy(&me, &un).map_err(|e| format!("Не удалось записать {UNINSTALLER}: {e}"))?;
+        fs::copy(&me, &un).map_err(|e| tr!("Не удалось записать {UNINSTALLER}: {e}", "Could not write {UNINSTALLER}: {e}"))?;
     }
     Ok(())
 }
@@ -403,7 +404,7 @@ fn create_shortcut(lnk: &Path, target: &Path, workdir: &Path) -> Result<(), Stri
     use windows::core::{Interface, HSTRING};
     use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, IPersistFile, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED};
     use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
-    let err = |e: windows::core::Error| format!("Не удалось создать ярлык {}: {e}", lnk.display());
+    let err = |e: windows::core::Error| tr!("Не удалось создать ярлык {}: {e}", "Could not create the shortcut {}: {e}", lnk.display());
     if let Some(parent) = lnk.parent() {
         let _ = fs::create_dir_all(parent);
     }
@@ -412,7 +413,8 @@ fn create_shortcut(lnk: &Path, target: &Path, workdir: &Path) -> Result<(), Stri
         let link: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER).map_err(err)?;
         link.SetPath(&HSTRING::from(target)).map_err(err)?;
         link.SetWorkingDirectory(&HSTRING::from(workdir)).map_err(err)?;
-        link.SetDescription(&HSTRING::from("Next Day: план на завтра и итоги дня")).map_err(err)?;
+        link.SetDescription(&HSTRING::from(tr!("Next Day: план на завтра и итоги дня", "Next Day: plan for tomorrow and day results")))
+            .map_err(err)?;
         link.SetIconLocation(&HSTRING::from(target), 0).map_err(err)?;
         let file: IPersistFile = link.cast().map_err(err)?;
         file.Save(&HSTRING::from(lnk), true).map_err(err)?;
@@ -450,11 +452,11 @@ fn write_setting(key: &str, value: Value) -> Result<(), String> {
     s[key] = value;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let text = serde_json::to_string_pretty(&s).map_err(|e| e.to_string())?;
-    fs::write(&path, text).map_err(|e| format!("Не удалось записать настройки: {e}"))
+    fs::write(&path, text).map_err(|e| tr!("Не удалось записать настройки: {e}", "Could not save the settings: {e}"))
 }
 
 fn register(dir: &Path) -> Result<(), String> {
-    let e = |e: std::io::Error| format!("Не удалось записать в реестр: {e}");
+    let e = |e: std::io::Error| tr!("Не удалось записать в реестр: {e}", "Could not write to the registry: {e}");
     let (k, _) = RegKey::predef(HKEY_CURRENT_USER).create_subkey(UNINSTALL_KEY).map_err(e)?;
     let exe = dir.join(EXE);
     let un = dir.join(UNINSTALLER);
@@ -516,7 +518,7 @@ fn remove_dir_retry(dir: &Path) -> Result<(), String> {
             }
         }
     }
-    Err(format!("Не удалось удалить {}: {last}", dir.display()))
+    Err(tr!("Не удалось удалить {}: {last}", "Could not delete {}: {last}", dir.display()))
 }
 
 pub fn launch(hidden: bool) -> Result<(), String> {
@@ -526,7 +528,7 @@ pub fn launch(hidden: bool) -> Result<(), String> {
     if hidden {
         cmd.arg("--hidden");
     }
-    cmd.spawn().map(|_| ()).map_err(|e| format!("Не удалось запустить Next Day: {e}"))
+    cmd.spawn().map(|_| ()).map_err(|e| tr!("Не удалось запустить Next Day: {e}", "Could not start Next Day: {e}"))
 }
 
 pub fn relaunch_from_temp() -> bool {

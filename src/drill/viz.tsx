@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
+import { t } from "../i18n";
 
 const SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"];
 const W = 640;
@@ -58,7 +59,7 @@ export function Chart({ spec }: { spec: ChartSpec }) {
   const svg = useRef<SVGSVGElement>(null);
   const type = spec.type ?? "line";
   const series = (type === "scatter" ? spec.series.slice(0, 3) : spec.series.slice(0, SERIES.length)).map((s, i) => ({
-    name: s.name ?? (spec.series.length > 1 ? `ряд ${i + 1}` : ""),
+    name: s.name ?? (spec.series.length > 1 ? t(`ряд ${i + 1}`, `series ${i + 1}`) : ""),
     y: s.y,
     color: SERIES[i],
   }));
@@ -95,7 +96,7 @@ export function Chart({ spec }: { spec: ChartSpec }) {
     y,
     title: String(xs[i]),
     rows: series
-      .map((s, k) => ({ color: s.color, name: s.name, value: typeof s.y[i] === "number" ? fmt(s.y[i] as number) : "нет", k }))
+      .map((s, k) => ({ color: s.color, name: s.name, value: typeof s.y[i] === "number" ? fmt(s.y[i] as number) : t("нет", "n/a"), k }))
       .filter((r) => only === undefined || r.k === only),
   });
 
@@ -171,7 +172,7 @@ export function Chart({ spec }: { spec: ChartSpec }) {
         {spec.title && <figcaption>{spec.title}</figcaption>}
         <span className="grow" />
         <button className="viz-toggle" onClick={() => setTable((t) => !t)}>
-          {table ? "График" : "Таблица"}
+          {table ? t("График", "Chart") : t("Таблица", "Table")}
         </button>
       </div>
       {series.length > 1 && (
@@ -290,7 +291,7 @@ function lex(src: string): Tok[] {
     } else if ("+-*/^()".includes(c)) {
       out.push({ k: "op", v: c });
       i++;
-    } else throw new Error(`непонятный символ ${c}`);
+    } else throw new Error(t(`непонятный символ ${c}`, `unexpected character ${c}`));
   }
   return out;
 }
@@ -312,14 +313,14 @@ const FN: Record<string, (v: number) => number> = {
 type Ex = (x: number) => number;
 
 function compile(src: string): Ex {
-  const t = lex(src);
+  const toks = lex(src);
   let i = 0;
-  const peek = () => t[i];
+  const peek = () => toks[i];
   const isOp = (v: string) => peek()?.k === "op" && peek()?.v === v;
   const expr = (): Ex => {
     let a = term();
     while (isOp("+") || isOp("-")) {
-      const op = t[i++].v;
+      const op = toks[i++].v;
       const l = a;
       const r = term();
       a = op === "+" ? (x) => l(x) + r(x) : (x) => l(x) - r(x);
@@ -330,7 +331,7 @@ function compile(src: string): Ex {
     let a = unary();
     for (;;) {
       if (isOp("*") || isOp("/")) {
-        const op = t[i++].v;
+        const op = toks[i++].v;
         const l = a;
         const r = unary();
         a = op === "*" ? (x) => l(x) * r(x) : (x) => l(x) / r(x);
@@ -359,12 +360,12 @@ function compile(src: string): Ex {
     return base;
   };
   const primary = (): Ex => {
-    const tk = t[i++];
-    if (!tk) throw new Error("формула оборвалась");
+    const tk = toks[i++];
+    if (!tk) throw new Error(t("формула оборвалась", "the formula ends too early"));
     if (tk.k === "num") return () => tk.v;
     if (tk.k === "op" && tk.v === "(") {
       const a = expr();
-      if (!isOp(")")) throw new Error("не закрыта скобка");
+      if (!isOp(")")) throw new Error(t("не закрыта скобка", "a bracket is not closed"));
       i++;
       return a;
     }
@@ -374,19 +375,19 @@ function compile(src: string): Ex {
       if (tk.v === "e") return () => Math.E;
       const f = FN[tk.v];
       if (f) {
-        if (!isOp("(")) throw new Error(`после ${tk.v} нужна скобка`);
+        if (!isOp("(")) throw new Error(t(`после ${tk.v} нужна скобка`, `${tk.v} needs a bracket after it`));
         i++;
         const a = expr();
-        if (!isOp(")")) throw new Error("не закрыта скобка");
+        if (!isOp(")")) throw new Error(t("не закрыта скобка", "a bracket is not closed"));
         i++;
         return (x) => f(a(x));
       }
-      throw new Error(`непонятное имя ${tk.v}`);
+      throw new Error(t(`непонятное имя ${tk.v}`, `unknown name ${tk.v}`));
     }
-    throw new Error(`непонятный символ ${tk.v}`);
+    throw new Error(t(`непонятный символ ${tk.v}`, `unexpected symbol ${tk.v}`));
   };
   const out = expr();
-  if (i < t.length) throw new Error("лишнее в конце формулы");
+  if (i < toks.length) throw new Error(t("лишнее в конце формулы", "extra text at the end of the formula"));
   return out;
 }
 
@@ -405,17 +406,17 @@ export function Plot({ src }: { src: string }) {
         hi = Number(range[2]);
         continue;
       }
-      const t = line.match(/^title\s*:\s*(.+)$/);
-      if (t) {
-        title = t[1];
+      const caption = line.match(/^title\s*:\s*(.+)$/);
+      if (caption) {
+        title = caption[1];
         continue;
       }
       const m = line.match(/^y\s*=\s*(.+)$/);
-      if (!m) throw new Error(`не понял строку: ${line}`);
+      if (!m) throw new Error(t(`не понял строку: ${line}`, `can't read the line: ${line}`));
       fs.push({ name: `y = ${m[1]}`, f: compile(m[1]) });
     }
-    if (!fs.length) throw new Error("нет ни одной строки y = ...");
-    if (!(hi > lo)) throw new Error("диапазон x пустой");
+    if (!fs.length) throw new Error(t("нет ни одной строки y = ...", "there is no y = ... line"));
+    if (!(hi > lo)) throw new Error(t("диапазон x пустой", "the x range is empty"));
     const N = 161;
     const x = Array.from({ length: N }, (_, i) => +(lo + ((hi - lo) * i) / (N - 1)).toFixed(6));
     const series = fs.map(({ name, f }) => ({ name, y: x.map((v) => (Number.isFinite(f(v)) && Math.abs(f(v)) < 1e9 ? f(v) : null)) }));
@@ -428,7 +429,9 @@ export function SafePlot({ src }: { src: string }) {
   try {
     compileCheck(src);
   } catch (e) {
-    return <pre className="viz-error">График не построен: {(e as Error).message}</pre>;
+    return (
+      <pre className="viz-error">{t(`График не построен: ${(e as Error).message}`, `Can't draw the plot: ${(e as Error).message}`)}</pre>
+    );
   }
   return <Plot src={src} />;
 }
@@ -441,9 +444,10 @@ function compileCheck(src: string) {
     if (m) {
       compile(m[1]);
       ok = true;
-    } else if (line && !/^x\s*=/.test(line) && !/^title\s*:/.test(line)) throw new Error(`не понял строку: ${line}`);
+    } else if (line && !/^x\s*=/.test(line) && !/^title\s*:/.test(line))
+      throw new Error(t(`не понял строку: ${line}`, `can't read the line: ${line}`));
   }
-  if (!ok) throw new Error("нет ни одной строки y = ...");
+  if (!ok) throw new Error(t("нет ни одной строки y = ...", "there is no y = ... line"));
 }
 
 type Edge = { a: string; b: string; dir: boolean; label: string };

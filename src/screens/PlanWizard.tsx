@@ -1,6 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type CheckItem, type Day, type GoalRef, type Plan, type PlanInput, type TaskRef } from "../api";
+import { t } from "../i18n";
 import { sfx } from "../sound";
 import { AttachChip, Button, Check, Linkify, toast, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
@@ -42,7 +43,7 @@ const okHours = (s: string) => {
   return h !== null && !isNaN(h) && h > 0 && h <= 24 ? h : null;
 };
 
-const STEPS = ["Имя", "Описание", "Чеклист"];
+const STEPS = t(["Имя", "Описание", "Чеклист"], ["Name", "Description", "Checklist"]);
 
 type Draft = { step: number; name: string; desc: string; need: boolean; rows: Row[] };
 const draftKey = (date: string) => `nd.draft.${date}`;
@@ -168,11 +169,14 @@ export function PlanWizard({
       return;
     }
     if ((need || hasGoals) && badHours) {
-      toast("Проверьте часы: число от 0,25 до 24, например 1,5 или 90м.", "error");
+      toast(
+        t("Проверьте часы: число от 0,25 до 24, например 1,5 или 90м.", "Check the hours: a number from 0.25 to 24, like 1.5 or 90m."),
+        "error",
+      );
       return;
     }
     if ((need || hasGoals) && rows.some((r) => !r.text.trim() && r.subs.some((s) => s.text.trim()))) {
-      toast("У подпунктов должен быть пункт: заполните его.", "error");
+      toast(t("У подпунктов должен быть пункт: заполните его.", "Sub-items need a parent item: fill it in."), "error");
       return;
     }
     const input: PlanInput = {
@@ -207,7 +211,7 @@ export function PlanWizard({
 
   const pickFile = async (key: string) => {
     try {
-      const f = await open({ multiple: false, directory: false, title: "Файл для пункта" });
+      const f = await open({ multiple: false, directory: false, title: t("Файл для пункта", "File for the item") });
       if (typeof f === "string") update(key, { attach: f });
     } catch (e) {
       toastError(e);
@@ -245,7 +249,7 @@ export function PlanWizard({
     }
   };
 
-  const whichDay = mode === "tomorrow" ? "завтрашний" : "сегодняшний";
+  const whichDay = mode === "tomorrow" ? t("завтрашний", "tomorrow") : t("сегодняшний", "today");
 
   return (
     <div className="wizard">
@@ -264,20 +268,20 @@ export function PlanWizard({
           ))}
         </div>
         <div className="wiz-date">
-          <span className="day-label">{mode === "tomorrow" ? "Завтра" : "Сегодня"}</span>
+          <span className="day-label">{mode === "tomorrow" ? t("Завтра", "Tomorrow") : t("Сегодня", "Today")}</span>
           <span>{longDate(date)}</span>
         </div>
       </div>
 
       {step === 0 && (
         <div className="wiz-body" key="s0">
-          <h1 className="q">Как назовём {whichDay} день?</h1>
+          <h1 className="q">{t(`Как назовём ${whichDay} день?`, `What shall we call ${whichDay}?`)}</h1>
           <input
             className="field big"
             autoFocus
             value={name}
             maxLength={80}
-            placeholder={`Например: ${example}`}
+            placeholder={t(`Например: ${example}`, `For example: ${example}`)}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -287,17 +291,25 @@ export function PlanWizard({
             }}
           />
           <p className="hint">
-            Имя задаёт главную тему и настроение дня. Оно будет в трее, в утреннем напоминании и в истории. Enter: дальше.
+            {t(
+              "Имя задаёт главную тему и настроение дня. Оно будет в трее, в утреннем напоминании и в истории. Enter: дальше.",
+              "The name sets the main theme and mood of the day. It shows in the tray, the morning reminder and the history. Enter: next.",
+            )}
           </p>
           {mode === "today" && (
-            <p className="hint">Вчера этот день не назвали, поэтому он отметится как «назван в тот же день». Это нормально.</p>
+            <p className="hint">
+              {t(
+                "Вчера этот день не назвали, поэтому он отметится как «назван в тот же день». Это нормально.",
+                'This day was not named yesterday, so it gets marked "named the same day". That is fine.',
+              )}
+            </p>
           )}
         </div>
       )}
 
       {step === 1 && (
         <div className="wiz-body" key="s1">
-          <h1 className="q">Опишите, чем будете заниматься.</h1>
+          <h1 className="q">{t("Опишите, чем будете заниматься.", "Describe what you will do.")}</h1>
           <textarea
             className="field area"
             autoFocus
@@ -311,15 +323,23 @@ export function PlanWizard({
                 next();
               }
             }}
-            placeholder="Например: буду делать модели для своей игры в Blockbench: сначала соберу референсы, потом блокинг персонажа."
+            placeholder={t(
+              "Например: буду делать модели для своей игры в Blockbench: сначала соберу референсы, потом блокинг персонажа.",
+              "For example: I'll make models for my game in Blockbench: first gather references, then block out the character.",
+            )}
           />
-          <p className="hint">Ссылки и пути к файлам станут кликабельными. Ctrl+Enter: дальше.</p>
+          <p className="hint">
+            {t(
+              "Ссылки и пути к файлам станут кликабельными. Ctrl+Enter: дальше.",
+              "Links and file paths become clickable. Ctrl+Enter: next.",
+            )}
+          </p>
         </div>
       )}
 
       {step === 2 && (
         <div className="wiz-body" key="s2">
-          <h1 className="q">Нужен чеклист?</h1>
+          <h1 className="q">{t("Нужен чеклист?", "Need a checklist?")}</h1>
           <Check
             className="big"
             checked={need || hasGoals}
@@ -328,11 +348,14 @@ export function PlanWizard({
               setNeed(v);
               if (v && rows.length === 0) addRow();
             }}
-            label="Нужен чеклист"
+            label={t("Нужен чеклист", "Use a checklist")}
           />
           {hasGoals && (
             <p className="hint">
-              Задачи целей ставятся сами и здесь не удаляются. Можно поменять им время. Чтобы освободить день, поставь цель на паузу.
+              {t(
+                "Задачи целей ставятся сами и здесь не удаляются. Можно поменять им время. Чтобы освободить день, поставь цель на паузу.",
+                "Goal tasks are added automatically and can't be removed here. You can change their time. To free the day, pause the goal.",
+              )}
             </p>
           )}
           {(need || hasGoals) && (
@@ -351,30 +374,64 @@ export function PlanWizard({
                           value={r.text}
                           readOnly={!!r.goal}
                           maxLength={300}
-                          placeholder={i === 0 ? "Например: посмотреть урок по Blockbench https://…" : "Ещё пункт"}
+                          placeholder={
+                            i === 0
+                              ? t(
+                                  "Например: посмотреть урок по Blockbench https://…",
+                                  "For example: watch a Blockbench tutorial https://...",
+                                )
+                              : t("Ещё пункт", "Another item")
+                          }
                           onChange={(e) => update(r.key, { text: e.target.value })}
                           onKeyDown={(e) => itemKey(e, r, i)}
                         />
                         {r.attach && <AttachChip target={r.attach} onRemove={() => update(r.key, { attach: null })} />}
                         {r.from && (
-                          <span className="chip from-chip" title="Этот пункт продолжает задачу из прошлого">
+                          <span
+                            className="chip from-chip"
+                            title={t("Этот пункт продолжает задачу из прошлого", "This item continues a task from the past")}
+                          >
                             <span className="chip-main">
                               <Px name="link" scale={1.5} />
                               <span>
-                                продолжает «<Linkify inert text={r.from.text} />», {dayMonth(r.from.date)}
+                                {t(
+                                  <>
+                                    продолжает «<Linkify inert text={r.from.text} />
+                                    », {dayMonth(r.from.date)}
+                                  </>,
+                                  <>
+                                    continues "<Linkify inert text={r.from.text} />" from {dayMonth(r.from.date)}
+                                  </>,
+                                )}
                               </span>
                             </span>
-                            <button className="chip-x" onClick={() => update(r.key, { from: null })} title="Убрать связь">
+                            <button
+                              className="chip-x"
+                              onClick={() => update(r.key, { from: null })}
+                              title={t("Убрать связь", "Remove link")}
+                            >
                               <Px name="cross" scale={1} />
                             </button>
                           </span>
                         )}
                         {hit && (
-                          <span className="chip from-chip goal-chip" title="Задача цели: ставится сама">
+                          <span
+                            className="chip from-chip goal-chip"
+                            title={t("Задача цели: ставится сама", "Goal task: added automatically")}
+                          >
                             <span className="chip-main">
                               <Px name="flag" scale={1.5} />
                               <span>
-                                цель «<Linkify inert text={hit.goal.title} />»: {hit.topic.title}
+                                {t(
+                                  <>
+                                    цель «<Linkify inert text={hit.goal.title} />
+                                    »: {hit.topic.title}
+                                  </>,
+                                  <>
+                                    goal "<Linkify inert text={hit.goal.title} />
+                                    ": {hit.topic.title}
+                                  </>,
+                                )}
                               </span>
                             </span>
                           </span>
@@ -385,15 +442,15 @@ export function PlanWizard({
                         value={r.hours}
                         readOnly={!!r.goal}
                         maxLength={6}
-                        placeholder="ч"
-                        title="Часы на пункт, необязательно: 1,5 или 90м"
+                        placeholder={t("ч", "h")}
+                        title={t("Часы на пункт, необязательно: 1,5 или 90м", "Hours for the item, optional: 1.5 or 90m")}
                         onChange={(e) => update(r.key, { hours: e.target.value })}
                         onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addRow(i))}
                       />
                       <select
                         className={`field select start${r.start == null ? " unset" : ""}`}
                         value={r.start ?? ""}
-                        title="Во сколько начать, необязательно"
+                        title={t("Во сколько начать, необязательно", "When to start, optional")}
                         onChange={(e) => update(r.key, { start: e.target.value === "" ? null : Number(e.target.value) })}
                       >
                         <option value="">--:--</option>
@@ -405,21 +462,30 @@ export function PlanWizard({
                       </select>
                       <button
                         className="icon-btn"
-                        title="Подпункт, до трёх"
+                        title={t("Подпункт, до трёх", "Sub-item, up to three")}
                         disabled={r.subs.length >= MAX_SUBS}
                         onClick={() => addSub(r)}
                       >
                         <Px name="sub" scale={2} />
                       </button>
-                      <button className="icon-btn" title="Продолжает задачу из прошлого" disabled={!!r.goal} onClick={() => setPicking(r.key)}>
+                      <button
+                        className="icon-btn"
+                        title={t("Продолжает задачу из прошлого", "Continues a task from the past")}
+                        disabled={!!r.goal}
+                        onClick={() => setPicking(r.key)}
+                      >
                         <Px name="link" scale={2} />
                       </button>
-                      <button className="icon-btn" title="Прикрепить файл" onClick={() => void pickFile(r.key)}>
+                      <button className="icon-btn" title={t("Прикрепить файл", "Attach a file")} onClick={() => void pickFile(r.key)}>
                         <Px name="folder" scale={2} />
                       </button>
                       <button
                         className="icon-btn"
-                        title={r.goal ? "Задачу цели не удалить: поставь цель на паузу" : "Удалить пункт"}
+                        title={
+                          r.goal
+                            ? t("Задачу цели не удалить: поставь цель на паузу", "A goal task can't be deleted: pause the goal")
+                            : t("Удалить пункт", "Delete item")
+                        }
                         disabled={!!r.goal}
                         onClick={() => remove(r.key)}
                       >
@@ -437,12 +503,12 @@ export function PlanWizard({
                             ref={bindInput(s.key)}
                             value={s.text}
                             maxLength={300}
-                            placeholder="Подпункт"
+                            placeholder={t("Подпункт", "Sub-item")}
                             onChange={(e) => updateSub(r, s.key, e.target.value)}
                             onKeyDown={(e) => subKey(e, r, i, j)}
                           />
                         </div>
-                        <button className="icon-btn" title="Удалить подпункт" onClick={() => removeSub(r, s.key)}>
+                        <button className="icon-btn" title={t("Удалить подпункт", "Delete sub-item")} onClick={() => removeSub(r, s.key)}>
                           <Px name="cross" scale={2} />
                         </button>
                       </div>
@@ -452,19 +518,22 @@ export function PlanWizard({
               })}
               <div className="items-foot">
                 <Button kind="paper" small icon="plus" onClick={() => addRow()}>
-                  Пункт
+                  {t("Пункт", "Item")}
                 </Button>
                 <span className={`total${total > 12 ? " warn" : ""}`}>
-                  {total > 0 && <>Всего: {hoursText(total)} ч</>}
-                  {total > 12 && ", многовато для одного дня"}
+                  {total > 0 && t(`Всего: ${hoursText(total)} ч`, `Total: ${hoursText(total)} h`)}
+                  {total > 12 && t(", многовато для одного дня", ", a lot for one day")}
                 </span>
               </div>
               <p className="hint">
-                Enter: новый пункт. Shift+Enter: подпункт, до трёх. Alt+стрелки: переставить. Часы указывать не обязательно.
+                {t(
+                  "Enter: новый пункт. Shift+Enter: подпункт, до трёх. Alt+стрелки: переставить. Часы указывать не обязательно.",
+                  "Enter: new item. Shift+Enter: sub-item, up to three. Alt+arrows: reorder. Hours are optional.",
+                )}
               </p>
               {carryLeft.length > 0 && (
                 <div className="carry">
-                  <span className="carry-title">Не успели сегодня. Перенести?</span>
+                  <span className="carry-title">{t("Не успели сегодня. Перенести?", "Not done today. Carry over?")}</span>
                   {carryLeft.map((c) => (
                     <button
                       key={c.id}
@@ -490,7 +559,14 @@ export function PlanWizard({
               )}
             </div>
           )}
-          {!need && !hasGoals && <p className="hint">Можно и без чеклиста: имени и описания бывает достаточно.</p>}
+          {!need && !hasGoals && (
+            <p className="hint">
+              {t(
+                "Можно и без чеклиста: имени и описания бывает достаточно.",
+                "You can skip the checklist: a name and description are often enough.",
+              )}
+            </p>
+          )}
         </div>
       )}
 
@@ -516,22 +592,22 @@ export function PlanWizard({
               onCancel();
             }}
           >
-            Отмена
+            {t("Отмена", "Cancel")}
           </Button>
         )}
         <span className="grow" />
         {step > 0 && (
           <Button kind="paper" icon="arrowL" onClick={back}>
-            Назад
+            {t("Назад", "Back")}
           </Button>
         )}
         {step < 2 ? (
           <Button icon="arrowR" disabled={!canNext} onClick={next}>
-            Дальше
+            {t("Дальше", "Next")}
           </Button>
         ) : (
           <Button kind="green" icon="check" disabled={busy || !canNext} onClick={() => void save()}>
-            {initial ? "Сохранить план" : "Записать план"}
+            {initial ? t("Сохранить план", "Save changes") : t("Записать план", "Save plan")}
           </Button>
         )}
       </div>

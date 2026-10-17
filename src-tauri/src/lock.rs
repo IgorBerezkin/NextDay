@@ -25,7 +25,7 @@ pub fn locked(app: &AppHandle) -> bool {
 
 fn build(app: &AppHandle, label: &str) -> tauri::Result<tauri::WebviewWindow> {
     WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
-        .title("Next Day: Зубрилка")
+        .title(tr!("Next Day: Зубрилка", "Next Day: Drill"))
         .decorations(false)
         .background_color(Color(26, 28, 44, 255))
         .visible(false)

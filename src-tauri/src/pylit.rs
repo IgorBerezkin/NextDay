@@ -52,17 +52,17 @@ impl Parser {
         if self.eat(c) {
             Ok(())
         } else {
-            Err(format!("ожидался символ {c}"))
+            Err(tr!("ожидался символ {c}", "expected the character {c}"))
         }
     }
 
     fn value(&mut self, depth: usize) -> Result<Py, String> {
         if depth > 64 {
-            return Err("слишком глубокая вложенность".into());
+            return Err(tr!("слишком глубокая вложенность", "nesting is too deep"));
         }
         self.skip();
         match self.peek() {
-            None => Err("ответ оборвался".into()),
+            None => Err(tr!("ответ оборвался", "the answer ends too early")),
             Some('[') => {
                 self.i += 1;
                 let (items, _) = self.items(']', depth)?;
@@ -89,12 +89,12 @@ impl Parser {
                     ('+', v @ (Py::Int(_) | Py::Float(_))) => Ok(v),
                     ('-', Py::Int(d)) => Ok(Py::Int(neg(&d))),
                     ('-', Py::Float(f)) => Ok(Py::Float(-f)),
-                    _ => Err("знак можно ставить только перед числом".into()),
+                    _ => Err(tr!("знак можно ставить только перед числом", "a sign can stand only before a number")),
                 }
             }
             Some(c) if c.is_ascii_digit() || c == '.' => self.number(),
             Some(c) if is_ident_start(c) => self.word(depth),
-            Some(c) => Err(format!("непонятный символ {c}")),
+            Some(c) => Err(tr!("непонятный символ {c}", "unexpected character {c}")),
         }
     }
 
@@ -164,7 +164,7 @@ impl Parser {
                     Py::List(v) | Py::Tuple(v) | Py::Set(v) => Ok(Py::Set(v)),
                     Py::Dict(v) if v.is_empty() => Ok(Py::Set(Vec::new())),
                     Py::Str(s) => Ok(Py::Set(dedupe(s.chars().map(|c| Py::Str(c.to_string())).collect()))),
-                    _ => Err("set() понимает только список, кортеж или строку".into()),
+                    _ => Err(tr!("set() понимает только список, кортеж или строку", "set() takes only a list, a tuple or a string")),
                 }
             }
             _ => Ok(Py::Name(w)),
@@ -192,10 +192,10 @@ impl Parser {
         }
         let raw: String = self.s[start..self.i].iter().filter(|c| **c != '_').collect();
         if float {
-            raw.parse::<f64>().map(Py::Float).map_err(|_| format!("непонятное число {raw}"))
+            raw.parse::<f64>().map(Py::Float).map_err(|_| tr!("непонятное число {raw}", "unclear number {raw}"))
         } else {
             if raw.is_empty() || !raw.chars().all(|c| c.is_ascii_digit()) {
-                return Err(format!("непонятное число {raw}"));
+                return Err(tr!("непонятное число {raw}", "unclear number {raw}"));
             }
             Ok(Py::Int(canon_int(&raw)))
         }
@@ -207,7 +207,7 @@ impl Parser {
         let mut out = String::new();
         loop {
             let Some(c) = self.peek() else {
-                return Err("строка не закрыта кавычкой".into());
+                return Err(tr!("строка не закрыта кавычкой", "the string has no closing quote"));
             };
             self.i += 1;
             if c == q {
@@ -218,7 +218,7 @@ impl Parser {
                 continue;
             }
             let Some(e) = self.peek() else {
-                return Err("строка оборвалась после \\".into());
+                return Err(tr!("строка оборвалась после \\", "the string ends after \\"));
             };
             self.i += 1;
             match e {
@@ -249,9 +249,9 @@ impl Parser {
                         _ => 8,
                     };
                     let hex: String = self.s.iter().skip(self.i).take(n).collect();
-                    let code = u32::from_str_radix(&hex, 16).map_err(|_| "непонятный код символа после \\".to_string())?;
+                    let code = u32::from_str_radix(&hex, 16).map_err(|_| tr!("непонятный код символа после \\", "unclear character code after \\"))?;
                     self.i += n;
-                    out.push(char::from_u32(code).ok_or("непонятный код символа")?);
+                    out.push(char::from_u32(code).ok_or_else(|| tr!("непонятный код символа", "unclear character code"))?);
                 }
                 '\n' => {}
                 '\\' | '\'' | '"' => out.push(e),
@@ -295,7 +295,7 @@ pub fn parse(text: &str) -> Result<Py, String> {
     let mut p = Parser { s: text.chars().collect(), i: 0 };
     p.skip();
     if p.peek().is_none() {
-        return Err("пустой ответ".into());
+        return Err(tr!("пустой ответ", "empty answer"));
     }
     let first = p.value(0)?;
     let mut items = vec![first];
@@ -310,7 +310,7 @@ pub fn parse(text: &str) -> Result<Py, String> {
     }
     p.skip();
     if let Some(c) = p.peek() {
-        return Err(format!("лишнее в конце ответа: {c}"));
+        return Err(tr!("лишнее в конце ответа: {c}", "extra text at the end of the answer: {c}"));
     }
     Ok(if bare { Py::Tuple(items) } else { items.pop().unwrap_or(Py::None) })
 }
@@ -442,7 +442,7 @@ pub fn check(spec: &CheckSpec, expected: &[&str], input: &str) -> Verdict {
                         let n = error_name(input);
                         return yes(expected.iter().any(|e| error_name(e) == n));
                     }
-                    return Verdict { correct: false, note: Some(format!("Не похоже на литерал Python: {e}.")) };
+                    return Verdict { correct: false, note: Some(tr!("Не похоже на литерал Python: {e}.", "This does not look like a Python literal: {e}.")) };
                 }
             };
             let ok = expected.iter().any(|e| match parse(e) {
@@ -458,7 +458,7 @@ pub fn check(spec: &CheckSpec, expected: &[&str], input: &str) -> Verdict {
         }
         Mode::Number => match parse_num(input) {
             Some(x) => yes(expected.iter().filter_map(|e| parse_num(e)).any(|w| (w - x).abs() <= spec.tolerance.max(0.0) + f64::EPSILON * w.abs().max(1.0))),
-            None => Verdict { correct: false, note: Some("Нужно число.".into()) },
+            None => Verdict { correct: false, note: Some(tr!("Нужно число.", "A number is needed.")) },
         },
         Mode::Output => {
             let got = input.trim_end_matches(['\n', '\r']).trim_end();
@@ -473,8 +473,8 @@ pub fn check(spec: &CheckSpec, expected: &[&str], input: &str) -> Verdict {
 
 pub fn valid_expected(spec: &CheckSpec, answer: &str) -> Result<(), String> {
     match spec.mode {
-        Mode::Python => parse(answer).map(|_| ()).map_err(|e| format!("ответ «{answer}» не литерал Python: {e}")),
-        Mode::Number => parse_num(answer).map(|_| ()).ok_or_else(|| format!("ответ «{answer}» не число")),
+        Mode::Python => parse(answer).map(|_| ()).map_err(|e| tr!("ответ «{answer}» не литерал Python: {e}", "the answer \"{answer}\" is not a Python literal: {e}")),
+        Mode::Number => parse_num(answer).map(|_| ()).ok_or_else(|| tr!("ответ «{answer}» не число", "the answer \"{answer}\" is not a number")),
         _ => Ok(()),
     }
 }

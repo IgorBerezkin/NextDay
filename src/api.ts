@@ -1,4 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import type { Lang } from "./i18n";
 
 export type SubItem = {
   id: string;
@@ -153,6 +154,7 @@ export type Settings = {
   autoUpdate: boolean;
   taskAlerts: boolean;
   mcpEnabled: boolean;
+  language: Lang;
 };
 
 export type Overview = {

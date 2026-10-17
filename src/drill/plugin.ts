@@ -1,4 +1,5 @@
 import type { BankCard, BankTopic, GenVariant } from "../api";
+import { lang, t } from "../i18n";
 
 export type GenMeta = { title: string; description: string; topics: BankTopic[]; templates: BankCard[] };
 export type GenOutput = { variants: Record<string, GenVariant[]>; errors: Record<string, string> };
@@ -36,7 +37,7 @@ const HARNESS = `
   onmessage = (e) => {
     const req = e.data;
     try {
-      if (!P || !Array.isArray(P.templates)) throw new Error("скрипт должен объявить const plugin = { topics: [...], templates: [...] }");
+      if (!P || !Array.isArray(P.templates)) throw new Error(${JSON.stringify(t("скрипт должен объявить const plugin = { topics: [...], templates: [...] }", "the script must declare const plugin = { topics: [...], templates: [...] }"))});
       if (req.op === "meta") {
         const topics = Array.isArray(P.topics) ? P.topics : [];
         postMessage({ ok: true, data: {
@@ -53,7 +54,7 @@ const HARNESS = `
         const t = P.templates.find((x) => x && x.id === id);
         const out = [];
         variants[id] = out;
-        if (!t || typeof t.make !== "function") { errors[id] = "у шаблона нет функции make(r)"; continue; }
+        if (!t || typeof t.make !== "function") { errors[id] = ${JSON.stringify(t("у шаблона нет функции make(r)", "the template has no make(r) function"))}; continue; }
         const seen = new Set();
         try {
           for (let k = 0; k < req.count * 6 && out.length < req.count; k++) {
@@ -75,7 +76,9 @@ const HARNESS = `
 
 function run<T>(code: string, req: object, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(new Blob([`${PRELUDE}\n${code}\n${HARNESS}`], { type: "text/javascript" }));
+    const url = URL.createObjectURL(
+      new Blob([`self.lang = ${JSON.stringify(lang())};\n${PRELUDE}\n${code}\n${HARNESS}`], { type: "text/javascript" }),
+    );
     let worker: Worker;
     try {
       worker = new Worker(url);
@@ -90,12 +93,26 @@ function run<T>(code: string, req: object, timeoutMs: number): Promise<T> {
       URL.revokeObjectURL(url);
       f();
     };
-    const timer = setTimeout(() => finish(() => reject(new Error(`генератор думает дольше ${timeoutMs / 1000} с`))), timeoutMs);
+    const timer = setTimeout(
+      () =>
+        finish(() =>
+          reject(new Error(t(`генератор думает дольше ${timeoutMs / 1000} с`, `the generator takes longer than ${timeoutMs / 1000} s`))),
+        ),
+      timeoutMs,
+    );
     worker.onmessage = (e: MessageEvent<{ ok: boolean; data?: T; error?: string }>) =>
-      finish(() => (e.data.ok ? resolve(e.data.data as T) : reject(new Error(e.data.error ?? "ошибка генератора"))));
+      finish(() => (e.data.ok ? resolve(e.data.data as T) : reject(new Error(e.data.error ?? t("ошибка генератора", "generator error")))));
     worker.onerror = (e) => {
       e.preventDefault();
-      finish(() => reject(new Error(e.message ? `ошибка в коде: ${e.message}` : "ошибка в коде генератора")));
+      finish(() =>
+        reject(
+          new Error(
+            e.message
+              ? t(`ошибка в коде: ${e.message}`, `error in the code: ${e.message}`)
+              : t("ошибка в коде генератора", "error in the generator code"),
+          ),
+        ),
+      );
     };
     worker.postMessage(req);
   });
@@ -103,7 +120,7 @@ function run<T>(code: string, req: object, timeoutMs: number): Promise<T> {
 
 export async function genMeta(code: string): Promise<GenMeta> {
   const m = await run<GenMeta>(code, { op: "meta" }, 3000);
-  if (!m.templates.length) throw new Error("в plugin.templates нет ни одного шаблона");
+  if (!m.templates.length) throw new Error(t("в plugin.templates нет ни одного шаблона", "plugin.templates has no templates"));
   return m;
 }
 

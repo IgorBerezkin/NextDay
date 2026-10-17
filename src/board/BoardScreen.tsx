@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Nav } from "../App";
 import { api, assetUrl, type CheckItem, type Day } from "../api";
+import { t } from "../i18n";
 import { SealDialog } from "../screens/parts";
 import { sfx } from "../sound";
 import { STICKERS, type IconName } from "../ui/icons";
@@ -45,14 +46,14 @@ type Snap = { items: Item[]; ink: ImageData; size: Size };
 type Pt = { x: number; y: number };
 
 const TOOLS: { key: Tool; icon: IconName; label: string; code: string; hk: string }[] = [
-  { key: "select", icon: "cursor", label: "Выбор и перенос", code: "KeyV", hk: "V" },
-  { key: "note", icon: "note", label: "Заметка", code: "KeyN", hk: "N" },
-  { key: "pen", icon: "pencil", label: "Пиксельная кисть", code: "KeyB", hk: "B" },
-  { key: "eraser", icon: "eraser", label: "Ластик", code: "KeyE", hk: "E" },
-  { key: "fill", icon: "bucket", label: "Заливка", code: "KeyG", hk: "G" },
+  { key: "select", icon: "cursor", label: t("Выбор и перенос", "Select and move"), code: "KeyV", hk: "V" },
+  { key: "note", icon: "note", label: t("Заметка", "Note"), code: "KeyN", hk: "N" },
+  { key: "pen", icon: "pencil", label: t("Пиксельная кисть", "Pixel brush"), code: "KeyB", hk: "B" },
+  { key: "eraser", icon: "eraser", label: t("Ластик", "Eraser"), code: "KeyE", hk: "E" },
+  { key: "fill", icon: "bucket", label: t("Заливка", "Fill"), code: "KeyG", hk: "G" },
 ];
 
-const SIZE_LABELS = ["Мелкий текст", "Обычный текст", "Крупный текст"];
+const SIZE_LABELS = t(["Мелкий текст", "Обычный текст", "Крупный текст"], ["Small text", "Normal text", "Large text"]);
 const SIZE_GLYPH = [14, 20, 28];
 const NOTE_W = { 16: 220, 30: 380, 50: 560 } as const;
 const CARD_W = { 16: 220, 30: 360, 50: 520 } as const;
@@ -85,11 +86,11 @@ function Closed({ nav, date, day, onBack }: { nav: Nav; date: string; day: Day |
     <div className="screen board-screen">
       <div className="bd-head">
         <Button kind="ghost" small icon="arrowL" onClick={onBack}>
-          Назад
+          {t("Назад", "Back")}
         </Button>
-        <div className="bd-title">Доска итогов</div>
+        <div className="bd-title">{t("Доска итогов", "Results board")}</div>
         <span className="save-state saved">
-          <Px name="lock" scale={1.5} /> только просмотр
+          <Px name="lock" scale={1.5} /> {t("только просмотр", "view only")}
         </span>
       </div>
       <div className="bd-stage">{board && <BoardViewer board={board} date={date} dataDir={nav.ov.dataDir} doneRefs={doneSet(day)} />}</div>
@@ -327,7 +328,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     const dims = await new Promise<{ nw: number; nh: number }>((res, rej) => {
       const img = new Image();
       img.onload = () => res({ nw: img.naturalWidth || 400, nh: img.naturalHeight || 300 });
-      img.onerror = () => rej(new Error("Картинка не открылась."));
+      img.onerror = () => rej(new Error(t("Картинка не открылась.", "Couldn't open the image.")));
       img.src = url;
     });
     const { w, h } = fitImage(dims.nw, dims.nh);
@@ -349,7 +350,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     let k = 0;
     for (const p of paths) {
       if (!IMG_RE.test(p)) {
-        toast(`Это не картинка: ${fileName(p)}`, "error");
+        toast(t(`Это не картинка: ${fileName(p)}`, `Not an image: ${fileName(p)}`), "error");
         continue;
       }
       try {
@@ -366,8 +367,8 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
     try {
       const sel = await open({
         multiple: true,
-        title: "Картинки для доски",
-        filters: [{ name: "Картинки", extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp"] }],
+        title: t("Картинки для доски", "Images for the board"),
+        filters: [{ name: t("Картинки", "Images"), extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp"] }],
       });
       const paths = Array.isArray(sel) ? sel : sel ? [sel] : [];
       await addImagePaths(paths);
@@ -786,7 +787,10 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
 
   const editingItem = editing ? items.find((i) => i.id === editing) : undefined;
   const empty = ready && items.length === 0 && !inkUrl.current;
-  const saveLabel = { saved: "сохранено", dirty: "…", saving: "сохраняю…", error: "не сохранилось" }[saveState];
+  const saveLabel = t(
+    { saved: "сохранено", dirty: "…", saving: "сохраняю…", error: "не сохранилось" },
+    { saved: "saved", dirty: "...", saving: "saving...", error: "not saved" },
+  )[saveState];
 
   return (
     <div className="screen board-screen">
@@ -801,11 +805,11 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
             go({ name: "today" });
           }}
         >
-          Назад
+          {t("Назад", "Back")}
         </Button>
         <div className="bd-title">
-          <span className="day-label">{date === ov.today ? "Сегодня" : "Вчера"}</span>
-          <span className="bd-name">Итоги дня «{plan.name}»</span>
+          <span className="day-label">{date === ov.today ? t("Сегодня", "Today") : t("Вчера", "Yesterday")}</span>
+          <span className="bd-name">{t(`Итоги дня «${plan.name}»`, `Day results: "${plan.name}"`)}</span>
         </div>
         <span className={`save-state ${saveState}`}>{saveLabel}</span>
         <Button
@@ -816,7 +820,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
             setSealOpen(true);
           }}
         >
-          Запечатать
+          {t("Запечатать", "Seal")}
         </Button>
       </div>
 
@@ -837,11 +841,15 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
           ))}
         </div>
         <div className="tool-group">
-          <button className="tool" title="Картинка из файла (или Ctrl+V со скриншотом)" onClick={() => void pickImages()}>
+          <button
+            className="tool"
+            title={t("Картинка из файла (или Ctrl+V со скриншотом)", "Image from file (or Ctrl+V with a screenshot)")}
+            onClick={() => void pickImages()}
+          >
             <Px name="image" scale={2} />
           </button>
           <div className="pop-wrap">
-            <button className={`tool${stickers ? " on" : ""}`} title="Наклейки" onClick={() => setStickers((s) => !s)}>
+            <button className={`tool${stickers ? " on" : ""}`} title={t("Наклейки", "Stickers")} onClick={() => setStickers((s) => !s)}>
               <Px name="star" scale={2} />
             </button>
             {stickers && (
@@ -863,7 +871,12 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
         {(tool === "pen" || tool === "eraser") && (
           <div className="tool-group">
             {[1, 2, 4].map((s) => (
-              <button key={s} className={`tool size${brush === s ? " on" : ""}`} title={`Размер кисти ${s} (клавиши [ и ])`} onClick={() => setBrush(s)}>
+              <button
+                key={s}
+                className={`tool size${brush === s ? " on" : ""}`}
+                title={t(`Размер кисти ${s} (клавиши [ и ])`, `Brush size ${s} (keys [ and ])`)}
+                onClick={() => setBrush(s)}
+              >
                 <i style={{ width: s * 3 + 3, height: s * 3 + 3 }} />
               </button>
             ))}
@@ -871,27 +884,32 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
         )}
         {(selText || tool === "note") && (
           <div className="tool-group">
-            {TEXT_SIZES.map((t, i) => (
+            {TEXT_SIZES.map((ts, i) => (
               <button
-                key={t}
-                className={`tool text${(selText?.size ?? textSize) === t ? " on" : ""}`}
+                key={ts}
+                className={`tool text${(selText?.size ?? textSize) === ts ? " on" : ""}`}
                 title={SIZE_LABELS[i]}
-                onClick={() => chooseSize(t)}
+                onClick={() => chooseSize(ts)}
               >
-                <span style={{ fontSize: SIZE_GLYPH[i] }}>А</span>
+                <span style={{ fontSize: SIZE_GLYPH[i] }}>{t("А", "A")}</span>
               </button>
             ))}
           </div>
         )}
         <span className="grow" />
         <div className="tool-group">
-          <button className="tool" disabled={!canUndo} onClick={undo} title="Отменить (Ctrl+Z)">
+          <button className="tool" disabled={!canUndo} onClick={undo} title={t("Отменить (Ctrl+Z)", "Undo (Ctrl+Z)")}>
             <Px name="undo" scale={2} />
           </button>
-          <button className="tool" disabled={!canRedo} onClick={redo} title="Вернуть (Ctrl+Y)">
+          <button className="tool" disabled={!canRedo} onClick={redo} title={t("Вернуть (Ctrl+Y)", "Redo (Ctrl+Y)")}>
             <Px name="redo" scale={2} />
           </button>
-          <button className="tool" disabled={!selected} onClick={() => selected && remove(selected)} title="Удалить (Delete)">
+          <button
+            className="tool"
+            disabled={!selected}
+            onClick={() => selected && remove(selected)}
+            title={t("Удалить (Delete)", "Delete (Del)")}
+          >
             <Px name="trash" scale={2} />
           </button>
         </div>
@@ -901,15 +919,24 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
         {checklist.length > 0 && (
           <aside className="bd-done">
             <div className="bd-done-title">
-              <Px name="check" scale={1.5} /> Сделано
+              <Px name="check" scale={1.5} /> {t("Сделано", "Done")}
             </div>
             {waiting.map((c) => (
-              <button key={c.id} className="done-card" title="Перетащи на доску или просто нажми" onPointerDown={(e) => startCardDrag(e, c)}>
+              <button
+                key={c.id}
+                className="done-card"
+                title={t("Перетащи на доску или просто нажми", "Drag onto the board or just click")}
+                onPointerDown={(e) => startCardDrag(e, c)}
+              >
                 <Linkify inert text={c.text} />
               </button>
             ))}
             {waiting.length === 0 && (
-              <p className="muted">{doneRefs.size ? "Все сделанные пункты уже на доске." : "Отметь пункт в чеклисте, и он появится здесь."}</p>
+              <p className="muted">
+                {doneRefs.size
+                  ? t("Все сделанные пункты уже на доске.", "All done items are already on the board.")
+                  : t("Отметь пункт в чеклисте, и он появится здесь.", "Tick an item in the checklist and it shows up here.")}
+              </p>
             )}
           </aside>
         )}
@@ -941,7 +968,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
                       dataDir={ov.dataDir}
                       hidden={it.id === editing}
                       done={it.kind === "task" ? doneRefs.has(it.ref) : undefined}
-                      hint="Двойной клик: описание"
+                      hint={t("Двойной клик: описание", "Double-click: description")}
                     />
                   ))}
                 </div>
@@ -961,7 +988,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
                       autoFocus
                       value={editingItem.text}
                       maxLength={2000}
-                      placeholder="Что получилось?"
+                      placeholder={t("Что получилось?", "How did it turn out?")}
                       style={{
                         left: editingItem.x,
                         top: editingItem.y,
@@ -998,7 +1025,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
                         autoFocus
                         value={editingItem.text}
                         maxLength={2000}
-                        placeholder="Что получилось?"
+                        placeholder={t("Что получилось?", "How did it turn out?")}
                         onChange={(e) => patch(editingItem.id, { text: e.target.value }, false)}
                         onBlur={finishEdit}
                         onKeyDown={(e) => {
@@ -1025,8 +1052,15 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
                   {empty && (
                     <div className="board-empty">
                       <Px name="image" scale={4} />
-                      <p>Вставьте скриншот (Win+Shift+S, затем Ctrl+V), перетащите картинку из проводника,</p>
-                      <p>добавьте заметку (N) или порисуйте пиксельной кистью (B).</p>
+                      <p>
+                        {t(
+                          "Вставьте скриншот (Win+Shift+S, затем Ctrl+V), перетащите картинку из проводника,",
+                          "Paste a screenshot (Win+Shift+S, then Ctrl+V), drag in an image from Explorer,",
+                        )}
+                      </p>
+                      <p>
+                        {t("добавьте заметку (N) или порисуйте пиксельной кистью (B).", "add a note (N) or draw with the pixel brush (B).")}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1034,7 +1068,12 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
             )}
           </ZoomStage>
           <ZoomBar zoom={zoom}>
-            <button className="tool" title="Расширить доску" disabled={size.w >= MAX_W && size.h >= MAX_H} onClick={growBoard}>
+            <button
+              className="tool"
+              title={t("Расширить доску", "Enlarge board")}
+              disabled={size.w >= MAX_W && size.h >= MAX_H}
+              onClick={growBoard}
+            >
               <Px name="grow" scale={2} />
             </button>
           </ZoomBar>
@@ -1042,7 +1081,10 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
       </div>
 
       <div className="bd-hint">
-        Ctrl+V: вставить · двойной клик: править · Ctrl+колесо: масштаб · тяни пустое место: двигать доску
+        {t(
+          "Ctrl+V: вставить · двойной клик: править · Ctrl+колесо: масштаб · тяни пустое место: двигать доску",
+          "Ctrl+V: paste · double-click: edit · Ctrl+wheel: zoom · drag empty space: move the board",
+        )}
       </div>
 
       {ghost && (
@@ -1060,7 +1102,7 @@ function Editor({ nav, date, day }: { nav: Nav; date: string; day: Day }) {
           onSealed={(d) => {
             sealedDay.current = d;
             setSealOpen(false);
-            setStampText("ЗАПЕЧАТАНО");
+            setStampText(t("ЗАПЕЧАТАНО", "SEALED"));
           }}
         />
       )}

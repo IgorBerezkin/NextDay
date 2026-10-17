@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[macro_use]
+mod i18n;
 mod setup;
 
 use serde::Deserialize;
@@ -123,7 +125,11 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(Mode { uninstall: uninstall_mode, from_temp })
         .setup(move |app| {
-            let title = if uninstall_mode { "Удаление Next Day" } else { "Установка Next Day" };
+            let title = if uninstall_mode {
+                tr!("Удаление Next Day", "Uninstall Next Day")
+            } else {
+                tr!("Установка Next Day", "Next Day Setup")
+            };
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("installer.html".into()))
                 .title(title)
                 .inner_size(760.0, 580.0)
@@ -146,5 +152,5 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![setup_info, check_dir, install, uninstall, launch_app, finish])
         .run(tauri::generate_context!())
-        .expect("не удалось запустить установщик Next Day");
+        .expect(&tr!("не удалось запустить установщик Next Day", "could not start the Next Day installer"));
 }

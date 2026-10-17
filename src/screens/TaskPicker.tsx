@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type TaskNode } from "../api";
+import { t } from "../i18n";
 import { Linkify, Modal, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
 import { dayMonth } from "../util";
@@ -20,30 +21,34 @@ export function TaskPicker({ before, onPick, onClose }: { before: string; onPick
     .slice(0, 100);
 
   return (
-    <Modal title="Какую задачу продолжает пункт?" onClose={onClose} wide>
+    <Modal title={t("Какую задачу продолжает пункт?", "Which task does this item continue?")} onClose={onClose} wide>
       <input
         className="field search pick-search"
         autoFocus
-        placeholder="Поиск по задачам и дням"
+        placeholder={t("Поиск по задачам и дням", "Search tasks and days")}
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
       <ul className="pick-list">
-        {list.map((t) => (
-          <li key={`${t.date}/${t.id}`}>
-            <button onClick={() => onPick(t)}>
-              <Px name={t.done ? "check" : "box"} scale={1.5} />
+        {list.map((task) => (
+          <li key={`${task.date}/${task.id}`}>
+            <button onClick={() => onPick(task)}>
+              <Px name={task.done ? "check" : "box"} scale={1.5} />
               <span className="pick-text">
-                <Linkify inert text={t.text} />
+                <Linkify inert text={task.text} />
               </span>
               <span className="pick-day">
-                {dayMonth(t.date)} · «{t.dayName}»
+                {t(`${dayMonth(task.date)} · «${task.dayName}»`, `${dayMonth(task.date)} · "${task.dayName}"`)}
               </span>
             </button>
           </li>
         ))}
       </ul>
-      {all && !list.length && <p className="muted">{needle ? "Ничего не нашлось." : "Раньше задач с чеклистом не было."}</p>}
+      {all && !list.length && (
+        <p className="muted">
+          {needle ? t("Ничего не нашлось.", "Nothing found.") : t("Раньше задач с чеклистом не было.", "No earlier checklist tasks.")}
+        </p>
+      )}
     </Modal>
   );
 }

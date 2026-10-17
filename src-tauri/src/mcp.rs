@@ -1,4 +1,4 @@
-use crate::ai_guide::{GUIDE, INSTRUCTIONS};
+use crate::ai_guide::{local, GUIDE, INSTRUCTIONS};
 use crate::model::*;
 use crate::store::Store;
 use crate::{clock, drill, goals, insights};
@@ -270,7 +270,7 @@ pub fn tools() -> Value {
         {
             "name": "get_drill",
             "title": "Drill overview",
-            "description": "The drill trainer (Зубрилка): presets (what to drill, how, session conditions), decks with topics and per-topic progress (open or locked, accuracy over the gate window, Leitner boxes, due cards), the streak of days with finished sessions, today's counts, the most missed cards with the user's last wrong answers, and recent sessions (done, escape, timeout or stopped). Call it before coaching or building decks.",
+            "description": local("The drill trainer (tab Зубрилка): presets (what to drill, how, session conditions), decks with topics and per-topic progress (open or locked, accuracy over the gate window, Leitner boxes, due cards), the streak of days with finished sessions, today's counts, the most missed cards with the user's last wrong answers, and recent sessions (done, escape, timeout or stopped). Call it before coaching or building decks."),
             "inputSchema": schema(json!({}), &[]),
             "annotations": ro()
         },
@@ -298,7 +298,7 @@ pub fn tools() -> Value {
         {
             "name": "get_drill_theory",
             "title": "Get drill theory",
-            "description": "Theory articles of the drill reference (Справочник): the built-in articles of the `python` deck and articles written by the user or AI, each attached to a deck and optionally a topic. The user opens them from the lightbulb button during a session. Optional filters: deckId, and topic (id) together with deckId, which also returns the articles about the whole deck.",
+            "description": local("Theory articles of the drill reference (tab Справочник): the built-in articles of the `python` deck and articles written by the user or AI, each attached to a deck and optionally a topic. The user opens them from the lightbulb button during a session. Optional filters: deckId, and topic (id) together with deckId, which also returns the articles about the whole deck."),
             "inputSchema": schema(json!({ "deckId": { "type": "string" }, "topic": { "type": "string" } }), &[]),
             "annotations": ro()
         },
@@ -318,7 +318,7 @@ pub fn tools() -> Value {
         {
             "name": "install_drill_generator",
             "title": "Install drill generator",
-            "description": "Saves a card generator plugin: a JavaScript script that declares `const plugin = { title, description, topics, templates }`, where every template has `make(r)` that returns one variant { prompt, code, answer, choices, alternatives, explain } built with the random helpers in r. The app runs the script in a sandboxed worker (no network, no access to the app) when a session starts, so cards get fresh data every session and a missed card comes back with new data. A new or changed generator is saved switched off: the user checks the code and sample cards and enables it in the app (Зубрилка, tab Наборы). Pass id to replace the code of an existing generator. Read the Generators section of nextday://guide first and run the script with node before installing.",
+            "description": local("Saves a card generator plugin: a JavaScript script that declares `const plugin = { title, description, topics, templates }`, where every template has `make(r)` that returns one variant { prompt, code, answer, choices, alternatives, explain } built with the random helpers in r. The app runs the script in a sandboxed worker (no network, no access to the app) when a session starts, so cards get fresh data every session and a missed card comes back with new data. A new or changed generator is saved switched off: the user checks the code and sample cards and enables it in the app (Зубрилка, tab Наборы). Pass id to replace the code of an existing generator. Read the Generators section of nextday://guide first and run the script with node before installing."),
             "inputSchema": schema(json!({
                 "id": { "type": "string", "description": "An existing generator id to replace its code. Omit to create one." },
                 "title": { "type": "string", "description": "Max 80 chars." },
@@ -344,8 +344,8 @@ pub fn tools() -> Value {
             "description": "Creates or replaces a check template: a named way to compare answers (mode, options and a hint shown under the answer field) kept in a group. The user picks templates when building a deck, and create_drill_deck and edit_drill_deck take `template` (id or name) instead of `check`. A deck copies the template, so later changes of the template do not touch existing decks. A new group appears when you use a new group name. Pass id to replace a template. Returns the template.",
             "inputSchema": schema(json!({
                 "id": { "type": "string", "description": "An existing template id to replace it. Omit to create one." },
-                "group": { "type": "string", "description": "Group title, up to 40 chars, for example Языки. Default Свои." },
-                "name": { "type": "string", "description": "Up to 60 chars, for example Английское слово." },
+                "group": { "type": "string", "description": local("Group title, up to 40 chars, for example Языки. Default Свои.") },
+                "name": { "type": "string", "description": local("Up to 60 chars, for example Английское слово.") },
                 "check": check_schema("How answers are compared and the hint under the answer field.")
             }), &["name", "check"]),
             "annotations": rw(false)
@@ -446,7 +446,7 @@ fn prompt_text(name: &str, args: &Value) -> Option<(String, String)> {
         }
         "drill_coach" => Some((
             "Drill coach".into(),
-            "Let's work on my drill (Зубрилка) in Next Day. Read nextday://guide if you have not yet and call get_drill. Tell me in a few sentences where I stand: open topics, accuracy, streak and how my recent sessions ended. Group my most missed cards by the rule behind them and use my last wrong answers to find what I misunderstand. Explain each rule with a tiny example and check me with one short question at a time. Then offer a deck that targets exactly these mistakes (create_drill_deck, 15-30 cards, python check mode for code questions, a short explain on every card) and, if I agree, add it to a preset with save_drill_preset.".into(),
+            local("Let's work on my drill (tab Зубрилка) in Next Day. Read nextday://guide if you have not yet and call get_drill. Tell me in a few sentences where I stand: open topics, accuracy, streak and how my recent sessions ended. Group my most missed cards by the rule behind them and use my last wrong answers to find what I misunderstand. Explain each rule with a tiny example and check me with one short question at a time. Then offer a deck that targets exactly these mistakes (create_drill_deck, 15-30 cards, python check mode for code questions, a short explain on every card) and, if I agree, add it to a preset with save_drill_preset."),
         )),
         _ => None,
     }
@@ -569,7 +569,7 @@ fn call(store: &Store, name: &str, args: Value) -> Result<(Value, bool), String>
             let mut input: drill::DeckInput = parse(args, "deck")?;
             input.id = None;
             let d = drill::save_deck(store, at, input, Author::Ai)?;
-            let note = "Created. The user sees it in the app under Зубрилка, tab Наборы; it is drilled after it is added to a preset.";
+            let note = local("Created. The user sees it in the app under Зубрилка, tab Наборы; it is drilled after it is added to a preset.");
             Ok((json!({ "deck": d, "note": note }), true))
         }
         "edit_drill_deck" => {
@@ -599,7 +599,7 @@ fn call(store: &Store, name: &str, args: Value) -> Result<(Value, bool), String>
         "install_drill_generator" => {
             let s = |k: &str| args.get(k).and_then(Value::as_str).map(str::to_string);
             let g = drill::install_generator(store, at, s("id").filter(|x| !x.is_empty()), str_arg(&args, "title")?, s("description"), str_arg(&args, "code")?)?;
-            let note = "Saved switched off. Ask the user to open Зубрилка, tab Наборы, press Проверить on the generator (it runs the script and shows sample cards), enable it and add it to a preset.";
+            let note = local("Saved switched off. Ask the user to open Зубрилка, tab Наборы, press Проверить on the generator (it runs the script and shows sample cards), enable it and add it to a preset.");
             Ok((json!({ "generator": { "id": g.id, "title": g.title, "enabled": g.enabled }, "note": note }), true))
         }
         "import_drill_bank" => {
@@ -610,7 +610,7 @@ fn call(store: &Store, name: &str, args: Value) -> Result<(Value, bool), String>
                 (None, None) => return Err("give bank or path".into()),
             };
             let report = drill::import_bank(store, at, input, replace.as_deref(), Author::Ai)?;
-            let note = "Imported. The user sees it in the app under Зубрилка, tab Наборы; it is drilled after it is added to a preset.";
+            let note = local("Imported. The user sees it in the app under Зубрилка, tab Наборы; it is drilled after it is added to a preset.");
             Ok((json!({ "report": report, "note": note }), true))
         }
         "save_drill_check" => {
@@ -664,7 +664,7 @@ fn tool_result(r: Result<(Value, bool), String>, changed: &dyn Fn()) -> Value {
 fn read_resource(store: Option<&Store>, params: &Value) -> Result<Value, (i64, String)> {
     let uri = params.get("uri").and_then(Value::as_str).ok_or((-32602, "missing uri".to_string()))?;
     let (mime, text) = match (uri, store) {
-        ("nextday://guide", _) => ("text/markdown", GUIDE.to_string()),
+        ("nextday://guide", _) => ("text/markdown", local(GUIDE)),
         (_, Some(s)) => data_resource(s, uri)?,
         (_, None) => return Err((-32603, OFFLINE.to_string())),
     };
@@ -717,14 +717,14 @@ fn answer(store: Option<&Store>, changed: &dyn Fn(), msg: &Value) -> Option<(u16
         "server/discover" => Ok(json!({
             "supportedVersions": supported(),
             "capabilities": capabilities(),
-            "instructions": INSTRUCTIONS,
+            "instructions": local(INSTRUCTIONS),
             "ttlMs": 0,
             "cacheScope": "private"
         })),
         "initialize" => {
             let asked = params.get("protocolVersion").and_then(Value::as_str).unwrap_or(LEGACY[0]);
             let chosen = if LEGACY.contains(&asked) { asked } else { LEGACY[0] };
-            Ok(json!({ "protocolVersion": chosen, "capabilities": capabilities(), "serverInfo": server_info(), "instructions": INSTRUCTIONS }))
+            Ok(json!({ "protocolVersion": chosen, "capabilities": capabilities(), "serverInfo": server_info(), "instructions": local(INSTRUCTIONS) }))
         }
         "ping" => Ok(json!({})),
         "tools/list" => Ok(json!({ "tools": tools(), "ttlMs": 0, "cacheScope": "private" })),
@@ -776,7 +776,7 @@ pub fn bind(preferred: u16) -> Result<(tiny_http::Server, u16), String> {
             Err(e) => last = e.to_string(),
         }
     }
-    Err(format!("Не удалось занять порт для MCP: {last}"))
+    Err(tr!("Не удалось занять порт для MCP: {last}", "Could not take a port for MCP: {last}"))
 }
 
 fn header<'a>(req: &'a tiny_http::Request, name: &str) -> Option<&'a str> {

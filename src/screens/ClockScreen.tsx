@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Nav } from "../App";
 import { api, type CheckItem } from "../api";
+import { t } from "../i18n";
 import { sfx } from "../sound";
 import { Button, Linkify, toastError } from "../ui/kit";
 import { CENTER, CLOCK_PX, ClockSky, MARK_R, MarkBadge, PixelClock, polar, useDayNight, type ClockMark, type Tone } from "../ui/PixelClock";
@@ -64,10 +65,10 @@ export function ClockScreen({ nav }: { nav: Nav }) {
   };
   const timed = useMemo(() => timedOf(items), [items, date, dsh]);
 
-  const t = now.getTime();
+  const time = now.getTime();
   const live = which === "today" ? timed.filter((x) => !x.it.done) : [];
-  const current = live.find((x) => x.when <= t && t < x.when + 3_600_000);
-  const upcoming = live.filter((x) => x.when > t).sort((a, b) => a.when - b.when)[0];
+  const current = live.find((x) => x.when <= time && time < x.when + 3_600_000);
+  const upcoming = live.filter((x) => x.when > time).sort((a, b) => a.when - b.when)[0];
   const toneOf = (x: Timed): Tone =>
     x.it.done ? "done" : x.it.id === current?.it.id ? "now" : x.it.id === upcoming?.it.id ? "next" : "todo";
   const topTone = (tones: Tone[]) => [...tones].sort((a, b) => RANK[b] - RANK[a])[0];
@@ -213,23 +214,23 @@ export function ClockScreen({ nav }: { nav: Nav }) {
         </div>
         <div className="seg">
           <button className={half === "am" ? "on" : ""} onClick={() => setHalf("am")}>
-            <Px name="moonColor" scale={1.5} /> До полудня
+            <Px name="moonColor" scale={1.5} /> {t("До полудня", "Before noon")}
           </button>
           <button className={half === "pm" ? "on" : ""} onClick={() => setHalf("pm")}>
-            <Px name="sunColor" scale={1.5} /> После полудня
+            <Px name="sunColor" scale={1.5} /> {t("После полудня", "After noon")}
           </button>
         </div>
       </div>
 
       <section className="clk-right panel">
         <div className="clk-head">
-          <h2>Расписание</h2>
+          <h2>{t("Расписание", "Schedule")}</h2>
           <div className="seg">
             <button className={which === "today" ? "on" : ""} onClick={() => switchDay("today")}>
-              Сегодня
+              {t("Сегодня", "Today")}
             </button>
             <button className={which === "tomorrow" ? "on" : ""} onClick={() => switchDay("tomorrow")}>
-              Завтра
+              {t("Завтра", "Tomorrow")}
             </button>
           </div>
         </div>
@@ -237,35 +238,51 @@ export function ClockScreen({ nav }: { nav: Nav }) {
         <div className="clk-body">
           {!day?.plan ? (
             <div className="clk-empty">
-              <p className="muted">{which === "today" ? "У сегодняшнего дня нет плана." : "Завтрашний день ещё не назван."}</p>
+              <p className="muted">
+                {which === "today"
+                  ? t("У сегодняшнего дня нет плана.", "Today has no plan.")
+                  : t("Завтрашний день ещё не назван.", "Tomorrow isn't named yet.")}
+              </p>
               <Button kind="paper" icon={which === "today" ? "sun" : "moon"} onClick={() => go({ name: which })}>
-                {which === "today" ? "К сегодняшнему дню" : "Назвать завтрашний день"}
+                {which === "today" ? t("К сегодняшнему дню", "Go to today") : t("Назвать завтрашний день", "Name tomorrow")}
               </Button>
             </div>
           ) : items.length === 0 ? (
-            <p className="muted clk-empty">В плане нет чеклиста. Время ставится пунктам чеклиста.</p>
+            <p className="muted clk-empty">
+              {t("В плане нет чеклиста. Время ставится пунктам чеклиста.", "The plan has no checklist. Times are set on checklist items.")}
+            </p>
           ) : (
             <>
               {which === "today" && (
                 <p className="clk-next">
-                  {current ? (
-                    <>
-                      <b>Сейчас:</b> «<Linkify inert text={current.it.text} />»
-                    </>
-                  ) : upcoming ? (
-                    <>
-                      <b>Дальше:</b> «<Linkify inert text={upcoming.it.text} />» в {hh(upcoming.at)}, через{" "}
-                      {duration((upcoming.when - t) / 1000)}
-                    </>
-                  ) : timed.length ? (
-                    live.length ? (
-                      "Задачи со временем на сегодня позади."
-                    ) : (
-                      "Все задачи со временем сделаны."
-                    )
-                  ) : (
-                    "Поставь задачам время, и часы подскажут, когда начинать."
-                  )}
+                  {current
+                    ? t(
+                        <>
+                          <b>Сейчас:</b> «<Linkify inert text={current.it.text} />»
+                        </>,
+                        <>
+                          <b>Now:</b> "<Linkify inert text={current.it.text} />"
+                        </>,
+                      )
+                    : upcoming
+                      ? t(
+                          <>
+                            <b>Дальше:</b> «<Linkify inert text={upcoming.it.text} />» в {hh(upcoming.at)}, через{" "}
+                            {duration((upcoming.when - time) / 1000)}
+                          </>,
+                          <>
+                            <b>Next:</b> "<Linkify inert text={upcoming.it.text} />" at {hh(upcoming.at)}, in{" "}
+                            {duration((upcoming.when - time) / 1000)}
+                          </>,
+                        )
+                      : timed.length
+                        ? live.length
+                          ? t("Задачи со временем на сегодня позади.", "Today's timed tasks are behind you.")
+                          : t("Все задачи со временем сделаны.", "All timed tasks are done.")
+                        : t(
+                            "Поставь задачам время, и часы подскажут, когда начинать.",
+                            "Give tasks a time, and the clock will tell you when to start.",
+                          )}
                 </p>
               )}
               <ul className="clk-list">
@@ -301,7 +318,10 @@ export function ClockScreen({ nav }: { nav: Nav }) {
               </ul>
               {editable && (
                 <p className="hint">
-                  Перетащи пункт на нужный час или выбери время справа. Метку можно утащить с часов, тогда время сбросится.
+                  {t(
+                    "Перетащи пункт на нужный час или выбери время справа. Метку можно утащить с часов, тогда время сбросится.",
+                    "Drag an item to an hour or pick a time on the right. Drag a mark off the clock to clear its time.",
+                  )}
                 </p>
               )}
             </>

@@ -1,4 +1,45 @@
-pub const INSTRUCTIONS: &str = "Next Day is the user's local day planner (Windows tray app). The user plans only TOMORROW, ticks checklist items during the day and seals the day with a rating. A goal is a map: topics linked by prerequisites, each with tasks ranked from simple to hard. While a goal is active the app itself puts its next tasks into tomorrow's plan, as many as fit the goal's daily minutes, and ticks move the goal forward. Start with get_overview and take dates from it. Before building a goal, read get_profile (real working rhythm) and recent get_history. create_goal makes a DRAFT that only the user can activate in the app; never pretend a draft is active. The drill trainer (Зубрилка) keeps decks of cards and presets of how to drill them: read get_drill before coaching, build decks with create_drill_deck and a fitting check template, tasks that need fresh data every time with install_drill_generator (a sandboxed JavaScript plugin) or import_drill_bank (a prepared JSON bank), and never turn on the screen lock or remove its escape unless the user asked. Read the resource nextday://guide for the data model, planning rules, tool reference and workflows.";
+pub const INSTRUCTIONS: &str = "Next Day is the user's local day planner (Windows tray app). The user plans only TOMORROW, ticks checklist items during the day and seals the day with a rating. A goal is a map: topics linked by prerequisites, each with tasks ranked from simple to hard. While a goal is active the app itself puts its next tasks into tomorrow's plan, as many as fit the goal's daily minutes, and ticks move the goal forward. Start with get_overview and take dates from it. Before building a goal, read get_profile (real working rhythm) and recent get_history. create_goal makes a DRAFT that only the user can activate in the app; never pretend a draft is active. The drill trainer (tab Зубрилка) keeps decks of cards and presets of how to drill them: read get_drill before coaching, build decks with create_drill_deck and a fitting check template, tasks that need fresh data every time with install_drill_generator (a sandboxed JavaScript plugin) or import_drill_bank (a prepared JSON bank), and never turn on the screen lock or remove its escape unless the user asked. Read the resource nextday://guide for the data model, planning rules, tool reference and workflows.";
+
+const ENGLISH_UI: [(&str, &str); 26] = [
+    ("ИИ через MCP", "AI over MCP"),
+    ("Зубрилка", "Drill"),
+    ("Справочник", "Reference"),
+    ("Наборы", "Decks"),
+    ("Проверить", "Test"),
+    ("Основные", "Basic"),
+    ("Для программистов", "For programmers"),
+    ("Выбор из вариантов", "Multiple choice"),
+    ("Самопроверка", "Self-check"),
+    ("Значение Python", "Python value"),
+    ("Форма данных Python", "Python data shape"),
+    ("Текст", "Text"),
+    ("Число", "Number"),
+    ("Свои", "Custom"),
+    ("Языки", "Languages"),
+    ("Английское слово", "English word"),
+    ("Формы неправильных глаголов", "Forms of irregular verbs"),
+    ("Неправильные глаголы", "Irregular verbs"),
+    ("Три формы", "Three forms"),
+    ("У неправильного глагола три формы: go, went, gone.", "An irregular verb has three forms: go, went, gone."),
+    ("Past Simple неправильного глагола нужно помнить.", "The past simple of an irregular verb has to be remembered."),
+    ("Past Simple от ", "Past simple of "),
+    ("даёт остаток", "gives the remainder"),
+    ("the letters ё and е are ignored", "the Cyrillic letters yo and ye count as one"),
+    ("(понедельник)", "(Monday)"),
+    ("(воскресенье)", "(Sunday)"),
+];
+
+pub fn english(text: &str) -> String {
+    ENGLISH_UI.iter().fold(text.to_string(), |s, (ru, en)| s.replace(ru, en))
+}
+
+pub fn local(text: &str) -> String {
+    if crate::i18n::en() {
+        english(text)
+    } else {
+        text.to_string()
+    }
+}
 
 pub const GUIDE: &str = r##"# Next Day for AI agents
 
@@ -14,7 +55,7 @@ The rhythm of the app:
 - Day: the plan is frozen; the user only ticks checklist items and sub-items.
 - Night or next morning: the user collects results on a board (notes, images, finished tasks) and seals the day with a rating 1-5 and an optional short summary. Sealed days are read-only history.
 - Goals: a goal is a map of topics. Arrows (prerequisites) say what must be mastered before what; every topic holds tasks ranked from simple to hard. While a goal is active, the app plans tomorrow by itself from the map and the goal's daily minutes. The user sees the map on the Map tab and the goal on the Goals tab.
-- Drill (Зубрилка): short cards answered in a row until a session goal is met. The user chooses what to drill (decks and topics), how (order, session size, self-check) and under which conditions (a full-screen lock or a normal window, an escape, a time ceiling). The built-in deck `python` teaches reading Python code without running it: what a variable holds, its shape, how it changes in a loop, which error the code raises. Its answers and value tables come from executing the code. The built-in generator `shapes` makes new tasks every session about how NumPy and PyTorch shapes change after one to three operations. Decks can also be generators (JavaScript plugins) or imported banks. How answers are compared (text, a number, a choice of options, self-check, Python values and shapes) comes from check templates that the user keeps in groups and can extend.
+- Drill trainer (tab Зубрилка): short cards answered in a row until a session goal is met. The user chooses what to drill (decks and topics), how (order, session size, self-check) and under which conditions (a full-screen lock or a normal window, an escape, a time ceiling). The built-in deck `python` teaches reading Python code without running it: what a variable holds, its shape, how it changes in a loop, which error the code raises. Its answers and value tables come from executing the code. The built-in generator `shapes` makes new tasks every session about how NumPy and PyTorch shapes change after one to three operations. Decks can also be generators (JavaScript plugins) or imported banks. How answers are compared (text, a number, a choice of options, self-check, Python values and shapes) comes from check templates that the user keeps in groups and can extend.
 
 ## 2. Connecting
 
@@ -220,7 +261,7 @@ const plugin = {
 - A template is `{id, topic, kind, rule, check, make}`. `id` is up to 60 chars and must stay stable: progress is stored by it. `kind` is one from the Bank table, choice by default. `make(r)` returns one variant with the fields of a bank variant.
 - `r` is a seeded random source: `r.random()`, `r.int(a, b)` with both ends included, `r.pick(list)`, `r.chance(p)`, `r.shuffle(list)` (returns a copy), `r.sample(list, k)`. Use it instead of Math.random. Numbers in answers and choices become strings.
 - At the start of a session the app calls `make` up to 12 times per template, drops repeats and checks every variant like a bank variant. The whole run must finish within 6 seconds.
-- The script runs in a sandboxed worker: no network, no DOM, no access to the app or its data, only computation.
+- The script runs in a sandboxed worker: no network, no DOM, no access to the app or its data, only computation. The global `lang` holds the app language, `ru` or `en`: write the texts of the cards in it.
 - A generator installed or changed through MCP is saved switched off. The user presses Проверить in the app, sees sample cards and enables it.
 - Make the four options of a choice or pick card the typical mistakes of this exact task (forgot an operation, took the wrong axis, mixed up two similar functions), not random noise.
 
@@ -270,7 +311,7 @@ The body uses the app's Markdown dialect: headings `#` to `###`, paragraphs, `**
 
 A good article gives the model, not a list of functions: how to picture the data, before and after pairs for the main operations, traps, and a table of expressions with their shapes.
 
-In every text the user reads (articles, card `explain`, bank and generator `rule` and `explain`, prompts) wrap each piece of code, variable name and value in backticks: write `a % b` даёт остаток, not a % b даёт остаток. The app shows them as code chips, so they never merge with the Russian words around them.
+In every text the user reads (articles, card `explain`, bank and generator `rule` and `explain`, prompts) wrap each piece of code, variable name and value in backticks: write `a % b` даёт остаток, not a % b даёт остаток. The app shows them as code chips, so they never merge with the words around them.
 
 ## 5. How the app plans
 
@@ -303,7 +344,7 @@ Task status changes:
 
 ## 6. Tools
 
-Every tool returns `structuredContent` and the same JSON as text. Tool errors come back with `isError: true` and a short message. The app speaks Russian, so these messages may be in Russian. Read them and adjust instead of retrying the same call.
+Every tool returns `structuredContent` and the same JSON as text. Tool errors come back with `isError: true` and a short message in the app language, Russian or English. Read them and adjust instead of retrying the same call.
 
 ### get_overview (read)
 
@@ -497,6 +538,7 @@ Prompts: `plan_goal(goal, deadline?)`, `evening_review()`, `readiness_check(goal
 
 ## 9. Conventions
 
+- The app speaks Russian or English, as the user chose in Settings; names of tabs and buttons in this guide follow that language.
 - Write goal texts in the user's language; look at their day names and checklist items.
 - Texts are plain text. URLs and Windows paths become clickable links in the app.
 - Ids are opaque strings; take them from tool results, except the topic ids you choose in `create_goal`.

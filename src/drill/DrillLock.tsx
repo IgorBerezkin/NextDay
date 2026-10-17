@@ -2,6 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState } from "react";
 import { api, type DrillSessionView } from "../api";
+import { t } from "../i18n";
 import { setSoundEnabled } from "../sound";
 import { Button, Progress } from "../ui/kit";
 import { Px } from "../ui/Px";
@@ -37,9 +38,9 @@ export function DrillLock({ primary }: { primary: boolean }) {
     return (
       <div className="drill-lock">
         <div className="drill-away">
-          <p>Сеанса нет.</p>
+          <p>{t("Сеанса нет.", "No session.")}</p>
           <Button kind="paper" onClick={() => void getCurrentWindow().close()}>
-            Закрыть
+            {t("Закрыть", "Close")}
           </Button>
         </div>
       </div>
@@ -52,10 +53,12 @@ export function DrillLock({ primary }: { primary: boolean }) {
       <div className="drill-lock dim">
         <div className="drill-away">
           <Px name="lock" scale={5} />
-          <p>Смотри на главный экран</p>
+          <p>{t("Смотри на главный экран", "Look at the main screen")}</p>
           <span className="muted">
-            {view.name}: верно {view.correct}
-            {view.goal === "correct" ? ` из ${view.amount}` : ""}
+            {t(
+              `${view.name}: верно ${view.correct}${view.goal === "correct" ? ` из ${view.amount}` : ""}`,
+              `${view.name}: ${view.correct}${view.goal === "correct" ? ` of ${view.amount}` : ""} right`,
+            )}
           </span>
           {view.goal !== "minutes" && <Progress value={value} cells={10} />}
         </div>

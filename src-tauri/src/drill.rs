@@ -1,4 +1,5 @@
 use crate::clock::{self, fmt_date, fmt_dt, next, parse_date, parse_dt, prev};
+use crate::i18n::pick;
 use crate::model::Author;
 use crate::pylit::{self, CheckSpec, Mode};
 use crate::store::{uid, Store};
@@ -21,6 +22,8 @@ pub const SHAPES: &str = "shapes";
 const BANK: &str = include_str!("../drill/python.json");
 const SHAPES_JS: &str = include_str!("../drill/shapes.js");
 const SHAPES_META: &str = include_str!("../drill/shapes.json");
+const BANK_EN: &str = include_str!("../drill/python.en.json");
+const SHAPES_META_EN: &str = include_str!("../drill/shapes.en.json");
 const INTERVALS: [i64; 5] = [0, 1, 2, 4, 8];
 const HISTORY: usize = 300;
 const RECENT: usize = 50;
@@ -106,22 +109,68 @@ pub struct Generator {
 
 pub type Generated = HashMap<String, HashMap<String, Vec<Variant>>>;
 
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct BankText {
+    title: String,
+    description: String,
+    topics: Vec<BankTopic>,
+    cards: Vec<CardText>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct CardText {
+    id: String,
+    rule: String,
+    questions: Vec<String>,
+}
+
+fn english_bank(b: &mut Bank) {
+    let t: BankText = serde_json::from_str(BANK_EN).unwrap_or_else(|e| {
+        eprintln!("английский текст банка не читается: {e}");
+        BankText::default()
+    });
+    if !t.title.is_empty() {
+        b.title = t.title;
+        b.description = t.description;
+    }
+    for topic in &mut b.topics {
+        if let Some(x) = t.topics.iter().find(|x| x.id == topic.id) {
+            topic.title = x.title.clone();
+            topic.theory = x.theory.clone();
+        }
+    }
+    for card in &mut b.cards {
+        let Some(x) = t.cards.iter().find(|x| x.id == card.id) else { continue };
+        card.rule = x.rule.clone();
+        for (v, q) in card.variants.iter_mut().zip(&x.questions) {
+            v.question = q.clone();
+        }
+    }
+}
+
 pub fn bank() -> &'static Arc<Bank> {
-    static B: OnceLock<Arc<Bank>> = OnceLock::new();
-    B.get_or_init(|| {
+    static B: [OnceLock<Arc<Bank>>; 2] = [OnceLock::new(), OnceLock::new()];
+    let en = crate::i18n::en();
+    B[usize::from(en)].get_or_init(|| {
         let mut b: Bank = serde_json::from_str(BANK).unwrap_or_else(|e| {
             eprintln!("банк карточек не читается: {e}");
             Bank::default()
         });
         b.id = BUILTIN.into();
+        if en {
+            english_bank(&mut b);
+        }
         Arc::new(b)
     })
 }
 
 pub fn shapes() -> &'static Generator {
-    static G: OnceLock<Generator> = OnceLock::new();
-    G.get_or_init(|| {
-        let mut g: Generator = serde_json::from_str(SHAPES_META).unwrap_or_else(|e| {
+    static G: [OnceLock<Generator>; 2] = [OnceLock::new(), OnceLock::new()];
+    let en = crate::i18n::en();
+    G[usize::from(en)].get_or_init(|| {
+        let mut g: Generator = serde_json::from_str(if en { SHAPES_META_EN } else { SHAPES_META }).unwrap_or_else(|e| {
             eprintln!("генератор форм не читается: {e}");
             Generator::default()
         });
@@ -138,17 +187,17 @@ pub fn is_builtin(deck: &str) -> bool {
 
 fn kind_spec(kind: &str) -> Option<(Mode, &'static str, &'static str)> {
     Some(match kind {
-        "value" | "python" => (Mode::Python, "значение", "python"),
-        "pick" => (Mode::Python, "выбор", "pick"),
-        "shape" => (Mode::Shape, "форма", "shape"),
-        "step" => (Mode::Python, "проход цикла", "python"),
-        "trace" => (Mode::Python, "трассировка", "python"),
-        "error" => (Mode::Error, "значение", "python"),
-        "output" => (Mode::Output, "вывод", "output"),
-        "text" => (Mode::Text, "вопрос", "text"),
-        "number" => (Mode::Number, "число", "number"),
-        "choice" => (Mode::Choice, "выбор", "choice"),
-        "self" => (Mode::SelfCheck, "вспомни", "self"),
+        "value" | "python" => (Mode::Python, pick("значение", "value"), "python"),
+        "pick" => (Mode::Python, pick("выбор", "choice"), "pick"),
+        "shape" => (Mode::Shape, pick("форма", "shape"), "shape"),
+        "step" => (Mode::Python, pick("проход цикла", "loop pass"), "python"),
+        "trace" => (Mode::Python, pick("трассировка", "trace"), "python"),
+        "error" => (Mode::Error, pick("значение", "value"), "python"),
+        "output" => (Mode::Output, pick("вывод", "output"), "output"),
+        "text" => (Mode::Text, pick("вопрос", "question"), "text"),
+        "number" => (Mode::Number, pick("число", "number"), "number"),
+        "choice" => (Mode::Choice, pick("выбор", "choice"), "choice"),
+        "self" => (Mode::SelfCheck, pick("вспомни", "recall"), "self"),
         _ => return None,
     })
 }
@@ -238,7 +287,7 @@ impl Default for Preset {
             escape: Escape::Hold,
             limit_minutes: 30,
             self_check: false,
-            theory_label: "Теория".into(),
+            theory_label: local(THEORY_LABEL),
             peek_keeps_box: true,
         }
     }
@@ -253,16 +302,58 @@ pub struct CheckTemplate {
     pub check: CheckSpec,
 }
 
+const THEORY_LABEL: [&str; 2] = ["Теория", "Theory"];
+const BASIC: [&str; 2] = ["Основные", "Basic"];
+const CODERS: [&str; 2] = ["Для программистов", "For programmers"];
+const OWN: [&str; 2] = ["Свои", "Custom"];
+const NO_TOPIC: [&str; 2] = ["Без темы", "No topic"];
+
+const DEFAULT_CHECKS: [(&str, [&str; 2], [&str; 2], Mode); 6] = [
+    ("text", BASIC, ["Текст", "Text"], Mode::Text),
+    ("choice", BASIC, ["Выбор из вариантов", "Multiple choice"], Mode::Choice),
+    ("number", BASIC, ["Число", "Number"], Mode::Number),
+    ("self", BASIC, ["Самопроверка", "Self-check"], Mode::SelfCheck),
+    ("python", CODERS, ["Значение Python", "Python value"], Mode::Python),
+    ("shape", CODERS, ["Форма данных Python", "Python data shape"], Mode::Shape),
+];
+
+const DEFAULT_PRESETS: [(&str, [&str; 2]); 2] = [("lock", ["Замок: 10 верных", "Lock: 10 right"]), ("window", ["Разминка в окне", "Warm-up in a window"])];
+
+fn local(pair: [&str; 2]) -> String {
+    pair[usize::from(crate::i18n::en())].to_string()
+}
+
 fn default_checks() -> Vec<CheckTemplate> {
-    let t = |id: &str, group: &str, name: &str, mode: Mode| CheckTemplate { id: id.into(), group: group.into(), name: name.into(), check: CheckSpec { mode, ..CheckSpec::default() } };
-    vec![
-        t("text", "Основные", "Текст", Mode::Text),
-        t("choice", "Основные", "Выбор из вариантов", Mode::Choice),
-        t("number", "Основные", "Число", Mode::Number),
-        t("self", "Основные", "Самопроверка", Mode::SelfCheck),
-        t("python", "Для программистов", "Значение Python", Mode::Python),
-        t("shape", "Для программистов", "Форма данных Python", Mode::Shape),
-    ]
+    DEFAULT_CHECKS
+        .iter()
+        .map(|&(id, group, name, mode)| CheckTemplate { id: id.into(), group: local(group), name: local(name), check: CheckSpec { mode, ..CheckSpec::default() } })
+        .collect()
+}
+
+pub fn relabel(store: &Store, lang: &str) -> Result<(), String> {
+    let to = usize::from(lang == "en");
+    let swap = |text: &mut String, pair: [&str; 2]| {
+        if *text == pair[1 - to] {
+            *text = pair[to].to_string();
+        }
+    };
+    let _g = store.lock();
+    let mut state = load_state(store);
+    for p in &mut state.presets {
+        if let Some((_, names)) = DEFAULT_PRESETS.iter().find(|(id, _)| *id == p.id) {
+            swap(&mut p.name, *names);
+        }
+        swap(&mut p.theory_label, THEORY_LABEL);
+    }
+    for c in &mut state.checks {
+        for group in [BASIC, CODERS, OWN] {
+            swap(&mut c.group, group);
+        }
+        if let Some((_, _, names, _)) = DEFAULT_CHECKS.iter().find(|(id, ..)| *id == c.id) {
+            swap(&mut c.name, *names);
+        }
+    }
+    save_state(store, &state)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -476,7 +567,7 @@ fn chars(s: &str) -> usize {
 fn text(s: &str, max: usize, what: &str) -> Result<String, String> {
     let t = s.trim().to_string();
     if chars(&t) > max {
-        return Err(format!("{what}: не длиннее {max} символов."));
+        return Err(tr!("{what}: не длиннее {max} символов.", "{what}: at most {max} characters."));
     }
     Ok(t)
 }
@@ -539,9 +630,10 @@ pub fn save_state(store: &Store, s: &DrillState) -> Result<(), String> {
 }
 
 fn default_presets() -> Vec<Preset> {
+    let [(lock, lock_name), (window, window_name)] = DEFAULT_PRESETS;
     vec![
-        Preset { id: "lock".into(), name: "Замок: 10 верных".into(), ..Preset::default() },
-        Preset { id: "window".into(), name: "Разминка в окне".into(), goal: GoalKind::Cards, amount: 15, screen: Screen::Window, ..Preset::default() },
+        Preset { id: lock.into(), name: local(lock_name), ..Preset::default() },
+        Preset { id: window.into(), name: local(window_name), goal: GoalKind::Cards, amount: 15, screen: Screen::Window, ..Preset::default() },
     ]
 }
 
@@ -555,7 +647,7 @@ fn deck_topics(d: &Deck) -> Vec<(String, String)> {
     let mut out: Vec<(String, String)> = Vec::new();
     for c in &d.cards {
         if !out.iter().any(|(id, _)| *id == c.topic) {
-            let title = if c.topic.is_empty() { "Без темы".to_string() } else { c.topic.clone() };
+            let title = if c.topic.is_empty() { local(NO_TOPIC) } else { c.topic.clone() };
             out.push((c.topic.clone(), title));
         }
     }
@@ -566,7 +658,7 @@ fn bank_topics(b: &Bank) -> Vec<(String, String)> {
     let mut out: Vec<(String, String)> = b.topics.iter().map(|t| (t.id.clone(), t.title.clone())).collect();
     for c in &b.cards {
         if !out.iter().any(|(id, _)| *id == c.topic) {
-            let title = if c.topic.is_empty() { "Без темы".to_string() } else { c.topic.clone() };
+            let title = if c.topic.is_empty() { local(NO_TOPIC) } else { c.topic.clone() };
             out.push((c.topic.clone(), title));
         }
     }
@@ -956,13 +1048,13 @@ fn resolve(cat: &Catalog, state: &DrillState, slot: &Slot) -> Option<Resolved> {
     let c = d.cards.iter().find(|c| c.id == k.card)?;
     let spec = c.check.clone().unwrap_or_else(|| d.check.clone());
     let (kind, ui) = match spec.mode {
-        Mode::Python | Mode::Error => ("значение", "python"),
-        Mode::Shape => ("форма", "shape"),
-        Mode::Number => ("число", "number"),
-        Mode::Choice => ("выбор", "choice"),
-        Mode::SelfCheck => ("вспомни", "self"),
-        Mode::Output => ("вывод", "output"),
-        Mode::Text => ("вопрос", "text"),
+        Mode::Python | Mode::Error => (pick("значение", "value"), "python"),
+        Mode::Shape => (pick("форма", "shape"), "shape"),
+        Mode::Number => (pick("число", "number"), "number"),
+        Mode::Choice => (pick("выбор", "choice"), "choice"),
+        Mode::SelfCheck => (pick("вспомни", "recall"), "self"),
+        Mode::Output => (pick("вывод", "output"), "output"),
+        Mode::Text => (pick("вопрос", "question"), "text"),
     };
     let mut expected = vec![c.answer.clone()];
     expected.extend(c.alternatives.iter().cloned());
@@ -1015,12 +1107,12 @@ fn today_of(store: &Store, at: NaiveDateTime) -> NaiveDate {
 
 pub fn start(store: &Store, at: NaiveDateTime, preset_id: &str, generated: Generated) -> Result<Session, String> {
     let state = load_state(store);
-    let preset = state.presets.iter().find(|p| p.id == preset_id).cloned().ok_or("Режим не найден.")?;
+    let preset = state.presets.iter().find(|p| p.id == preset_id).cloned().ok_or_else(|| tr!("Режим не найден.", "Mode not found."))?;
     let mut cat = Catalog::load(store);
     cat.attach(generated);
     let pool = candidates(&cat, &state, &preset);
     if pool.is_empty() {
-        return Err("В выбранных наборах и темах нет карточек.".into());
+        return Err(tr!("В выбранных наборах и темах нет карточек.", "The chosen decks and topics have no cards."));
     }
     let mut rng = Rng::new();
     let today = today_of(store, at);
@@ -1229,7 +1321,7 @@ pub fn view(s: &Session, at: NaiveDateTime) -> SessionView {
 }
 
 pub fn reveal(s: &mut Session) -> Result<(), String> {
-    let slot = s.current.as_mut().ok_or("Сеанс закончен.")?;
+    let slot = s.current.as_mut().ok_or_else(|| tr!("Сеанс закончен.", "The session is over."))?;
     slot.revealed = true;
     Ok(())
 }
@@ -1263,20 +1355,20 @@ pub struct AnswerView {
 
 pub fn answer(store: &Store, s: &mut Session, at: NaiveDateTime, input: AnswerInput) -> Result<AnswerView, String> {
     if s.ended.is_some() {
-        return Err("Сеанс уже закончен.".into());
+        return Err(tr!("Сеанс уже закончен.", "The session is already over."));
     }
-    let slot = s.current.clone().ok_or("Сеанс закончен.")?;
+    let slot = s.current.clone().ok_or_else(|| tr!("Сеанс закончен.", "The session is over."))?;
     let _g = store.lock();
     let mut state = load_state(store);
-    let r = resolve(&s.catalog, &state, &slot).ok_or("Карточка пропала из набора.")?;
+    let r = resolve(&s.catalog, &state, &slot).ok_or_else(|| tr!("Карточка пропала из набора.", "The card is gone from the deck."))?;
     let self_check = s.preset.self_check || r.spec.mode == Mode::SelfCheck;
     let given = input.text.clone().unwrap_or_default();
     let (correct, note) = if self_check {
-        let knew = input.knew.ok_or("Отметь, знал ли ответ.")?;
+        let knew = input.knew.ok_or_else(|| tr!("Отметь, знал ли ответ.", "Mark whether you knew the answer."))?;
         (knew, None)
     } else {
         if given.trim().is_empty() {
-            return Err("Ответ пустой.".into());
+            return Err(tr!("Ответ пустой.", "The answer is empty."));
         }
         let exp: Vec<&str> = r.expected.iter().map(String::as_str).collect();
         let v = pylit::check(&r.spec, &exp, &given);
@@ -1599,27 +1691,27 @@ pub fn overview(store: &Store, at: NaiveDateTime) -> Overview {
 }
 
 fn clean_card(c: CardInput, deck_check: &CheckSpec, seen: &mut HashSet<String>) -> Result<Card, String> {
-    let prompt = text(&c.prompt, 2000, "Вопрос")?;
+    let prompt = text(&c.prompt, 2000, &tr!("Вопрос", "Question"))?;
     let code = c.code.trim_end().trim_start_matches('\n').to_string();
     if chars(&code) > 4000 {
-        return Err("Код в карточке: не длиннее 4000 символов.".into());
+        return Err(tr!("Код в карточке: не длиннее 4000 символов.", "Card code: at most 4000 characters."));
     }
     if prompt.is_empty() && code.is_empty() {
-        return Err("У карточки нет вопроса.".into());
+        return Err(tr!("У карточки нет вопроса.", "The card has no question."));
     }
-    let answer = text(&c.answer, 500, "Ответ")?;
+    let answer = text(&c.answer, 500, &tr!("Ответ", "Answer"))?;
     if answer.is_empty() {
-        return Err(format!("У карточки «{}» нет ответа.", prompt.chars().take(40).collect::<String>()));
+        return Err(tr!("У карточки «{}» нет ответа.", "The card \"{}\" has no answer.", prompt.chars().take(40).collect::<String>()));
     }
-    let alternatives: Vec<String> = c.alternatives.iter().map(|a| text(a, 500, "Другой ответ")).collect::<Result<Vec<_>, _>>()?.into_iter().filter(|a| !a.is_empty()).take(10).collect();
-    let mut choices: Vec<String> = c.choices.iter().map(|a| text(a, 300, "Вариант ответа")).collect::<Result<Vec<_>, _>>()?.into_iter().filter(|a| !a.is_empty()).take(8).collect();
+    let alternatives: Vec<String> = c.alternatives.iter().map(|a| text(a, 500, &tr!("Другой ответ", "Other answer"))).collect::<Result<Vec<_>, _>>()?.into_iter().filter(|a| !a.is_empty()).take(10).collect();
+    let mut choices: Vec<String> = c.choices.iter().map(|a| text(a, 300, &tr!("Вариант ответа", "Option"))).collect::<Result<Vec<_>, _>>()?.into_iter().filter(|a| !a.is_empty()).take(8).collect();
     let spec = c.check.clone().unwrap_or_else(|| deck_check.clone());
     if spec.mode == Mode::Choice {
         if !choices.contains(&answer) {
             choices.insert(0, answer.clone());
         }
         if choices.len() < 2 {
-            return Err("Для выбора нужно хотя бы два варианта.".into());
+            return Err(tr!("Для выбора нужно хотя бы два варианта.", "Multiple choice needs at least two options."));
         }
     }
     for a in std::iter::once(&answer).chain(alternatives.iter()) {
@@ -1630,16 +1722,16 @@ fn clean_card(c: CardInput, deck_check: &CheckSpec, seen: &mut HashSet<String>) 
         None => uid(),
     };
     seen.insert(id.clone());
-    Ok(Card { id, topic: text(&c.topic, 80, "Тема")?, prompt, code, answer, alternatives, choices, check: c.check, explain: text(&c.explain, 2000, "Пояснение")? })
+    Ok(Card { id, topic: text(&c.topic, 80, &tr!("Тема", "Topic"))?, prompt, code, answer, alternatives, choices, check: c.check, explain: text(&c.explain, 2000, &tr!("Пояснение", "Explanation"))? })
 }
 
 fn clean_spec(mut s: CheckSpec) -> Result<CheckSpec, String> {
     if matches!(s.mode, Mode::Error | Mode::Output) {
         s.mode = Mode::Text;
     }
-    s.hint = text(&s.hint, 200, "Подсказка к ответу")?;
+    s.hint = text(&s.hint, 200, &tr!("Подсказка к ответу", "Answer hint"))?;
     if !s.tolerance.is_finite() || s.tolerance < 0.0 {
-        return Err("Допуск должен быть неотрицательным числом.".into());
+        return Err(tr!("Допуск должен быть неотрицательным числом.", "The tolerance must be a non-negative number."));
     }
     Ok(s)
 }
@@ -1654,17 +1746,17 @@ pub fn save_deck(store: &Store, at: NaiveDateTime, input: DeckInput, author: Aut
     let _g = store.lock();
     let existing: Option<Deck> = input.id.as_deref().filter(|i| !i.is_empty()).and_then(|i| store.load_item(DECKS, i));
     if input.id.as_deref().is_some_and(|i| !i.is_empty()) && existing.is_none() {
-        return Err("Набор не найден.".into());
+        return Err(tr!("Набор не найден.", "Deck not found."));
     }
     if existing.is_none() && user_decks(store).len() >= MAX_DECKS {
-        return Err(format!("Наборов не больше {MAX_DECKS}."));
+        return Err(tr!("Наборов не больше {MAX_DECKS}.", "At most {MAX_DECKS} decks."));
     }
-    let title = text(&input.title, 80, "Название набора")?;
+    let title = text(&input.title, 80, &tr!("Название набора", "Deck title"))?;
     if title.is_empty() {
-        return Err("Дай набору название.".into());
+        return Err(tr!("Дай набору название.", "Give the deck a title."));
     }
     if input.cards.len() > MAX_CARDS {
-        return Err(format!("В наборе не больше {MAX_CARDS} карточек."));
+        return Err(tr!("В наборе не больше {MAX_CARDS} карточек.", "A deck holds at most {MAX_CARDS} cards."));
     }
     let state = load_state(store);
     let check = match input.template.as_deref().filter(|t| !t.trim().is_empty()) {
@@ -1685,7 +1777,7 @@ pub fn save_deck(store: &Store, at: NaiveDateTime, input: DeckInput, author: Aut
     let deck = Deck {
         id: existing.as_ref().map(|d| d.id.clone()).unwrap_or_else(uid),
         title,
-        description: text(&input.description, 1000, "Описание")?,
+        description: text(&input.description, 1000, &tr!("Описание", "Description"))?,
         author: existing.as_ref().map(|d| d.author).unwrap_or(author),
         check,
         gate: clean_gate(input.gate),
@@ -1698,7 +1790,7 @@ pub fn save_deck(store: &Store, at: NaiveDateTime, input: DeckInput, author: Aut
 }
 
 pub fn edit_deck(store: &Store, at: NaiveDateTime, id: &str, patch: DeckPatch) -> Result<Deck, String> {
-    let d: Deck = store.load_item(DECKS, id).ok_or("Набор не найден.")?;
+    let d: Deck = store.load_item(DECKS, id).ok_or_else(|| tr!("Набор не найден.", "Deck not found."))?;
     let mut cards: Vec<CardInput> = d
         .cards
         .iter()
@@ -1740,10 +1832,10 @@ pub fn edit_deck(store: &Store, at: NaiveDateTime, id: &str, patch: DeckPatch) -
 
 pub fn delete_deck(store: &Store, id: &str) -> Result<(), String> {
     if is_builtin(id) {
-        return Err("Встроенный набор удалить нельзя.".into());
+        return Err(tr!("Встроенный набор удалить нельзя.", "The built-in deck can't be deleted."));
     }
     let _g = store.lock();
-    let sub = [DECKS, BANKS, GENS].into_iter().find(|s| store.has_item(s, id)).ok_or("Набор не найден.")?;
+    let sub = [DECKS, BANKS, GENS].into_iter().find(|s| store.has_item(s, id)).ok_or_else(|| tr!("Набор не найден.", "Deck not found."))?;
     store.delete_item(sub, id)?;
     let mut state = load_state(store);
     let prefix = format!("{id}:");
@@ -1798,20 +1890,20 @@ pub fn get_deck(store: &Store, id: &str) -> Result<Value, String> {
             .collect();
         return Ok(json!({ "id": b.id, "kind": "bank", "title": b.title, "description": b.description, "builtin": is_builtin(id), "author": b.author, "topics": b.topics, "cards": cards }));
     }
-    let d = cat.decks.get(id).ok_or("Набор не найден.")?;
+    let d = cat.decks.get(id).ok_or_else(|| tr!("Набор не найден.", "Deck not found."))?;
     serde_json::to_value(d).map_err(|e| e.to_string())
 }
 
 pub fn clean_preset(store: &Store, mut p: Preset) -> Result<Preset, String> {
     let cat = Catalog::load(store);
-    p.name = text(&p.name, 60, "Название режима")?;
+    p.name = text(&p.name, 60, &tr!("Название режима", "Mode name"))?;
     if p.name.is_empty() {
-        p.name = "Режим".into();
+        p.name = tr!("Режим", "Mode");
     }
     let mut sources: Vec<Source> = Vec::new();
     for s in p.sources {
         if !cat.exists(&s.deck) {
-            return Err(format!("Набор {} не найден.", s.deck));
+            return Err(tr!("Набор {} не найден.", "Deck {} not found.", s.deck));
         }
         let topics = cat.topics(&s.deck).unwrap_or_default();
         let mut picked: Vec<String> = Vec::new();
@@ -1820,7 +1912,7 @@ pub fn clean_preset(store: &Store, mut p: Preset) -> Result<Preset, String> {
             match found {
                 Some(id) if !picked.contains(&id) => picked.push(id),
                 Some(_) => {}
-                None => return Err(format!("В наборе «{}» нет темы «{t}».", cat.title(&s.deck))),
+                None => return Err(tr!("В наборе «{}» нет темы «{t}».", "The deck \"{}\" has no topic \"{t}\".", cat.title(&s.deck))),
             }
         }
         if !sources.iter().any(|x| x.deck == s.deck) {
@@ -1828,17 +1920,17 @@ pub fn clean_preset(store: &Store, mut p: Preset) -> Result<Preset, String> {
         }
     }
     if sources.is_empty() {
-        return Err("Выбери хотя бы один набор.".into());
+        return Err(tr!("Выбери хотя бы один набор.", "Choose at least one deck."));
     }
     p.sources = sources;
     let max = if p.goal == GoalKind::Minutes { 180 } else { 200 };
     if p.amount == 0 || p.amount > max {
-        return Err(format!("Объём сеанса: от 1 до {max}."));
+        return Err(tr!("Объём сеанса: от 1 до {max}.", "Session size: from 1 to {max}."));
     }
     p.limit_minutes = p.limit_minutes.clamp(5, 180);
-    p.theory_label = text(&p.theory_label, 24, "Подпись кнопки теории")?;
+    p.theory_label = text(&p.theory_label, 24, &tr!("Подпись кнопки теории", "Theory button caption"))?;
     if p.screen == Screen::Lock && p.goal == GoalKind::Minutes && p.limit_minutes < p.amount {
-        return Err("Потолок времени замка меньше длительности сеанса.".into());
+        return Err(tr!("Потолок времени замка меньше длительности сеанса.", "The lock time limit is shorter than the session."));
     }
     if p.id.is_empty() {
         p.id = uid();
@@ -1854,7 +1946,7 @@ pub fn save_preset(store: &Store, preset: Preset, make_default: bool) -> Result<
         Some(i) => state.presets[i] = p.clone(),
         None => {
             if state.presets.len() >= MAX_PRESETS {
-                return Err(format!("Режимов не больше {MAX_PRESETS}."));
+                return Err(tr!("Режимов не больше {MAX_PRESETS}.", "At most {MAX_PRESETS} modes."));
             }
             state.presets.push(p.clone());
         }
@@ -1878,7 +1970,7 @@ pub fn set_default(store: &Store, id: &str) -> Result<(), String> {
     let _g = store.lock();
     let mut state = load_state(store);
     if !state.presets.iter().any(|p| p.id == id) {
-        return Err("Режим не найден.".into());
+        return Err(tr!("Режим не найден.", "Mode not found."));
     }
     state.default_preset = id.into();
     save_state(store, &state)
@@ -1893,9 +1985,9 @@ pub fn set_prefs(store: &Store, prefs: BuiltinPrefs) -> Result<(), String> {
 
 pub fn set_topic(store: &Store, at: NaiveDateTime, deck: &str, topic: &str, open: bool) -> Result<(), String> {
     let cat = Catalog::load(store);
-    let topics = cat.topics(deck).ok_or("Набор не найден.")?;
+    let topics = cat.topics(deck).ok_or_else(|| tr!("Набор не найден.", "Deck not found."))?;
     if !topics.iter().any(|(id, _)| id == topic) {
-        return Err("Тема не найдена.".into());
+        return Err(tr!("Тема не найдена.", "Topic not found."));
     }
     let _g = store.lock();
     let mut state = load_state(store);
@@ -1913,23 +2005,23 @@ fn find_check(state: &DrillState, key: &str) -> Result<CheckSpec, String> {
         .find(|c| c.id == key)
         .or_else(|| state.checks.iter().find(|c| c.name.to_lowercase() == key.to_lowercase()))
         .map(|c| c.check.clone())
-        .ok_or_else(|| format!("Шаблон проверки «{key}» не найден."))
+        .ok_or_else(|| tr!("Шаблон проверки «{key}» не найден.", "Check template \"{key}\" not found."))
 }
 
 pub fn save_check(store: &Store, input: CheckTemplate) -> Result<CheckTemplate, String> {
-    let name = text(&input.name, 60, "Название шаблона")?;
+    let name = text(&input.name, 60, &tr!("Название шаблона", "Template name"))?;
     if name.is_empty() {
-        return Err("Дай шаблону название.".into());
+        return Err(tr!("Дай шаблону название.", "Give the template a name."));
     }
-    let group = text(&input.group, 40, "Группа")?;
-    let group = if group.is_empty() { "Свои".to_string() } else { group };
+    let group = text(&input.group, 40, &tr!("Группа", "Group"))?;
+    let group = if group.is_empty() { local(OWN) } else { group };
     let check = clean_spec(input.check)?;
     let _g = store.lock();
     let mut state = load_state(store);
     let id = input.id.trim().to_string();
     let old = state.checks.iter().position(|c| !id.is_empty() && c.id == id);
     if old.is_none() && state.checks.len() >= MAX_CHECKS {
-        return Err(format!("Шаблонов не больше {MAX_CHECKS}."));
+        return Err(tr!("Шаблонов не больше {MAX_CHECKS}.", "At most {MAX_CHECKS} templates."));
     }
     let id = if old.is_some() || (!id.is_empty() && id.len() <= 40) { id } else { uid() };
     let t = CheckTemplate { id, group, name, check };
@@ -1954,11 +2046,11 @@ pub fn delete_check(store: &Store, id: Option<&str>, group: Option<&str>) -> Res
     match (id.filter(|x| !x.is_empty()), group.filter(|x| !x.is_empty())) {
         (Some(id), _) => state.checks.retain(|c| c.id != id),
         (None, Some(group)) => state.checks.retain(|c| c.group != group),
-        _ => return Err("Укажи шаблон или группу.".into()),
+        _ => return Err(tr!("Укажи шаблон или группу.", "Give a template or a group.")),
     }
     let gone = before - state.checks.len();
     if gone == 0 {
-        return Err("Такого шаблона нет.".into());
+        return Err(tr!("Такого шаблона нет.", "There is no such template."));
     }
     save_state(store, &state)?;
     Ok(gone)
@@ -2004,7 +2096,7 @@ pub fn set_gate(store: &Store, deck: &str, gate: Gate) -> Result<(), String> {
         d.gate = gate;
         return store.save_item(DECKS, deck, &d);
     }
-    Err("Набор не найден.".into())
+    Err(tr!("Набор не найден.", "Deck not found."))
 }
 
 fn note(problems: &mut Vec<String>, text: String) {
@@ -2045,27 +2137,27 @@ fn valid_walk(w: &RawValue) -> bool {
 }
 
 fn clean_variant(v: Variant, kind: &str, keep_walk: bool) -> Result<Variant, String> {
-    let (mode, _, ui) = kind_spec(kind).ok_or_else(|| format!("неизвестный вид карточки «{kind}»"))?;
-    let question = text(&v.question, 2000, "Вопрос")?;
+    let (mode, _, ui) = kind_spec(kind).ok_or_else(|| tr!("неизвестный вид карточки «{kind}»", "unknown card kind \"{kind}\""))?;
+    let question = text(&v.question, 2000, &tr!("Вопрос", "Question"))?;
     let code = v.code.trim_end().trim_start_matches('\n').to_string();
     if chars(&code) > 4000 {
-        return Err("Код: не длиннее 4000 символов.".into());
+        return Err(tr!("Код: не длиннее 4000 символов.", "Code: at most 4000 characters."));
     }
     if question.is_empty() && code.is_empty() {
-        return Err("нет ни вопроса, ни кода".into());
+        return Err(tr!("нет ни вопроса, ни кода", "no question and no code"));
     }
-    let answer = text(&v.answer, 500, "Ответ")?;
+    let answer = text(&v.answer, 500, &tr!("Ответ", "Answer"))?;
     if answer.is_empty() {
-        return Err("нет ответа".into());
+        return Err(tr!("нет ответа", "no answer"));
     }
     let spec = CheckSpec { mode, ..CheckSpec::default() };
-    let alternatives: Vec<String> = v.alternatives.iter().map(|a| text(a, 500, "Другой ответ")).collect::<Result<Vec<_>, _>>()?.into_iter().filter(|a| !a.is_empty()).take(10).collect();
+    let alternatives: Vec<String> = v.alternatives.iter().map(|a| text(a, 500, &tr!("Другой ответ", "Other answer"))).collect::<Result<Vec<_>, _>>()?.into_iter().filter(|a| !a.is_empty()).take(10).collect();
     for a in std::iter::once(&answer).chain(alternatives.iter()) {
         pylit::valid_expected(&spec, a)?;
     }
     let mut choices: Vec<String> = Vec::new();
     for c in &v.choices {
-        let c = text(c, 300, "Вариант ответа")?;
+        let c = text(c, 300, &tr!("Вариант ответа", "Option"))?;
         if !c.is_empty() && !choices.contains(&c) {
             choices.push(c);
         }
@@ -2075,72 +2167,72 @@ fn clean_variant(v: Variant, kind: &str, keep_walk: bool) -> Result<Variant, Str
             choices.insert(0, answer.clone());
         }
         if choices.len() < 2 {
-            return Err("для выбора нужно хотя бы два варианта".into());
+            return Err(tr!("для выбора нужно хотя бы два варианта", "multiple choice needs at least two options"));
         }
         if choices.len() > 8 {
-            return Err("вариантов не больше 8".into());
+            return Err(tr!("вариантов не больше 8", "at most 8 options"));
         }
     } else {
         choices.clear();
     }
     let walk = if keep_walk { v.walk.filter(|w| valid_walk(w)) } else { None };
-    Ok(Variant { code, question, answer, choices, alternatives, explain: text(&v.explain, 2000, "Пояснение")?, walk })
+    Ok(Variant { code, question, answer, choices, alternatives, explain: text(&v.explain, 2000, &tr!("Пояснение", "Explanation"))?, walk })
 }
 
 fn clean_topics(topics: Vec<BankTopic>) -> Result<Vec<BankTopic>, String> {
     if topics.len() > MAX_TOPICS {
-        return Err(format!("Тем не больше {MAX_TOPICS}."));
+        return Err(tr!("Тем не больше {MAX_TOPICS}.", "At most {MAX_TOPICS} topics."));
     }
     let mut out: Vec<BankTopic> = Vec::new();
     for t in topics {
-        let id = text(&t.id, 60, "Идентификатор темы")?;
+        let id = text(&t.id, 60, &tr!("Идентификатор темы", "Topic id"))?;
         if id.is_empty() {
-            return Err("У темы нет id.".into());
+            return Err(tr!("У темы нет id.", "A topic has no id."));
         }
         if out.iter().any(|x| x.id == id) {
-            return Err(format!("Тема {id} повторяется."));
+            return Err(tr!("Тема {id} повторяется.", "Topic {id} is repeated."));
         }
         if chars(&t.theory) > 100_000 {
-            return Err(format!("Теория темы {id}: не длиннее 100000 символов."));
+            return Err(tr!("Теория темы {id}: не длиннее 100000 символов.", "Theory of topic {id}: at most 100000 characters."));
         }
-        let title = text(&t.title, 80, "Название темы")?;
+        let title = text(&t.title, 80, &tr!("Название темы", "Topic title"))?;
         out.push(BankTopic { title: if title.is_empty() { id.clone() } else { title }, id, theory: t.theory.trim_end().to_string() });
     }
     Ok(out)
 }
 
 fn clean_template(c: &BankCard, topics: &mut Vec<BankTopic>, seen: &mut HashSet<String>) -> Result<BankCard, String> {
-    let id = text(&c.id, 60, "Идентификатор карточки")?;
+    let id = text(&c.id, 60, &tr!("Идентификатор карточки", "Card id"))?;
     if id.is_empty() {
-        return Err("У карточки нет id.".into());
+        return Err(tr!("У карточки нет id.", "A card has no id."));
     }
     if !seen.insert(id.clone()) {
-        return Err(format!("Карточка {id} повторяется."));
+        return Err(tr!("Карточка {id} повторяется.", "Card {id} is repeated."));
     }
     let kind = match c.kind.trim() {
         "" => "choice".to_string(),
         k => k.to_string(),
     };
     if kind_spec(&kind).is_none() {
-        return Err(format!("Карточка {id}: неизвестный вид «{kind}»."));
+        return Err(tr!("Карточка {id}: неизвестный вид «{kind}».", "Card {id}: unknown kind \"{kind}\"."));
     }
     let want = c.topic.trim();
     let topic = match topics.iter().find(|t| t.id == want || t.title == want) {
         Some(t) => t.id.clone(),
         None => {
             if topics.len() >= MAX_TOPICS || chars(want) > 60 {
-                return Err(format!("Карточка {id}: тема «{want}» не подходит."));
+                return Err(tr!("Карточка {id}: тема «{want}» не подходит.", "Card {id}: topic \"{want}\" does not fit."));
             }
-            topics.push(BankTopic { id: want.into(), title: if want.is_empty() { "Без темы".into() } else { want.into() }, theory: String::new() });
+            topics.push(BankTopic { id: want.into(), title: if want.is_empty() { local(NO_TOPIC) } else { want.into() }, theory: String::new() });
             want.to_string()
         }
     };
-    Ok(BankCard { id, topic, kind, rule: text(&c.rule, 2000, "Правило")?, check: c.check.clone().map(clean_spec).transpose()?, variants: Vec::new() })
+    Ok(BankCard { id, topic, kind, rule: text(&c.rule, 2000, &tr!("Правило", "Rule"))?, check: c.check.clone().map(clean_spec).transpose()?, variants: Vec::new() })
 }
 
 fn clean_meta(topics: Vec<BankTopic>, templates: &[BankCard]) -> Result<(Vec<BankTopic>, Vec<BankCard>), String> {
     if templates.len() > MAX_TEMPLATES {
-        return Err(format!("Шаблонов не больше {MAX_TEMPLATES}."));
+        return Err(tr!("Шаблонов не больше {MAX_TEMPLATES}.", "At most {MAX_TEMPLATES} templates."));
     }
     let mut topics = clean_topics(topics)?;
     let mut seen = HashSet::new();
@@ -2164,8 +2256,8 @@ pub struct GeneratorInput {
 fn existing_gen(store: &Store, id: Option<&str>) -> Result<Option<Generator>, String> {
     match id.filter(|i| !i.is_empty()) {
         None => Ok(None),
-        Some(i) if is_builtin(i) => Err("Встроенный генератор менять нельзя.".into()),
-        Some(i) => store.load_item(GENS, i).map(Some).ok_or_else(|| "Генератор не найден.".to_string()),
+        Some(i) if is_builtin(i) => Err(tr!("Встроенный генератор менять нельзя.", "The built-in generator can't be changed.")),
+        Some(i) => store.load_item(GENS, i).map(Some).ok_or_else(|| tr!("Генератор не найден.", "Generator not found.")),
     }
 }
 
@@ -2173,31 +2265,31 @@ pub fn get_generator(store: &Store, id: &str) -> Result<Generator, String> {
     if id == SHAPES {
         return Ok(shapes().clone());
     }
-    store.load_item(GENS, id).ok_or_else(|| "Генератор не найден.".into())
+    store.load_item(GENS, id).ok_or_else(|| tr!("Генератор не найден.", "Generator not found."))
 }
 
 pub fn save_generator(store: &Store, at: NaiveDateTime, input: GeneratorInput, author: Author) -> Result<Generator, String> {
     let _g = store.lock();
     let existing = existing_gen(store, input.id.as_deref())?;
     if existing.is_none() && deck_count(store) >= MAX_DECKS {
-        return Err(format!("Наборов не больше {MAX_DECKS}."));
+        return Err(tr!("Наборов не больше {MAX_DECKS}.", "At most {MAX_DECKS} decks."));
     }
-    let title = text(&input.title, 80, "Название генератора")?;
+    let title = text(&input.title, 80, &tr!("Название генератора", "Generator title"))?;
     if title.is_empty() {
-        return Err("Дай генератору название.".into());
+        return Err(tr!("Дай генератору название.", "Give the generator a title."));
     }
     if input.code.trim().is_empty() {
-        return Err("В генераторе нет кода.".into());
+        return Err(tr!("В генераторе нет кода.", "The generator has no code."));
     }
     if chars(&input.code) > MAX_CODE {
-        return Err(format!("Код генератора: не длиннее {MAX_CODE} символов."));
+        return Err(tr!("Код генератора: не длиннее {MAX_CODE} символов.", "Generator code: at most {MAX_CODE} characters."));
     }
     let (topics, templates) = clean_meta(input.topics, &input.templates)?;
     let now = fmt_dt(at);
     let g = Generator {
         id: existing.as_ref().map(|g| g.id.clone()).unwrap_or_else(uid),
         title,
-        description: text(&input.description, 1000, "Описание")?,
+        description: text(&input.description, 1000, &tr!("Описание", "Description"))?,
         author: existing.as_ref().map(|g| g.author).unwrap_or(author),
         code: input.code,
         enabled: input.enabled && !templates.is_empty(),
@@ -2219,7 +2311,7 @@ pub fn install_generator(store: &Store, at: NaiveDateTime, id: Option<String>, t
 
 pub fn disable_generator(store: &Store, id: &str) -> Result<(), String> {
     let _g = store.lock();
-    let mut g = existing_gen(store, Some(id))?.ok_or("Генератор не найден.")?;
+    let mut g = existing_gen(store, Some(id))?.ok_or_else(|| tr!("Генератор не найден.", "Generator not found."))?;
     g.enabled = false;
     store.save_item(GENS, id, &g)
 }
@@ -2235,7 +2327,7 @@ pub struct GenCheck {
 
 pub fn check_generator(topics: Vec<BankTopic>, templates: Vec<BankCard>, made: &HashMap<String, Vec<Variant>>) -> Result<GenCheck, String> {
     if templates.is_empty() {
-        return Err("В генераторе нет шаблонов: объяви plugin.templates.".into());
+        return Err(tr!("В генераторе нет шаблонов: объяви plugin.templates.", "The generator has no templates: declare plugin.templates."));
     }
     let (_, cards) = clean_meta(topics, &templates)?;
     let mut problems = Vec::new();
@@ -2243,13 +2335,13 @@ pub fn check_generator(topics: Vec<BankTopic>, templates: Vec<BankCard>, made: &
     for c in &cards {
         let list = made.get(&c.id).map(Vec::as_slice).unwrap_or(&[]);
         if list.is_empty() {
-            note(&mut problems, format!("{}: шаблон не дал ни одного варианта", c.id));
+            note(&mut problems, tr!("{}: шаблон не дал ни одного варианта", "{}: the template gave no variants", c.id));
         }
         let mut ok = 0;
         for (i, v) in list.iter().enumerate() {
             match clean_variant(v.clone(), &c.kind, false) {
                 Ok(_) => ok += 1,
-                Err(e) => note(&mut problems, format!("{}, вариант {}: {e}", c.id, i + 1)),
+                Err(e) => note(&mut problems, tr!("{}, вариант {}: {e}", "{}, variant {}: {e}", c.id, i + 1)),
             }
         }
         ready += usize::from(ok > 0);
@@ -2269,7 +2361,7 @@ pub struct GenSource {
 
 pub fn gen_sources(store: &Store, preset_id: &str) -> Result<Vec<GenSource>, String> {
     let state = load_state(store);
-    let preset = state.presets.iter().find(|p| p.id == preset_id).ok_or("Режим не найден.")?;
+    let preset = state.presets.iter().find(|p| p.id == preset_id).ok_or_else(|| tr!("Режим не найден.", "Mode not found."))?;
     let cat = Catalog::load(store);
     let mut out: Vec<GenSource> = Vec::new();
     for k in source_keys(&cat, &state, preset) {
@@ -2307,39 +2399,39 @@ pub struct ImportReport {
 
 pub fn parse_bank(text: &str) -> Result<BankInput, String> {
     if text.len() as u64 > MAX_BANK_BYTES {
-        return Err("Банк больше 16 МБ.".into());
+        return Err(tr!("Банк больше 16 МБ.", "The bank is larger than 16 MB."));
     }
-    serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| format!("Банк не читается как JSON: {e}."))
+    serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| tr!("Банк не читается как JSON: {e}.", "The bank is not valid JSON: {e}."))
 }
 
 pub fn read_bank_file(path: &str) -> Result<BankInput, String> {
     let p = Path::new(path);
     if !p.extension().is_some_and(|e| e.eq_ignore_ascii_case("json")) {
-        return Err("Нужен файл .json.".into());
+        return Err(tr!("Нужен файл .json.", "A .json file is needed."));
     }
-    let len = std::fs::metadata(p).map_err(|e| format!("Файл не найден: {e}."))?.len();
+    let len = std::fs::metadata(p).map_err(|e| tr!("Файл не найден: {e}.", "File not found: {e}."))?.len();
     if len > MAX_BANK_BYTES {
-        return Err("Банк больше 16 МБ.".into());
+        return Err(tr!("Банк больше 16 МБ.", "The bank is larger than 16 MB."));
     }
-    parse_bank(&std::fs::read_to_string(p).map_err(|e| format!("Файл не читается: {e}."))?)
+    parse_bank(&std::fs::read_to_string(p).map_err(|e| tr!("Файл не читается: {e}.", "The file can't be read: {e}."))?)
 }
 
 pub fn import_bank(store: &Store, at: NaiveDateTime, input: BankInput, replace: Option<&str>, author: Author) -> Result<ImportReport, String> {
     let _g = store.lock();
     let existing: Option<Bank> = match replace.filter(|r| !r.is_empty()) {
-        Some(r) if is_builtin(r) => return Err("Встроенный набор заменить нельзя.".into()),
-        Some(r) => Some(store.load_item(BANKS, r).ok_or("Банк для замены не найден.")?),
+        Some(r) if is_builtin(r) => return Err(tr!("Встроенный набор заменить нельзя.", "The built-in deck can't be replaced.")),
+        Some(r) => Some(store.load_item(BANKS, r).ok_or_else(|| tr!("Банк для замены не найден.", "The bank to replace was not found."))?),
         None => None,
     };
     if existing.is_none() && deck_count(store) >= MAX_DECKS {
-        return Err(format!("Наборов не больше {MAX_DECKS}."));
+        return Err(tr!("Наборов не больше {MAX_DECKS}.", "At most {MAX_DECKS} decks."));
     }
-    let title = text(&input.title, 80, "Название банка")?;
+    let title = text(&input.title, 80, &tr!("Название банка", "Bank title"))?;
     if title.is_empty() {
-        return Err("У банка нет названия: заполни title.".into());
+        return Err(tr!("У банка нет названия: заполни title.", "The bank has no title: fill in title."));
     }
     if input.cards.len() > MAX_CARDS {
-        return Err(format!("В банке не больше {MAX_CARDS} карточек."));
+        return Err(tr!("В банке не больше {MAX_CARDS} карточек.", "A bank holds at most {MAX_CARDS} cards."));
     }
     let mut topics = clean_topics(input.topics)?;
     let mut seen = HashSet::new();
@@ -2368,21 +2460,21 @@ pub fn import_bank(store: &Store, at: NaiveDateTime, input: BankInput, replace: 
                 }
                 Err(e) => {
                     dropped += 1;
-                    note(&mut problems, format!("{}, вариант {}: {e}", card.id, i + 1));
+                    note(&mut problems, tr!("{}, вариант {}: {e}", "{}, variant {}: {e}", card.id, i + 1));
                 }
             }
         }
         if card.variants.is_empty() {
-            note(&mut problems, format!("{}: не осталось ни одного варианта", card.id));
+            note(&mut problems, tr!("{}: не осталось ни одного варианта", "{}: no variants left", card.id));
             continue;
         }
         cards.push(card);
     }
     if overflow {
-        note(&mut problems, format!("Часть вариантов не вошла: не больше {MAX_VARIANTS} на карточку и {MAX_BANK_VARIANTS} на банк."));
+        note(&mut problems, tr!("Часть вариантов не вошла: не больше {MAX_VARIANTS} на карточку и {MAX_BANK_VARIANTS} на банк.", "Some variants were left out: at most {MAX_VARIANTS} per card and {MAX_BANK_VARIANTS} per bank."));
     }
     if cards.is_empty() {
-        return Err(format!("В банке нет ни одной рабочей карточки. {}", problems.join(" ")));
+        return Err(tr!("В банке нет ни одной рабочей карточки. {}", "The bank has no working cards. {}", problems.join(" ")));
     }
     topics.retain(|t| cards.iter().any(|c| c.topic == t.id));
     let now = fmt_dt(at);
@@ -2390,7 +2482,7 @@ pub fn import_bank(store: &Store, at: NaiveDateTime, input: BankInput, replace: 
     let b = Bank {
         id: existing.as_ref().map(|b| b.id.clone()).unwrap_or_else(uid),
         title,
-        description: text(&input.description, 1000, "Описание")?,
+        description: text(&input.description, 1000, &tr!("Описание", "Description"))?,
         author: existing.as_ref().map(|b| b.author).unwrap_or(author),
         gate: clean_gate(gate),
         topics,
@@ -2477,23 +2569,23 @@ pub fn topic_articles(store: &Store, deck: &str, topic: &str) -> Vec<Article> {
 
 pub fn save_article(store: &Store, at: NaiveDateTime, input: ArticleInput, author: Author) -> Result<Article, String> {
     let cat = Catalog::load(store);
-    let topics = cat.topics(&input.deck).ok_or("Набор не найден.")?;
+    let topics = cat.topics(&input.deck).ok_or_else(|| tr!("Набор не найден.", "Deck not found."))?;
     let topic = input.topic.trim().to_string();
     let topic = topics.iter().find(|(id, title)| *id == topic || *title == topic).map(|(id, _)| id.clone()).unwrap_or(topic);
     if !topic.is_empty() && !topics.iter().any(|(id, _)| *id == topic) {
-        return Err(format!("В наборе нет темы «{topic}»."));
+        return Err(tr!("В наборе нет темы «{topic}».", "The deck has no topic \"{topic}\"."));
     }
-    let title = text(&input.title, 120, "Заголовок")?;
+    let title = text(&input.title, 120, &tr!("Заголовок", "Title"))?;
     if title.is_empty() {
-        return Err("Дай статье заголовок.".into());
+        return Err(tr!("Дай статье заголовок.", "Give the article a title."));
     }
     if chars(&input.body) > 100_000 {
-        return Err("Статья: не длиннее 100000 символов.".into());
+        return Err(tr!("Статья: не длиннее 100000 символов.", "Article: at most 100000 characters."));
     }
     let _g = store.lock();
     let existing: Option<Article> = match input.id.as_deref().filter(|i| !i.is_empty()) {
-        Some(i) if builtin_articles(&cat).iter().any(|a| a.id == i) => return Err("Встроенную статью менять нельзя, добавь свою.".into()),
-        Some(i) => Some(store.load_item(THEORY, i).ok_or("Статья не найдена.")?),
+        Some(i) if builtin_articles(&cat).iter().any(|a| a.id == i) => return Err(tr!("Встроенную статью менять нельзя, добавь свою.", "Built-in articles can't be changed, add your own.")),
+        Some(i) => Some(store.load_item(THEORY, i).ok_or_else(|| tr!("Статья не найдена.", "Article not found."))?),
         None => None,
     };
     let now = fmt_dt(at);
@@ -2514,7 +2606,7 @@ pub fn save_article(store: &Store, at: NaiveDateTime, input: ArticleInput, autho
 
 pub fn delete_article(store: &Store, id: &str) -> Result<(), String> {
     if builtin_articles(&Catalog::load(store)).iter().any(|a| a.id == id) {
-        return Err("Встроенную статью удалить нельзя.".into());
+        return Err(tr!("Встроенную статью удалить нельзя.", "Built-in articles can't be deleted."));
     }
     let _g = store.lock();
     store.delete_item(THEORY, id)
@@ -2923,5 +3015,25 @@ mod tests {
         delete_check(&store, Some(&word.id), None).unwrap();
         assert_eq!(load_state(&store).checks.len(), 7);
         assert_eq!(overview(&store, t0).checks.len(), 7);
+    }
+
+    #[test]
+    fn relabel_switches_untouched_default_names() {
+        let store = tmp_store("relabel");
+        let mut st = load_state(&store);
+        st.checks[1].name = "Мой выбор".into();
+        st.checks.push(CheckTemplate { id: "x".into(), group: "Свои".into(), name: "Слово".into(), ..Default::default() });
+        save_state(&store, &st).unwrap();
+        relabel(&store, "en").unwrap();
+        let st = load_state(&store);
+        assert_eq!(st.presets[0].name, "Lock: 10 right");
+        assert_eq!(st.presets[1].theory_label, "Theory");
+        assert_eq!((st.checks[0].group.as_str(), st.checks[0].name.as_str()), ("Basic", "Text"));
+        assert_eq!(st.checks[1].name, "Мой выбор");
+        assert_eq!((st.checks[6].group.as_str(), st.checks[6].name.as_str()), ("Custom", "Слово"));
+        relabel(&store, "ru").unwrap();
+        let st = load_state(&store);
+        assert_eq!(st.presets[0].name, "Замок: 10 верных");
+        assert_eq!(st.checks[4].group, "Для программистов");
     }
 }

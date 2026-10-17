@@ -36,7 +36,7 @@ fn pretty_links(text: &str) -> String {
         let tail = &rest[pos..];
         let end = tail.find(|c: char| c.is_whitespace() || "<>\"'".contains(c)).unwrap_or(tail.len());
         let url = tail[..end].trim_end_matches(|c: char| ".,;:!?)]}".contains(c));
-        out.push_str("ссылка");
+        out.push_str(&tr!("ссылка", "link"));
         rest = &tail[url.len()..];
     }
     out.push_str(rest);
@@ -46,10 +46,17 @@ fn pretty_links(text: &str) -> String {
 pub fn hours_text(h: f64) -> String {
     let s = format!("{:.2}", h);
     let s = s.trim_end_matches('0').trim_end_matches('.');
-    s.replace('.', ",")
+    if crate::i18n::en() {
+        s.to_string()
+    } else {
+        s.replace('.', ",")
+    }
 }
 
-pub fn plural(n: usize, one: &str, few: &str, many: &str) -> String {
+pub fn plural(n: usize, one: &str, few: &str, many: &str, en_one: &str, en_many: &str) -> String {
+    if crate::i18n::en() {
+        return format!("{n} {}", if n == 1 { en_one } else { en_many });
+    }
     let (m10, m100) = (n % 10, n % 100);
     let w = if m10 == 1 && m100 != 11 {
         one
@@ -98,11 +105,11 @@ fn status(store: &Store, c: &logic::Ctx) -> Status {
 
 fn apply_tray(app: &AppHandle, s: &Status) {
     let t = plan_name(s.today.as_ref(), 34)
-        .map(|n| format!("Сегодня: «{n}»"))
-        .unwrap_or_else(|| "Сегодня: день без имени".into());
+        .map(|n| tr!("Сегодня: «{n}»", "Today: \"{n}\""))
+        .unwrap_or_else(|| tr!("Сегодня: день без имени", "Today: unnamed day"));
     let m = plan_name(s.tomorrow.as_ref(), 34)
-        .map(|n| format!("Завтра: «{n}»"))
-        .unwrap_or_else(|| "Завтра: ещё не назван".into());
+        .map(|n| tr!("Завтра: «{n}»", "Tomorrow: \"{n}\""))
+        .unwrap_or_else(|| tr!("Завтра: ещё не назван", "Tomorrow: not named yet"));
     let alert = s.evening && (s.plan_missing || s.result_open);
     tray::update(app, alert, &format!("Next Day\n{t}\n{m}"));
 }
@@ -198,31 +205,31 @@ pub fn tick(app: &AppHandle) {
 fn morning_toast(app: &AppHandle, s: &Status) {
     let (title, mut body) = match s.today.as_ref().and_then(|d| d.plan.as_ref()) {
         Some(p) => {
-            let title = format!("Сегодня: «{}»", short(&p.name, 48));
+            let title = tr!("Сегодня: «{}»", "Today: \"{}\"", short(&p.name, 48));
             let body = match p.checklist.as_deref() {
                 Some(items) if !items.is_empty() => {
                     let h: f64 = items.iter().filter_map(|i| i.hours).sum();
-                    let n = plural(items.len(), "пункт", "пункта", "пунктов");
+                    let n = plural(items.len(), "пункт", "пункта", "пунктов", "item", "items");
                     if h > 0.0 {
-                        format!("В чеклисте {n}, примерно {} ч.", hours_text(h))
+                        tr!("В чеклисте {n}, примерно {} ч.", "{n} in the checklist, about {} h.", hours_text(h))
                     } else {
-                        format!("В чеклисте {n}.")
+                        tr!("В чеклисте {n}.", "{n} in the checklist.")
                     }
                 }
                 _ if !p.description.is_empty() => short(&pretty_links(&p.description), 120),
-                _ => "Хорошего дня!".to_string(),
+                _ => tr!("Хорошего дня!", "Have a good day!"),
             };
             (title, body)
         }
         None => (
-            "Сегодня безымянный день".to_string(),
-            "Вчера день не назвали. Можно назвать его прямо сейчас.".to_string(),
+            tr!("Сегодня безымянный день", "Today has no name"),
+            tr!("Вчера день не назвали. Можно назвать его прямо сейчас.", "You did not name it yesterday. You can name it right now."),
         ),
     };
     if s.yesterday.as_ref().is_some_and(|d| d.result_open()) {
-        body.push_str("\nВчерашний день ждёт итогов.");
+        body.push_str(&tr!("\nВчерашний день ждёт итогов.", "\nYesterday is waiting for its results."));
     }
-    notify::show(app, &title, &body, "today", &[("Открыть", "open:today")]);
+    notify::show(app, &title, &body, "today", &[(tr!("Открыть", "Open").as_str(), "open:today")]);
 }
 
 fn task_alerts(app: &AppHandle, c: &logic::Ctx, s: &Status, ns: &mut NotifyState) -> bool {
@@ -256,46 +263,47 @@ fn task_alerts(app: &AppHandle, c: &logic::Ctx, s: &Status, ns: &mut NotifyState
 }
 
 fn task_toast(app: &AppHandle, it: &CheckItem, hour: u8) {
-    let mut body = format!("По плану на {hour:02}:00.");
+    let mut body = tr!("По плану на {hour:02}:00.", "Planned for {hour:02}:00.");
     if let Some(h) = it.hours {
-        body.push_str(&format!(" Примерно {} ч.", hours_text(h)));
+        body.push_str(&tr!(" Примерно {} ч.", " About {} h.", hours_text(h)));
     }
-    let title = format!("Пора: «{}»", short(&pretty_links(&it.text), 60));
-    notify::show(app, &title, &body, "clock", &[("Открыть", "open:clock")]);
+    let title = tr!("Пора: «{}»", "Time for \"{}\"", short(&pretty_links(&it.text), 60));
+    notify::show(app, &title, &body, "clock", &[(tr!("Открыть", "Open").as_str(), "open:clock")]);
 }
 
 fn evening_toast(app: &AppHandle, s: &Status) {
     let name = plan_name(s.today.as_ref(), 40).unwrap_or_default();
     let (title, body, route) = if s.plan_missing && s.result_open {
         (
-            "Вечерний ритуал".to_string(),
-            format!("Подведите итоги дня «{name}» и назовите завтрашний день."),
+            tr!("Вечерний ритуал", "Evening ritual"),
+            tr!("Подведите итоги дня «{name}» и назовите завтрашний день.", "Collect the results of \"{name}\" and name tomorrow."),
             "ritual",
         )
     } else if s.plan_missing {
         (
-            "Как назовём завтрашний день?".to_string(),
-            "Пара минут на план, и завтра начнётся без раскачки.".to_string(),
+            tr!("Как назовём завтрашний день?", "What will you call tomorrow?"),
+            tr!("Пара минут на план, и завтра начнётся без раскачки.", "Two minutes on the plan, and tomorrow starts without a slow warm-up."),
             "tomorrow",
         )
     } else if s.plan_auto && !s.result_open {
         (
-            "Завтра уже расписано по целям".to_string(),
-            format!(
+            tr!("Завтра уже расписано по целям", "Tomorrow is already planned from your goals"),
+            tr!(
                 "План «{}» составился сам. Можно назвать день по-своему и добавить свои пункты.",
+                "The plan \"{}\" was made automatically. You can rename the day and add your own items.",
                 plan_name(s.tomorrow.as_ref(), 40).unwrap_or_default()
             ),
             "tomorrow",
         )
     } else {
         (
-            format!("Итоги дня «{name}»"),
-            "Отметьте сделанное, прикрепите скрины и запечатайте день.".to_string(),
+            tr!("Итоги дня «{name}»", "Results of \"{name}\""),
+            tr!("Отметьте сделанное, прикрепите скрины и запечатайте день.", "Tick what is done, attach screenshots and seal the day."),
             "results",
         )
     };
     let open = format!("open:{route}");
-    notify::show(app, &title, &body, route, &[("Открыть", open.as_str()), ("Позже", "snooze")]);
+    notify::show(app, &title, &body, route, &[(tr!("Открыть", "Open").as_str(), open.as_str()), (tr!("Позже", "Later").as_str(), "snooze")]);
 }
 
 #[cfg(test)]
@@ -304,11 +312,11 @@ mod tests {
 
     #[test]
     fn russian_plural() {
-        assert_eq!(plural(1, "пункт", "пункта", "пунктов"), "1 пункт");
-        assert_eq!(plural(3, "пункт", "пункта", "пунктов"), "3 пункта");
-        assert_eq!(plural(11, "пункт", "пункта", "пунктов"), "11 пунктов");
-        assert_eq!(plural(22, "пункт", "пункта", "пунктов"), "22 пункта");
-        assert_eq!(plural(25, "пункт", "пункта", "пунктов"), "25 пунктов");
+        assert_eq!(plural(1, "пункт", "пункта", "пунктов", "item", "items"), "1 пункт");
+        assert_eq!(plural(3, "пункт", "пункта", "пунктов", "item", "items"), "3 пункта");
+        assert_eq!(plural(11, "пункт", "пункта", "пунктов", "item", "items"), "11 пунктов");
+        assert_eq!(plural(22, "пункт", "пункта", "пунктов", "item", "items"), "22 пункта");
+        assert_eq!(plural(25, "пункт", "пункта", "пунктов", "item", "items"), "25 пунктов");
     }
 
     #[test]

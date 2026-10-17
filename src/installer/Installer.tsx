@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useState } from "react";
 import { errText } from "../api";
+import { t } from "../i18n";
 import { sfx } from "../sound";
 import { Button, Check, Progress } from "../ui/kit";
 import { Px } from "../ui/Px";
@@ -45,7 +46,7 @@ export default function Installer() {
     invoke<Info>("setup_info").then((i) => {
       setInfo(i);
       setDir(i.installDir);
-      document.title = i.uninstall ? "Удаление Next Day" : "Установка Next Day";
+      document.title = i.uninstall ? t("Удаление Next Day", "Uninstall Next Day") : t("Установка Next Day", "Next Day Setup");
       if (i.installedVersion) {
         setDesktop(i.desktopShortcut);
         setAutostart(i.autostart);
@@ -61,7 +62,13 @@ export default function Installer() {
       setDir(c.path);
       setDirMsg(
         c.hasOtherFiles
-          ? { bad: false, text: "В этой папке уже есть другие файлы. Next Day положит рядом свои и при удалении уберёт только их." }
+          ? {
+              bad: false,
+              text: t(
+                "В этой папке уже есть другие файлы. Next Day положит рядом свои и при удалении уберёт только их.",
+                "This folder already has other files. Next Day will add its own and remove only those on uninstall.",
+              ),
+            }
           : null,
       );
       return c.path;
@@ -73,7 +80,12 @@ export default function Installer() {
 
   const browse = async () => {
     try {
-      const picked = await open({ directory: true, multiple: false, title: "Куда установить Next Day", defaultPath: parentOf(dir) });
+      const picked = await open({
+        directory: true,
+        multiple: false,
+        title: t("Куда установить Next Day", "Where to install Next Day"),
+        defaultPath: parentOf(dir),
+      });
       if (typeof picked === "string") await verifyDir(picked);
     } catch (e) {
       setDirMsg({ bad: true, text: errText(e) });
@@ -141,9 +153,9 @@ export default function Installer() {
         <span className="setup-brand" data-tauri-drag-region>
           NEXT DAY
         </span>
-        <span className="setup-tag">{uninstall ? "удаление" : "установка"}</span>
+        <span className="setup-tag">{uninstall ? t("удаление", "uninstall") : t("установка", "setup")}</span>
         <span className="grow" data-tauri-drag-region />
-        <button className="setup-close" disabled={phase === "work"} onClick={() => void invoke("finish")} title="Закрыть">
+        <button className="setup-close" disabled={phase === "work"} onClick={() => void invoke("finish")} title={t("Закрыть", "Close")}>
           <Px name="winClose" scale={1.2} />
         </button>
       </header>
@@ -157,24 +169,35 @@ export default function Installer() {
               <img className="setup-logo" src={appIcon} alt="" />
               <div>
                 <h1>Next Day</h1>
-                <p>Вечером называешь завтрашний день, днём отмечаешь чеклист, вечером запечатываешь итоги.</p>
+                <p>
+                  {t(
+                    "Вечером называешь завтрашний день, днём отмечаешь чеклист, вечером запечатываешь итоги.",
+                    "Name tomorrow in the evening, tick off the checklist by day, seal the results at night.",
+                  )}
+                </p>
                 {info.installedVersion ? (
                   <p className="setup-note">
-                    Уже стоит {info.installedVersion}. Обновлю, дни и доски не трону.
+                    {t(
+                      `Уже стоит ${info.installedVersion}. Обновлю, дни и доски не трону.`,
+                      `Version ${info.installedVersion} is already installed. I'll update it and keep your days and boards.`,
+                    )}
                   </p>
                 ) : (
                   <p className="muted">
-                    Версия {info.version} · {String(info.sizeMb).replace(".", ",")} МБ · без прав администратора
+                    {t(
+                      `Версия ${info.version} · ${String(info.sizeMb).replace(".", ",")} МБ · без прав администратора`,
+                      `Version ${info.version} · ${info.sizeMb} MB · no admin rights needed`,
+                    )}
                   </p>
                 )}
               </div>
             </div>
             <div className="setup-opts">
-              <Check checked={desktop} onChange={setDesktop} label="Значок на рабочем столе" />
-              <Check checked={autostart} onChange={setAutostart} label="Запускать вместе с Windows" />
+              <Check checked={desktop} onChange={setDesktop} label={t("Значок на рабочем столе", "Desktop shortcut")} />
+              <Check checked={autostart} onChange={setAutostart} label={t("Запускать вместе с Windows", "Start with Windows")} />
             </div>
             <div className="setup-dir">
-              <span className="setup-label">Папка установки</span>
+              <span className="setup-label">{t("Папка установки", "Install folder")}</span>
               <div className="setup-dir-row">
                 <input
                   className={`field${dirMsg?.bad ? " bad" : ""}`}
@@ -193,23 +216,25 @@ export default function Installer() {
                   }}
                 />
                 <Button kind="paper" icon="folder" onClick={() => void browse()}>
-                  Обзор…
+                  {t("Обзор…", "Browse")}
                 </Button>
               </div>
               {dirMsg && <p className={`setup-dir-msg${dirMsg.bad ? " bad" : ""}`}>{dirMsg.text}</p>}
               {!dirMsg && info.installedVersion && dir !== info.installDir && (
-                <p className="setup-dir-msg">Перенесу программу сюда, старая папка освободится.</p>
+                <p className="setup-dir-msg">
+                  {t("Перенесу программу сюда, старая папка освободится.", "I'll move the app here and clean up the old folder.")}
+                </p>
               )}
             </div>
             <div className="setup-foot">
               {dir !== info.defaultDir && (
                 <button className="setup-link" onClick={() => void verifyDir(info.defaultDir)}>
-                  папка по умолчанию
+                  {t("папка по умолчанию", "default folder")}
                 </button>
               )}
               <span className="grow" />
               <Button icon="check" disabled={!!dirMsg?.bad} onClick={() => void run()}>
-                {info.installedVersion ? "Обновить" : "Установить"}
+                {info.installedVersion ? t("Обновить", "Update") : t("Установить", "Install")}
               </Button>
             </div>
           </>
@@ -220,21 +245,25 @@ export default function Installer() {
             <div className="setup-hero">
               <img className="setup-logo" src={appIcon} alt="" />
               <div>
-                <h1>Удалить Next Day?</h1>
-                <p>Уберу программу, значки и автозапуск.</p>
+                <h1>{t("Удалить Next Day?", "Uninstall Next Day?")}</h1>
+                <p>{t("Уберу программу, значки и автозапуск.", "I'll remove the app, its shortcuts and autostart.")}</p>
               </div>
             </div>
             <div className="setup-opts">
-              <Check checked={removeData} onChange={setRemoveData} label="Удалить и мои дни, доски и картинки" />
+              <Check
+                checked={removeData}
+                onChange={setRemoveData}
+                label={t("Удалить и мои дни, доски и картинки", "Also delete your days, boards and images")}
+              />
               <p className="muted small-path">{info.dataDir}</p>
             </div>
             <div className="setup-foot">
               <span className="grow" />
               <Button kind="paper" onClick={() => void invoke("finish")}>
-                Отмена
+                {t("Отмена", "Cancel")}
               </Button>
               <Button kind="danger" icon="trash" onClick={() => void run()}>
-                Удалить
+                {t("Удалить", "Uninstall")}
               </Button>
             </div>
           </>
@@ -242,7 +271,7 @@ export default function Installer() {
 
         {phase === "work" && (
           <div className="setup-work">
-            <h2>{uninstall ? "Удаляю…" : "Устанавливаю…"}</h2>
+            <h2>{uninstall ? t("Удаляю…", "Uninstalling") : t("Устанавливаю…", "Installing")}</h2>
             <Progress value={steps.length ? done / steps.length : 0} />
             <ul className="setup-steps">
               {steps.map((s, i) => (
@@ -257,13 +286,13 @@ export default function Installer() {
 
         {info && phase === "done" && !uninstall && (
           <div className="setup-done">
-            <div className="stamp">УСТАНОВЛЕНО</div>
-            <p>Спасибо за установку! Всё готово :)</p>
+            <div className="stamp">{t("УСТАНОВЛЕНО", "INSTALLED")}</div>
+            <p>{t("Спасибо за установку! Всё готово :)", "Thanks for installing! All set :)")}</p>
             <div className="setup-foot">
-              <Check checked={launch} onChange={setLaunch} label="Запустить Next Day" />
+              <Check checked={launch} onChange={setLaunch} label={t("Запустить Next Day", "Launch Next Day")} />
               <span className="grow" />
               <Button icon="arrowR" onClick={() => void finish()}>
-                Готово
+                {t("Готово", "Done")}
               </Button>
             </div>
           </div>
@@ -271,29 +300,32 @@ export default function Installer() {
 
         {info && phase === "done" && uninstall && (
           <div className="setup-done">
-            <div className="stamp">УДАЛЕНО</div>
+            <div className="stamp">{t("УДАЛЕНО", "UNINSTALLED")}</div>
             <p>
               {removeData || !info.dataExists
-                ? "Next Day удалён полностью."
-                : `Программа удалена. Ваши дни остались в ${info.dataDir}, при новой установке всё вернётся.`}
+                ? t("Next Day удалён полностью.", "Next Day is fully removed.")
+                : t(
+                    `Программа удалена. Ваши дни остались в ${info.dataDir}, при новой установке всё вернётся.`,
+                    `The app is removed. Your days stay in ${info.dataDir} and come back when you install again.`,
+                  )}
             </p>
             <div className="setup-foot">
               <span className="grow" />
-              <Button onClick={() => void finish()}>Закрыть</Button>
+              <Button onClick={() => void finish()}>{t("Закрыть", "Close")}</Button>
             </div>
           </div>
         )}
 
         {phase === "error" && (
           <div className="setup-done">
-            <h2 className="setup-error-title">Не получилось</h2>
+            <h2 className="setup-error-title">{t("Не получилось", "Something went wrong")}</h2>
             <p className="setup-error">{error}</p>
             <div className="setup-foot">
               <span className="grow" />
               <Button kind="paper" onClick={() => void invoke("finish")}>
-                Закрыть
+                {t("Закрыть", "Close")}
               </Button>
-              <Button onClick={() => void run()}>Попробовать ещё раз</Button>
+              <Button onClick={() => void run()}>{t("Попробовать ещё раз", "Try again")}</Button>
             </div>
           </div>
         )}

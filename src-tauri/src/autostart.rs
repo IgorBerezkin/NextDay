@@ -66,7 +66,7 @@ mod imp {
         false
     }
     pub fn enable() -> Result<(), String> {
-        Err("Автозапуск сделан только для Windows.".into())
+        Err(tr!("Автозапуск сделан только для Windows.", "Autostart works only on Windows."))
     }
     pub fn disable() -> Result<(), String> {
         Ok(())

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Nav } from "../App";
 import { api, type Goal, type GoalTask, type TaskKind, type Topic } from "../api";
 import { useZoom, ZoomBar, ZoomStage } from "../board/Stage";
+import { t } from "../i18n";
 import { sfx } from "../sound";
 import { Button, Linkify, Progress, toast, toastError } from "../ui/kit";
 import { Px } from "../ui/Px";
@@ -161,13 +162,21 @@ export function MapScreen({ nav, focus }: { nav: Nav; focus?: string }) {
       <div className="screen map-screen empty-map">
         <div className="empty map-empty">
           <Px name="map" scale={5} />
-          <h2 className="empty-title">Карта целей пока пустая</h2>
+          <h2 className="empty-title">{t("Карта целей пока пустая", "The goal map is still empty")}</h2>
           <p>
-            Здесь цель видна как граф: темы и стрелки «что нужно знать до чего». Нажатие на тему показывает её задачи от простых к сложным.
-            Начни с цели, а темы добавишь здесь сам или попросишь ИИ.
+            {t(
+              <>
+                Здесь цель видна как граф: темы и стрелки «что нужно знать до чего». Нажатие на тему показывает её задачи от простых к
+                сложным. Начни с цели, а темы добавишь здесь сам или попросишь ИИ.
+              </>,
+              <>
+                Here a goal shows up as a graph: topics and arrows for "what you need to know before what". Click a topic to see its tasks
+                from simple to hard. Start with a goal, then add topics here yourself or ask AI.
+              </>,
+            )}
           </p>
           <Button kind="paper" icon="flag" onClick={() => nav.go({ name: "goals" })}>
-            К целям
+            {t("К целям", "Go to goals")}
           </Button>
         </div>
       </div>
@@ -271,7 +280,9 @@ function GoalMap({
                       <span>
                         {done}/{p.topic.tasks.length}
                       </span>
-                      {soon && <span className="gnode-soon">{soon.plannedFor === ov.today ? "сегодня" : "завтра"}</span>}
+                      {soon && (
+                        <span className="gnode-soon">{soon.plannedFor === ov.today ? t("сегодня", "today") : t("завтра", "tomorrow")}</span>
+                      )}
                     </span>
                     <span className="gnode-title">{p.topic.title}</span>
                   </button>
@@ -280,7 +291,7 @@ function GoalMap({
               <div className="gnode goal-node" style={{ left: map.goalNode.x, top: map.goalNode.y, width: NODE_W, height: NODE_H }}>
                 <span className="gnode-head">
                   <Px name="sTrophy" scale={1.5} />
-                  <span>цель</span>
+                  <span>{t("цель", "goal")}</span>
                 </span>
                 <span className="gnode-title">{goal.title}</span>
               </div>
@@ -290,7 +301,12 @@ function GoalMap({
         <ZoomBar zoom={zoom} />
         {goal.topics.length === 0 && (
           <div className="map-hint">
-            <p>В цели пока нет тем. Добавь первую тему справа или попроси ИИ разложить цель на темы.</p>
+            <p>
+              {t(
+                "В цели пока нет тем. Добавь первую тему справа или попроси ИИ разложить цель на темы.",
+                "This goal has no topics yet. Add the first topic on the right or ask AI to break the goal into topics.",
+              )}
+            </p>
           </div>
         )}
       </div>
@@ -353,34 +369,49 @@ function GoalSummary({ goal, onNew, onGoal }: { goal: Goal; onNew: () => void; o
   return (
     <section className="map-card">
       <p className="muted">
-        {GOAL_STATUS[goal.status]} · темы {p.topicsDone} из {p.topicsTotal} · задачи {p.tasksDone} из {p.tasksTotal}
+        {t(
+          `${GOAL_STATUS[goal.status]} · темы ${p.topicsDone} из ${p.topicsTotal} · задачи ${p.tasksDone} из ${p.tasksTotal}`,
+          `${GOAL_STATUS[goal.status]} · ${p.topicsDone} of ${p.topicsTotal} topics · ${p.tasksDone} of ${p.tasksTotal} tasks`,
+        )}
       </p>
       <Progress value={p.tasksTotal ? p.tasksDone / p.tasksTotal : 0} />
-      {finish && <p className={`goal-finish${finish.late ? " late" : ""}`}>Прогноз: {finish.text}</p>}
+      {finish && (
+        <p className={`goal-finish${finish.late ? " late" : ""}`}>
+          {t("Прогноз:", "Forecast:")} {finish.text}
+        </p>
+      )}
       <p className="muted map-help">
-        Стрелка ведёт от темы, которую нужно знать, к теме, которой она нужна. Тема открывается, когда пройдены все темы до неё. Нажми на
-        тему, чтобы увидеть её задачи от простых к сложным. Карту можно двигать мышью и приближать колесом с Ctrl.
+        {t(
+          <>
+            Стрелка ведёт от темы, которую нужно знать, к теме, которой она нужна. Тема открывается, когда пройдены все темы до неё. Нажми
+            на тему, чтобы увидеть её задачи от простых к сложным. Карту можно двигать мышью и приближать колесом с Ctrl.
+          </>,
+          <>
+            An arrow goes from a topic you need to know to the topic that needs it. A topic unlocks when all topics before it are done.
+            Click a topic to see its tasks from simple to hard. You can drag the map with the mouse and zoom with Ctrl and the wheel.
+          </>,
+        )}
       </p>
       <ul className="map-legend">
         <li>
-          <i className="lg st-done" /> пройдена
+          <i className="lg st-done" /> {t("пройдена", "done")}
         </li>
         <li>
-          <i className="lg st-going" /> идёт
+          <i className="lg st-going" /> {t("идёт", "in progress")}
         </li>
         <li>
-          <i className="lg st-open" /> открыта
+          <i className="lg st-open" /> {t("открыта", "open")}
         </li>
         <li>
-          <i className="lg st-locked" /> закрыта
+          <i className="lg st-locked" /> {t("закрыта", "locked")}
         </li>
       </ul>
       <div className="map-actions">
         <Button kind="paper" icon="plus" onClick={onNew}>
-          Новая тема
+          {t("Новая тема", "New topic")}
         </Button>
         <Button kind="ghost" icon="flag" onClick={onGoal}>
-          К цели
+          {t("К цели", "Open goal")}
         </Button>
       </div>
     </section>
@@ -413,12 +444,15 @@ function TopicPanel({
   const waiting = before.filter((t) => topicState(goal, t) !== "done");
   const stateText =
     state === "done"
-      ? "Тема пройдена."
+      ? t("Тема пройдена.", "Topic done.")
       : state === "locked"
-        ? `Тема закрыта: сначала ${waiting.map((t) => `«${t.title}»`).join(", ")}.`
+        ? t(
+            `Тема закрыта: сначала ${waiting.map((w) => `«${w.title}»`).join(", ")}.`,
+            `Topic locked: finish ${waiting.map((w) => `"${w.title}"`).join(", ")} first.`,
+          )
         : state === "going"
-          ? "Тема идёт."
-          : "Тема открыта: её задачи попадут в план по очереди.";
+          ? t("Тема идёт.", "Topic in progress.")
+          : t("Тема открыта: её задачи попадут в план по очереди.", "Topic open: its tasks go into your plan one by one.");
   return (
     <section className="map-card">
       <h2 className="map-card-title">
@@ -427,7 +461,7 @@ function TopicPanel({
       <p className={`topic-state st-${state}`}>{stateText}</p>
       {before.length > 0 && (
         <div className="map-links">
-          <span className="muted">Нужно знать до неё:</span>
+          <span className="muted">{t("Нужно знать до неё:", "Needs first:")}</span>
           {before.map((t) => (
             <button key={t.id} className="map-link" onClick={() => onPick(t.id)}>
               <Px name="arrowL" scale={1.5} /> {t.title}
@@ -437,7 +471,7 @@ function TopicPanel({
       )}
       {after.length > 0 && (
         <div className="map-links">
-          <span className="muted">Открывает:</span>
+          <span className="muted">{t("Открывает:", "Unlocks:")}</span>
           {after.map((t) => (
             <button key={t.id} className="map-link" onClick={() => onPick(t.id)}>
               <Px name="arrowR" scale={1.5} /> {t.title}
@@ -450,9 +484,9 @@ function TopicPanel({
           <Linkify text={topic.note} />
         </blockquote>
       )}
-      <h3 className="topic-tasks-title">Задачи от простых к сложным</h3>
+      <h3 className="topic-tasks-title">{t("Задачи от простых к сложным", "Tasks from simple to hard")}</h3>
       {topic.tasks.length === 0 ? (
-        <p className="muted">Задач пока нет.</p>
+        <p className="muted">{t("Задач пока нет.", "No tasks yet.")}</p>
       ) : (
         <ol className="topic-tasks">
           {topic.tasks.map((t, i) => (
@@ -471,7 +505,7 @@ function TopicPanel({
       )}
       <div className="map-actions">
         <Button kind="paper" small icon="pencil" onClick={onEdit}>
-          Изменить тему
+          {t("Изменить тему", "Edit topic")}
         </Button>
       </div>
     </section>
@@ -505,12 +539,12 @@ function TaskRow({
     if (withResult) {
       const h = parseHours(time);
       if (h !== null && (isNaN(h) || h <= 0 || h > 24)) {
-        toast("Время укажи числом часов, например 1,5 или 90м.", "error");
+        toast(t("Время укажи числом часов, например 1,5 или 90м.", "Enter the time in hours, like 1.5 or 90m."), "error");
         return;
       }
       const sc = score.trim() === "" ? null : Number(score);
       if (sc !== null && (!Number.isInteger(sc) || sc < 0 || sc > 100)) {
-        toast("Балл должен быть целым числом от 0 до 100.", "error");
+        toast(t("Балл должен быть целым числом от 0 до 100.", "The score must be a whole number from 0 to 100."), "error");
         return;
       }
       result = { minutes: h === null ? null : Math.round(h * 60), score: sc, note: note.trim() || null };
@@ -528,9 +562,9 @@ function TaskRow({
   const r = task.result;
   const line = r
     ? [
-        r.score != null ? `балл ${r.score}` : "",
-        r.minutes != null ? `ушло ${mins(r.minutes)}` : "",
-        r.confidence != null ? `уверенность ${r.confidence} из 5` : "",
+        r.score != null ? t(`балл ${r.score}`, `score ${r.score}`) : "",
+        r.minutes != null ? t(`ушло ${mins(r.minutes)}`, `took ${mins(r.minutes)}`) : "",
+        r.confidence != null ? t(`уверенность ${r.confidence} из 5`, `confidence ${r.confidence} of 5`) : "",
       ]
         .filter(Boolean)
         .join(", ")
@@ -546,7 +580,7 @@ function TaskRow({
           <span className="ttask-sub">
             {KIND[task.kind]}
             {task.minutes != null && <> · {mins(task.minutes)}</>}
-            {r?.score != null && <> · балл {r.score}</>}
+            {r?.score != null && <> · {t(`балл ${r.score}`, `score ${r.score}`)}</>}
           </span>
         </span>
         {when && <span className={`ttask-when w-${task.status}`}>{when}</span>}
@@ -555,12 +589,12 @@ function TaskRow({
         <div className="ttask-body">
           {task.doneWhen && (
             <p>
-              <b>Готово, если:</b> <Linkify text={task.doneWhen} />
+              <b>{t("Готово, если:", "Done when:")}</b> <Linkify text={task.doneWhen} />
             </p>
           )}
           {r && (line || r.note) && (
             <p className="route-result">
-              <b>Итог{r.by === "ai" ? " от ИИ" : ""}:</b> {line}
+              <b>{t(`Итог${r.by === "ai" ? " от ИИ" : ""}:`, `Result${r.by === "ai" ? " by AI" : ""}:`)}</b> {line}
               {r.note && (
                 <>
                   {line ? ". " : ""}
@@ -574,37 +608,43 @@ function TaskRow({
               className="field short"
               value={time}
               maxLength={6}
-              placeholder="ч"
-              title="Сколько ушло времени"
+              placeholder={t("ч", "h")}
+              title={t("Сколько ушло времени", "How long it took")}
               onChange={(e) => setTime(e.target.value)}
             />
             <input
               className="field short"
               value={score}
               maxLength={3}
-              placeholder="балл"
-              title="Балл от 0 до 100"
+              placeholder={t("балл", "score")}
+              title={t("Балл от 0 до 100", "Score from 0 to 100")}
               onChange={(e) => setScore(e.target.value)}
             />
-            <input className="field grow" value={note} maxLength={2000} placeholder="Заметка" onChange={(e) => setNote(e.target.value)} />
+            <input
+              className="field grow"
+              value={note}
+              maxLength={2000}
+              placeholder={t("Заметка", "Note")}
+              onChange={(e) => setNote(e.target.value)}
+            />
           </div>
           <div className="ttask-actions">
             {task.status !== "done" && (
               <Button kind="green" small icon="check" disabled={busy} onClick={() => void record("done", true)}>
-                Сделано
+                {t("Сделано", "Done")}
               </Button>
             )}
             <Button kind="paper" small disabled={busy} onClick={() => void record(null, true)}>
-              Записать итог
+              {t("Записать итог", "Save result")}
             </Button>
             {task.status !== "skipped" && task.status !== "done" && (
               <Button kind="ghost" small disabled={busy} onClick={() => void record("skipped", false)}>
-                Пропустить
+                {t("Пропустить", "Skip")}
               </Button>
             )}
             {(task.status === "done" || task.status === "skipped") && (
               <Button kind="ghost" small icon="undo" disabled={busy} onClick={() => void record("todo", false)}>
-                Вернуть
+                {t("Вернуть", "Reopen")}
               </Button>
             )}
           </div>
@@ -661,11 +701,11 @@ function TopicEditor({
 
   const save = async () => {
     if (!title.trim()) {
-      toast("Дай теме название.", "error");
+      toast(t("Дай теме название.", "Give the topic a name."), "error");
       return;
     }
     if (rows.some((r) => r.minutes.trim() && !(Number(r.minutes) > 0 && Number(r.minutes) <= 960))) {
-      toast("Минуты у задачи: целое число от 1 до 960.", "error");
+      toast(t("Минуты у задачи: целое число от 1 до 960.", "Task minutes: a whole number from 1 to 960."), "error");
       return;
     }
     const id = topic?.id ?? `t${uid()}`;
@@ -707,39 +747,41 @@ function TopicEditor({
 
   return (
     <section className="map-card topic-editor">
-      <h2 className="map-card-title">{topic ? "Изменить тему" : "Новая тема"}</h2>
+      <h2 className="map-card-title">{topic ? t("Изменить тему", "Edit topic") : t("Новая тема", "New topic")}</h2>
       <label className="ge-field">
-        <span>Название</span>
+        <span>{t("Название", "Name")}</span>
         <input
           className="field"
           autoFocus
           maxLength={120}
           value={title}
-          placeholder="Например: линейная алгебра"
+          placeholder={t("Например: линейная алгебра", "For example: linear algebra")}
           onChange={(e) => setTitle(e.target.value)}
         />
       </label>
       <label className="ge-field">
-        <span>Материалы и подсказки</span>
+        <span>{t("Материалы и подсказки", "Materials and hints")}</span>
         <textarea className="field area" rows={2} maxLength={4000} value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
       {others.length > 0 && (
         <div className="ge-field">
-          <span>Нужно знать до неё</span>
+          <span>{t("Нужно знать до неё", "Needs first")}</span>
           <div className="req-list">
-            {others.map((t) => {
-              const on = requires.includes(t.id);
-              const off = blocked.has(t.id);
+            {others.map((other) => {
+              const on = requires.includes(other.id);
+              const off = blocked.has(other.id);
               return (
                 <button
-                  key={t.id}
+                  key={other.id}
                   className={`req-chip${on ? " on" : ""}`}
                   disabled={off}
-                  title={off ? "Эта тема сама зависит от редактируемой" : undefined}
-                  onClick={() => setRequires((rs) => (rs.includes(t.id) ? rs.filter((x) => x !== t.id) : [...rs, t.id]))}
+                  title={
+                    off ? t("Эта тема сама зависит от редактируемой", "This topic itself depends on the one you are editing") : undefined
+                  }
+                  onClick={() => setRequires((rs) => (rs.includes(other.id) ? rs.filter((x) => x !== other.id) : [...rs, other.id]))}
                 >
                   {on && <Px name="check" scale={1} />}
-                  {t.title}
+                  {other.title}
                 </button>
               );
             })}
@@ -747,7 +789,7 @@ function TopicEditor({
         </div>
       )}
       <div className="ge-field">
-        <span>Задачи от простых к сложным</span>
+        <span>{t("Задачи от простых к сложным", "Tasks from simple to hard")}</span>
         <ol className="edit-tasks">
           {rows.map((r, i) => (
             <li key={r.key} className={r.done ? "done" : ""}>
@@ -758,14 +800,14 @@ function TopicEditor({
                   maxLength={300}
                   value={r.text}
                   readOnly={r.done}
-                  placeholder="Задача"
+                  placeholder={t("Задача", "Task")}
                   onChange={(e) => upd(r.key, { text: e.target.value })}
                 />
                 <input
                   className="field short"
                   maxLength={3}
                   value={r.minutes}
-                  placeholder="мин"
+                  placeholder={t("мин", "min")}
                   onChange={(e) => upd(r.key, { minutes: e.target.value.replace(/\D/g, "") })}
                 />
               </div>
@@ -781,18 +823,28 @@ function TopicEditor({
                   className="field grow"
                   maxLength={300}
                   value={r.doneWhen}
-                  placeholder="Готово, если…"
+                  placeholder={t("Готово, если…", "Done when...")}
                   onChange={(e) => upd(r.key, { doneWhen: e.target.value })}
                 />
-                <button className="icon-btn up" title="Проще: выше в списке" disabled={i === 0} onClick={() => move(i, -1)}>
+                <button
+                  className="icon-btn up"
+                  title={t("Проще: выше в списке", "Simpler: move up")}
+                  disabled={i === 0}
+                  onClick={() => move(i, -1)}
+                >
                   <Px name="arrowL" scale={1.5} />
                 </button>
-                <button className="icon-btn up" title="Сложнее: ниже в списке" disabled={i === rows.length - 1} onClick={() => move(i, 1)}>
+                <button
+                  className="icon-btn up"
+                  title={t("Сложнее: ниже в списке", "Harder: move down")}
+                  disabled={i === rows.length - 1}
+                  onClick={() => move(i, 1)}
+                >
                   <Px name="arrowR" scale={1.5} />
                 </button>
                 <button
                   className="icon-btn"
-                  title={r.done ? "Сделанную задачу не удалить" : "Удалить задачу"}
+                  title={r.done ? t("Сделанную задачу не удалить", "A done task can't be deleted") : t("Удалить задачу", "Delete task")}
                   disabled={r.done}
                   onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}
                 >
@@ -809,24 +861,24 @@ function TopicEditor({
           disabled={rows.length >= 30}
           onClick={() => setRows((rs) => [...rs, { key: uid(), text: "", minutes: "", kind: "learn", doneWhen: "", done: false }])}
         >
-          Задача
+          {t("Задача", "Task")}
         </Button>
       </div>
       <div className="map-actions">
         <Button kind="green" icon="check" disabled={busy} onClick={() => void save()}>
-          Сохранить
+          {t("Сохранить", "Save")}
         </Button>
         <Button kind="ghost" onClick={onCancel}>
-          Отмена
+          {t("Отмена", "Cancel")}
         </Button>
         <span className="grow" />
         {topic &&
           (confirm ? (
             <Button kind="danger" small icon="trash" onClick={() => void remove()}>
-              Точно удалить
+              {t("Точно удалить", "Really delete")}
             </Button>
           ) : (
-            <Button kind="ghost" small icon="trash" title="Удалить тему" onClick={() => setConfirm(true)} />
+            <Button kind="ghost" small icon="trash" title={t("Удалить тему", "Delete topic")} onClick={() => setConfirm(true)} />
           ))}
       </div>
     </section>

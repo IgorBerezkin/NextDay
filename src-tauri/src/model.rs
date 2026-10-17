@@ -128,6 +128,7 @@ pub struct Settings {
     pub auto_update: bool,
     pub task_alerts: bool,
     pub mcp_enabled: bool,
+    pub language: String,
 }
 
 impl Default for Settings {
@@ -145,6 +146,7 @@ impl Default for Settings {
             auto_update: true,
             task_alerts: true,
             mcp_enabled: false,
+            language: crate::i18n::system(),
         }
     }
 }
