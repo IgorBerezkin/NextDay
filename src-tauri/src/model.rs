@@ -128,6 +128,7 @@ pub struct Settings {
     pub auto_update: bool,
     pub task_alerts: bool,
     pub mcp_enabled: bool,
+    #[serde(default)]
     pub language: String,
 }
 

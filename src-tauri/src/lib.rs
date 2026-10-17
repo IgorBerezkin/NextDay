@@ -294,6 +294,7 @@ pub fn run() {
             }
             let dir = data_dir(app)?;
             let store = store::Store::open(dir.clone())?;
+            store.pin_language()?;
             i18n::set(&store.load_settings().language);
             if !store.settings_exist() {
                 let s = model::Settings::default();

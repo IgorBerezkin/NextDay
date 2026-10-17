@@ -189,11 +189,26 @@ impl Store {
     }
 
     pub fn load_settings(&self) -> Settings {
-        read_json(&self.dir.join("settings.json")).unwrap_or_default()
+        let mut s: Settings = read_json(&self.dir.join("settings.json")).unwrap_or_default();
+        if s.language.is_empty() {
+            s.language = if self.has_days() { "ru".into() } else { crate::i18n::system() };
+        }
+        s
     }
 
     pub fn save_settings(&self, s: &Settings) -> Result<(), String> {
         write_json(&self.dir.join("settings.json"), s)
+    }
+
+    pub fn pin_language(&self) -> Result<(), String> {
+        match read_json::<Value>(&self.dir.join("settings.json")) {
+            Some(v) if v.get("language").is_none() => self.save_settings(&self.load_settings()),
+            _ => Ok(()),
+        }
+    }
+
+    fn has_days(&self) -> bool {
+        fs::read_dir(self.dir.join("days")).is_ok_and(|mut d| d.next().is_some())
     }
 
     pub fn load_notify(&self) -> NotifyState {

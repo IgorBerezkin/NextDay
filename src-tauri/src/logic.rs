@@ -706,6 +706,19 @@ mod tests {
     }
 
     #[test]
+    fn old_installs_keep_russian() {
+        let dir = std::env::temp_dir().join(format!("nextday-test-lang-{}", uid()));
+        let s = Store::open(dir.clone()).unwrap();
+        std::fs::write(dir.join("settings.json"), r#"{"autostartWanted": false}"#).unwrap();
+        assert_eq!(s.load_settings().language, crate::i18n::system());
+        save_plan(&s, at("2026-10-06T21:00:00"), "2026-10-07", plan("День", &[("a", None)])).unwrap();
+        assert_eq!(s.load_settings().language, "ru");
+        s.pin_language().unwrap();
+        let saved: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join("settings.json")).unwrap()).unwrap();
+        assert_eq!((saved["language"].as_str(), saved["autostartWanted"].as_bool()), (Some("ru"), Some(false)));
+    }
+
+    #[test]
     fn tasks_link_to_earlier_days() {
         let s = tmp_store("links");
         let d = save_plan(&s, at("2026-10-06T21:00:00"), "2026-10-07", plan("Первый", &[("Пример 1", None)])).unwrap();
